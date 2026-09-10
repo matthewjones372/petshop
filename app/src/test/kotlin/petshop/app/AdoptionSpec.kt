@@ -2,7 +2,9 @@ package petshop.app
 
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.render
+import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.subgraph
+import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.parMap
 import io.kotest.assertions.withClue
@@ -12,7 +14,7 @@ import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.PetId
 import petshop.domain.PetShop
-import java.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The shop under test, and nothing else: no port bound, no documents served, and no arrivals turning
@@ -51,11 +53,23 @@ class AdoptionSpec {
 class SettingsSpec {
 
     @Test
+    fun `a test changes one setting and the file keeps the rest`() {
+        val faster = petshop.subgraph<Settings>().overridingConfig("petshop.arrivalsEvery = 1s")
+
+        val read = testApp(faster) { settings: Settings -> settings }
+
+        read.arrivalsEvery shouldBe 1.seconds
+        withClue("the port was never restated, and came from application.conf") {
+            read.port shouldBe 8080
+        }
+    }
+
+    @Test
     fun `the settings come from the file rather than a default`() {
         val read = testApp(petshop.subgraph<Settings>()) { settings: Settings -> settings }
 
         read.port shouldBe 8080
-        read.arrivalsEvery shouldBe Duration.ofSeconds(5)
+        read.arrivalsEvery shouldBe 5.seconds
     }
 
     @Test

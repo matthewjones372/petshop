@@ -14,7 +14,6 @@ import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.Species
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.time.toKotlinDuration
 
 /** The background work every service has one of: new pets keep turning up. */
 class Arrivals internal constructor()
@@ -29,7 +28,7 @@ private val names = listOf("Pickle", "Waffle", "Sprocket", "Marmalade", "Biscuit
 val arrivals: Module =
     single { ref: ActorRef<Shop>, config: Settings, system: ActorSystem ->
         val next = AtomicLong(opening.size.toLong())
-        Stream.tick(every = config.arrivalsEvery.toKotlinDuration(), element = Unit)
+        Stream.tick(every = config.arrivalsEvery, element = Unit)
             .map { _ ->
                 val id = next.incrementAndGet()
                 Pet(PetId(id), names[(id % names.size).toInt()], Species.entries[(id % 4).toInt()])

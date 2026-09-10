@@ -1,8 +1,6 @@
 package petshop.app
 
 import arrow.core.Either
-import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory
 import io.github.matthewjones372.lark.app.Health
 import io.github.matthewjones372.lark.app.HealthRegistry
 import io.github.matthewjones372.lark.app.Module
@@ -17,7 +15,8 @@ import io.github.matthewjones372.lark.otel.tracedSpan
 import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.github.matthewjones372.lark.app.pekko.actor
-import io.github.matthewjones372.lark.app.typesafe.configured
+import io.github.matthewjones372.lark.app.typesafe.config
+import io.github.matthewjones372.lark.app.typesafe.loadedConfig
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pekko.PelicanServer
@@ -31,7 +30,7 @@ import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.PetShopError
 import petshop.domain.Species
-import java.time.Duration
+import kotlin.time.Duration
 import org.apache.pekko.actor.typed.ActorSystem as TypedSystem
 import kotlin.time.Duration.Companion.seconds
 
@@ -72,8 +71,7 @@ class ActorPetShop(
 private val asking = 3.seconds
 
 private val settings: Module =
-    single<Config> { ConfigFactory.load() } +
-        configured("petshop") { Settings(int("port"), of(Duration.ofSeconds(5)) { getDuration("arrivalsEvery") }) }
+    loadedConfig() + config<Settings>("petshop") { Settings(int("port"), duration("arrivalsEvery")) }
 
 private val telemetry: Module =
     singleOf<OpenTelemetrySdk>({ OpenTelemetrySdk.builder().build() }, { sdk -> sdk.close() }) +

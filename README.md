@@ -60,6 +60,30 @@ val petshop: Module = settings + theShop + arrivals + web
 `main` is four lines. The load test starts the same value in its own process,
 runs two thousand requests through it, and gets the port back afterwards.
 
+## What a test looks like
+
+```kotlin
+// twenty adopters, one tortoise, no port bound and no arrivals turning up mid-assertion
+testApp(petshop.subgraph<PetShop>()) { shop: PetShop ->
+    parMap((1..20).toList()) { who -> shop.adopt(PetId(1), by = "adopter $who") }
+}.count { it.isRight() } shouldBe 1
+
+// one setting changed; application.conf keeps the rest
+testApp(petshop.subgraph<Settings>().overridingConfig("petshop.arrivalsEvery = 1s")) { it }
+```
+
+and what the load test asks:
+
+```kotlin
+// adopt the tortoise, then have two hundred a second try to adopt it again.
+// every one must be told it is gone: a 200 in there is two people sold one pet.
+exec(adoptTaken, api.post("/pets/1/adoption").expecting(409))
+```
+
+That last one is a **correctness** claim checked under load rather than a
+latency one, and it is the thing this stack can say that none of the three
+libraries could say alone.
+
 ## Does it help?
 
 ### Pelican: yes, clearly
