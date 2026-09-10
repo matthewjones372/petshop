@@ -1,0 +1,40 @@
+package petshop.api
+
+import io.github.matthewjones372.pelican.div
+import io.github.matthewjones372.pelican.endpoint
+import io.github.matthewjones372.pelican.errorJson
+import io.github.matthewjones372.pelican.json
+import io.github.matthewjones372.pelican.orFail
+import io.github.matthewjones372.pelican.pathParam
+import petshop.domain.AlreadyAdopted
+import petshop.domain.NoSuchPet
+import petshop.domain.Pet
+
+/**
+ * What the shop's HTTP contract is, as values. The server routes, the OpenAPI document and the typed
+ * client all come from these; there is no second description of any of it.
+ */
+val petId = pathParam<Long>("petId", description = "The pet's id")
+
+/** The two ways a request about a pet can fail, each with the status the document publishes. */
+val petMissing = errorJson<NoSuchPet>(404, "No pet with that id")
+
+val petTaken = errorJson<AlreadyAdopted>(409, "That pet has already been adopted")
+
+val listPets = endpoint {
+    get("pets")
+    summary = "Every pet in the shop"
+    json<List<Pet>>()
+}
+
+val getPet = endpoint(petId) {
+    get("pets" / petId)
+    summary = "One pet"
+    json<Pet>() orFail petMissing
+}
+
+val adoptPet = endpoint(petId) {
+    post("pets" / petId / "adoption")
+    summary = "Take a pet home"
+    json<Pet>().orFail(petMissing, petTaken)
+}
