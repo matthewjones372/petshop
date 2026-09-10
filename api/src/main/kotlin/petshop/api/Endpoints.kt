@@ -21,6 +21,15 @@ val petMissing = errorJson<NoSuchPet>(404, "No pet with that id")
 
 val petTaken = errorJson<AlreadyAdopted>(409, "That pet has already been adopted")
 
+/** What the shop says when asked whether it can serve. */
+data class Healthy(val ready: Boolean, val failing: List<String>)
+
+val health = endpoint {
+    get("health")
+    summary = "Whether the shop can serve"
+    json<Healthy>()
+}
+
 val listPets = endpoint {
     get("pets")
     summary = "Every pet in the shop"

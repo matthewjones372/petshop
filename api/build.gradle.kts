@@ -14,4 +14,5 @@ dependencies {
     api("org.apache.pekko:pekko-http_2.13:1.3.0")
 
     testImplementation("io.github.matthewjones372:pelican-test:$pelicanVersion")
+    testImplementation("io.github.matthewjones372:pelican-test-pekko:$pelicanVersion")
 }
