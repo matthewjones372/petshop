@@ -5,17 +5,19 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.probe
+import arrow.core.Option
+import io.github.matthewjones372.lark.app.boundTo
+import io.github.matthewjones372.lark.app.pekko.ask
 import io.github.matthewjones372.lark.app.single
+import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.pekko.actor
 import io.github.matthewjones372.lark.app.typesafe.configured
-import io.github.matthewjones372.lark.pekko.await
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.javadsl.Adapter
-import org.apache.pekko.actor.typed.javadsl.AskPattern
 import petshop.api.petshopApi
 import petshop.domain.Pet
 import petshop.domain.PetId
@@ -41,19 +43,17 @@ class ActorPetShop(
     private val system: ActorSystem,
 ) : PetShop {
 
-    private val asking = Duration.ofSeconds(3)
-
-    private fun scheduler() = Adapter.toTyped(system).scheduler()
-
-    override fun all(): List<Pet> =
-        AskPattern.ask(ref, { replyTo -> Everything(replyTo) }, asking, scheduler()).await()
+    override fun all(): List<Pet> = ref.ask(system, asking) { replyTo -> Everything(replyTo) }
 
     override fun find(id: PetId): Pet? =
-        AskPattern.ask(ref, { replyTo -> Find(id, replyTo) }, asking, scheduler()).await().fold({ null }, { pet -> pet })
+        ref.ask(system, asking) { replyTo: ActorRef<Option<Pet>> -> Find(id, replyTo) }
+            .fold({ null }, { pet -> pet })
 
     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> =
-        AskPattern.ask(ref, { replyTo -> Adopt(id, by, replyTo) }, asking, scheduler()).await()
+        ref.ask(system, asking) { replyTo -> Adopt(id, by, replyTo) }
 }
+
+private val asking = 3.seconds
 
 private val settings: Module =
     single<Config> { ConfigFactory.load() } +
@@ -67,7 +67,7 @@ private val theShop: Module =
     // the one Pelican binds a port with.
     single<TypedSystem<Void>, ActorSystem> { classic -> Adapter.toTyped(classic) } +
         actor("shop") { _: Settings -> shop(opening.associateBy { it.id }) } +
-        single { ref: ActorRef<Shop>, system: ActorSystem -> ActorPetShop(ref, system) as PetShop }
+        singleOf(::ActorPetShop).boundTo<PetShop>()
             .probe("shop", timeout = 3.seconds) { shop: PetShop -> shop.all().isNotEmpty() }
 
 private val web: Module =

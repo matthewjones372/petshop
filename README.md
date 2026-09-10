@@ -83,15 +83,30 @@ after — that test is the best thing in this repository and it is not writable
 without something that owns start-up and shutdown. And `probe` means the shop
 answers `/pets` before anything is told it is ready.
 
-**It did not make the wiring shorter.** `app/Wiring.kt` is about ninety lines to
-describe eight nodes. Written by hand in `main` it would be about sixty. What
-the extra thirty buy is release, ordering and the in-process load test; if a
-service does not want those, they are thirty lines for nothing.
+**It did not make the wiring shorter, and `singleOf` did not change that.**
+`app/Wiring.kt` is 84 lines for eight nodes; by hand in `main` it would be
+about sixty.
 
-**One papercut, three times.** `single<Type> { dependency: Other -> … }` does not
-compile: with one type argument given, the overload that takes a dependency
-cannot apply, so it has to be `single<Type, Other> { … }`. It caught me in the
-wiring here and twice before that.
+`singleOf(::Thing)` and `boundTo<Interface>()` were added to Lark after this
+repository was first written, precisely because two services had come out
+longer. Rewriting the wiring with them moved it by **nothing**: eleven lines
+added, eleven removed.
+
+The reason is worth having. `singleOf` reads a key and its dependencies off a
+constructor reference, which shortens a node that is a plain constructor call —
+and **one of the eight nodes here is one**. The rest are a resource with a
+release, a factory, an adapter between two Pekko systems, a stream being run,
+and a config section: none is a constructor, and none gets shorter. A service's
+wiring turns out to be mostly not constructor-shaped.
+
+`ask` did help, for a different reason: it removed the
+`Adapter.toTyped(system).scheduler()` line that each of three calls needed. That
+is boilerplate deleted rather than a node made shorter.
+
+**The papercut is fixed.** `single<Type> { dependency: Other -> … }` does not
+compile — Kotlin has no partial type-argument inference — and it caught me three
+times in three codebases. `singleOf(::Thing).boundTo<Interface>()` never gives a
+type argument beside a dependency, so it has nowhere to happen.
 
 **`lark-stream` and `lark-app-pekko` were unremarkable**, which is the compliment.
 Six lines each and nothing surprising.
@@ -120,7 +135,12 @@ what found it.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.1.0`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
+Pelican `1.0.0-RC1`, Lark `0.1.1-SNAPSHOT`, Proofload `0.1.0-rc4`, Kotlin 2.4.10,
+JDK 21.
+
+Lark is a snapshot because `singleOf`, `boundTo` and `ask` were written for this
+repository and are not in `0.1.0`. `./gradlew publishToMavenLocal` in Lark's
+checkout installs it.
 
 All three are early. Lark says so on its own front page, and this repository is
 the first thing to use it for anything.

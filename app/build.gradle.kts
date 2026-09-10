@@ -2,7 +2,7 @@ plugins { application }
 
 application { mainClass.set("petshop.app.MainKt") }
 
-val larkVersion = "0.1.0"
+val larkVersion = "0.1.1-SNAPSHOT"
 
 dependencies {
     api(project(":api"))
