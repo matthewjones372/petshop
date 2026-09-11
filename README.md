@@ -204,11 +204,28 @@ so the underline is opt-in per developer. And a module arriving from another
 Gradle module has no source to read, so a graph assembled across modules is one
 the editor stays quiet about — this one is not, but a larger service would be.
 
-`larkWiring` is still the gate. It runs the graph, so it sees what no reader of
-source can, and it catches the case the compiler misses: a dependency added in
-`Arrivals.kt` alone does not recompile `Wiring.kt`, so an incremental
-`compileKotlin` says nothing and `./gradlew build` still fails. The compiler
-plugin buys earliness, not correctness.
+The third limit is the one that decides how much of this is real, and it is
+easiest to see by breaking the graph twice. On a full compile the error above is
+what arrives. On an **incremental** one, this does:
+
+```
+w: .../Wiring.kt:119:1 lark-app: this graph was not read here, and is checked by larkWiring alone: petshop/app/arrivals, which has no source here
+```
+
+An incremental compilation re-parses only what changed; everything else arrives
+as symbols from the last compilation's class files, and a class file has no
+initialiser to read. So a graph spread over more than one file is usually one
+the compiler plugin declines, and it declines out loud rather than reporting a
+sound graph. In the editor this does not arise — analysis there is always from
+current sources, which is why the underline is reliable exactly where it was
+wanted.
+
+`larkWiring` is the gate, then, and not a formality. It runs the graph, so it
+sees what no reader of source can, it is unaffected by any of the above, and in
+the incremental case it is the only thing that catches the fault at all —
+naming, in this one, both `Wiring.kt:92` and `Arrivals.kt:29`, which is better
+than the compiler plugin manages even when it does read the graph. The plugin
+buys earliness where it can get it. It buys no correctness, and is not asked to.
 
 ### Proofload: yes, and it was the least work
 
