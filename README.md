@@ -124,10 +124,10 @@ and only running it found the bug. `ask` binds its reply to `Any`, so the code
 that did it no longer compiles, and a does-not-compile fixture in Lark holds
 that.
 
-**The wiring is checked on every build.** `larkWiring` walks the graph on
-`check`: a missing key fails the build and names the recipe that asked for it,
-with the file and line it was written on. A dependency nothing provides is a red
-build rather than a start-up that dies in staging.
+**The wiring is checked as the code compiles.** A missing key is a compiler
+error on the recipe that asked for it, and a red underline in the editor before
+any build is run. A dependency nothing provides cannot reach staging, or a
+commit.
 
 **A dependency nothing reads cannot hide.** The actor took a `Settings` it never
 looked at, and `render()` drew that edge as though it were real. A test asserts
@@ -156,8 +156,8 @@ does not delete code. It makes a set of mistakes impossible.
 
 ### The wiring check: cheap, and it found nothing here
 
-`lark-app-gradle` checks every graph in the project on `check` and draws each
-one. Applying it is one line in `app/build.gradle.kts`; declaring the
+`lark-app-gradle` checks every graph in the project as it compiles and draws
+each one. Applying it is one line in `app/build.gradle.kts`; declaring the
 application as a value so the check knows the root it starts from is ten more
 in `Wiring.kt`, and it takes seven out of `Main.kt`, which is now six lines
 including imports. Call it **net ten lines** for a gate that runs on every
@@ -177,18 +177,38 @@ which is the native encoding when a build redirects the stream, and
 tool against a real service finds.
 
 **The report names the line**, which is the part that matters day to day.
-Deleting `telemetry` from the graph to see what it says:
+Commenting out the actor to see what it says:
 
 ```
-lark-app wiring
-
-❯ error: missing Tracer
-❯     for PetShop                 Wiring.kt:180
+e: .../petshop/app/src/main/kotlin/petshop/app/Wiring.kt:92:9 lark-app: PetShop needs ActorRef<Shop>, and nothing builds it
+e: .../petshop/app/src/main/kotlin/petshop/app/Arrivals.kt:29:1 lark-app: Arrivals needs ActorRef<Shop>, and nothing builds it
 ```
 
-Not a compile error — the graph is an expression, so nothing reads it until
-something runs it. It is a failed `./gradlew build` with a line the IDE
-hyperlinks, which is most of what a compile error was wanted for.
+`Wiring.kt:92` is the `singleOf(::ActorPetShop)` that asked. Since Lark `0.2.0`
+that is also a compiler error and a red underline on that call, which is what
+the last version of this paragraph said could not be had: a module is an
+expression, and nothing reads an expression until something runs it.
+
+What changed is that a second thing now reads it — `lark-app-compiler`, a K2
+checker that reconstructs the graph from the compiler's own syntax tree. It
+follows `single`, `singleOf`, `actor`, `config`, `+`, `boundTo`, names in the
+same file and the branches of a `when`, and abandons an application entirely on
+anything else, on the grounds that a red line under working code is worse than a
+fault found a moment later.
+
+This graph is one it can read: all ten keys, the same ten `render()` draws.
+Two limits are worth knowing before expecting it everywhere. IntelliJ runs no
+third-party compiler plugin in the editor until
+`kotlin.k2.only.bundled.compiler.plugins.enabled` is unchecked in the registry,
+so the underline is opt-in per developer. And a module arriving from another
+Gradle module has no source to read, so a graph assembled across modules is one
+the editor stays quiet about — this one is not, but a larger service would be.
+
+`larkWiring` is still the gate. It runs the graph, so it sees what no reader of
+source can, and it catches the case the compiler misses: a dependency added in
+`Arrivals.kt` alone does not recompile `Wiring.kt`, so an incremental
+`compileKotlin` says nothing and `./gradlew build` still fails. The compiler
+plugin buys earliness, not correctness.
 
 ### Proofload: yes, and it was the least work
 
@@ -214,10 +234,13 @@ what found it.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.1.2`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
+Pelican `1.0.0-RC1`, Lark `0.2.0`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
 
-`singleOf`, `boundTo`, `ask`, `config<T>` and the wiring check were all written
-while this repository was being built, which is what it is for.
+`singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler
+plugin that reports it as you type were all written while this repository was
+being built, which is what it is for. This graph is what the compiler plugin was
+developed against, and finding that it read all ten keys and named the same
+missing one the running check names is what said it worked.
 
 All three are early. Lark says so on its own front page, and this repository is
 the first thing to use it for anything.
