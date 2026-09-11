@@ -1,12 +1,12 @@
 plugins {
     application
     // Checks every graph in this project on `check`, and renders each one.
-    id("io.github.matthewjones372.lark.wiring") version "0.1.1-SNAPSHOT"
+    id("io.github.matthewjones372.lark.wiring") version "0.1.1"
 }
 
 application { mainClass.set("petshop.app.MainKt") }
 
-val larkVersion = "0.1.1-SNAPSHOT"
+val larkVersion = "0.1.1"
 
 dependencies {
     api(project(":api"))
