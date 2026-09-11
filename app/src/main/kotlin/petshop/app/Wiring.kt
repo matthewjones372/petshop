@@ -1,8 +1,10 @@
 package petshop.app
 
 import arrow.core.Either
+import io.github.matthewjones372.lark.app.AppScope
 import io.github.matthewjones372.lark.app.Health
 import io.github.matthewjones372.lark.app.HealthRegistry
+import io.github.matthewjones372.lark.app.LarkApp
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.probe
 import arrow.core.Option
@@ -30,6 +32,7 @@ import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.PetShopError
 import petshop.domain.Species
+import kotlin.reflect.typeOf
 import kotlin.time.Duration
 import org.apache.pekko.actor.typed.ActorSystem as TypedSystem
 import kotlin.time.Duration.Companion.seconds
@@ -75,15 +78,16 @@ private val settings: Module =
 
 private val telemetry: Module =
     singleOf<OpenTelemetrySdk>({ OpenTelemetrySdk.builder().build() }, { sdk -> sdk.close() }) +
-        // The type argument is written out because `getTracer` is Java: without it the key is the
-        // platform type `Tracer!`, which nothing asking for a `Tracer` ever matches.
-        single<Tracer, OpenTelemetrySdk> { sdk -> sdk.getTracer("petshop") }
+        // boundTo rather than a type argument: `getTracer` is Java, so the inferred key is the
+        // platform type `Tracer!` that nothing matches — and naming the key as a type argument would
+        // force naming the dependency as one too.
+        single { sdk: OpenTelemetrySdk -> sdk.getTracer("petshop") }.boundTo<Tracer>()
 
 private val theShop: Module =
     singleOf<ActorSystem>({ ActorSystem.create("petshop") }, { system -> system.terminate() }) +
         // The typed view of the same system. Two types, two keys, and the one that spawns actors is
         // not the one Pelican binds a port with.
-        single<TypedSystem<Void>, ActorSystem> { classic -> Adapter.toTyped(classic) } +
+        single { classic: ActorSystem -> Adapter.toTyped(classic) }.boundTo<TypedSystem<Void>>() +
         actor<Shop>("shop") { shop(opening.associateBy { it.id }) } +
         singleOf(::ActorPetShop).boundTo<PetShop>()
             .probe("shop", timeout = 3.seconds) { shop: PetShop -> shop.all().isNotEmpty() }
@@ -107,3 +111,17 @@ private fun asked(health: HealthRegistry): Healthy = when (val readiness = healt
 }
 
 val petshop: Module = settings + telemetry + theShop + arrivals + web
+
+/**
+ * The application as a value, so `main` is the leaving and the build can read the root it starts
+ * from without running anything.
+ */
+object Petshop : LarkApp<PelicanServer>() {
+
+    override val module: Module = petshop
+
+    override fun AppScope.run(root: PelicanServer) {
+        println("Petshop on ${root.baseUrl}, docs at ${root.baseUrl}/api-docs")
+        root.block()
+    }
+}

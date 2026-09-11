@@ -1,4 +1,8 @@
-plugins { application }
+plugins {
+    application
+    // Checks every graph in this project on `check`, and renders each one.
+    id("io.github.matthewjones372.lark.wiring") version "0.1.1-SNAPSHOT"
+}
 
 application { mainClass.set("petshop.app.MainKt") }
 
