@@ -1,8 +1,8 @@
 pluginManagement {
     repositories {
-        // The wiring plugin ships from the same build as the library, so a local
-        // install covers it the same way `mavenLocal()` covers lark itself.
-        mavenLocal()
+        // The wiring plugin ships from the same build as the library, and from
+        // the same place.
+        mavenCentral()
         gradlePluginPortal()
     }
 }

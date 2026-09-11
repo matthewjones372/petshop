@@ -214,7 +214,7 @@ what found it.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.1.1`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
+Pelican `1.0.0-RC1`, Lark `0.1.2`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
 
 `singleOf`, `boundTo`, `ask`, `config<T>` and the wiring check were all written
 while this repository was being built, which is what it is for.

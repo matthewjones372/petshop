@@ -5,12 +5,7 @@ plugins {
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
 
-    repositories {
-        // lark 0.1.0 is still propagating to repo1; mavenLocal covers the gap and
-        // is harmless once it lands.
-        mavenLocal()
-        mavenCentral()
-    }
+    repositories { mavenCentral() }
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
         jvmToolchain(21)
