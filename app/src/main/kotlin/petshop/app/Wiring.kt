@@ -116,7 +116,7 @@ val petshop: Module = settings + telemetry + theShop + arrivals + web
  * The application as a value, so `main` is the leaving and the build can read the root it starts
  * from without running anything.
  */
-object Petshop : LarkApp<PelicanServer>(typeOf<PelicanServer>()) {
+object Petshop : LarkApp<PelicanServer>() {
 
     override val module: Module = petshop
 
