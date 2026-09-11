@@ -3,12 +3,11 @@ package petshop.load
 import io.github.matthewjones372.lark.app.use
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.pekko.PelicanServer
+import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.proofload.at
 import io.github.matthewjones372.proofload.engine.Proofload
-import io.github.matthewjones372.proofload.http.exec
-import io.github.matthewjones372.proofload.http.http
 import io.github.matthewjones372.proofload.junit5.LoadTest
 import io.github.matthewjones372.proofload.perSecond
 import io.github.matthewjones372.proofload.report.writeHtmlReport
@@ -19,6 +18,7 @@ import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import petshop.api.adoptPet
 import petshop.api.listPets
+import petshop.domain.AlreadyAdopted
 import petshop.app.petshop
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
@@ -29,9 +29,9 @@ import kotlin.time.Duration.Companion.seconds
  * stream and the endpoints, exactly as `main` starts them. Nothing is stubbed, and the graph is given
  * back when the block returns.
  *
- * The paths the load runs against are asked of the endpoints rather than written out, so a renamed
- * route moves the load with it. Proofload needs a URL because it is the thing generating the
- * requests; nothing here needs to know what that URL says.
+ * The load runs through Pelican's own typed client, so no URL appears in this file at all: a step
+ * names the endpoint it calls, and what it expects back is the failure the endpoint declared rather
+ * than a status code. A renamed route or a changed error moves the load with it, at compile time.
  */
 class PetshopLoadTest {
 
@@ -43,9 +43,12 @@ class PetshopLoadTest {
     fun `browsing holds up at two hundred a second`(proofload: Proofload) {
         val outcome = petshop.use { server: PelicanServer ->
             apiClient(server.baseUrl, JacksonCodecs).use { client ->
-                val api = http.baseUrl(server.baseUrl)
+                // `response` rather than `call`: decoding every catalogue into a `List<Pet>` would put
+                // the generator's own Jackson time inside a number that is about the shop.
                 val shopping = scenario("browsing") {
-                    exec(browse, api.get(client.request(listPets, Unit).path).expecting(200))
+                    exec(browse) { step ->
+                        if (!client.response(listPets, Unit).isSuccess) step.fail("the shop did not answer")
+                    }
                 }
 
                 proofload.run(shopping.at(200.perSecond, over = 10.seconds))
@@ -61,8 +64,8 @@ class PetshopLoadTest {
 
     /**
      * The claim the actor exists for, checked under load rather than in a unit test: a pet is sold
-     * once. The step expects a 409, so a single 200 — two people told they got the same tortoise —
-     * fails the run, and so does a 500.
+     * once. The step expects the declared `AlreadyAdopted`, so a single Ok — two people told they got
+     * the same tortoise — fails the run, and so does anything the endpoint never declared.
      */
     @LoadTest
     fun `a pet already adopted is never sold again`(proofload: Proofload) {
@@ -72,9 +75,14 @@ class PetshopLoadTest {
                 // nobody took would answer 200s and never reach the claim.
                 client.outcome(adoptPet, 1L).shouldBeOk()
 
-                val api = http.baseUrl(server.baseUrl)
                 val rush = scenario("the rush") {
-                    exec(adoptTaken, api.post(client.request(adoptPet, 1L).path).expecting(409))
+                    exec(adoptTaken) { step ->
+                        when (val answer = client.outcome(adoptPet, 1L)) {
+                            is Outcome.Ok -> step.fail("the tortoise was sold twice")
+                            is Outcome.Err ->
+                                if (answer.error !is AlreadyAdopted) step.fail("not the declared failure")
+                        }
+                    }
                 }
 
                 proofload.run(rush.at(200.perSecond, over = 10.seconds))
