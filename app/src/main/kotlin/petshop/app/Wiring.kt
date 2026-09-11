@@ -75,15 +75,16 @@ private val settings: Module =
 
 private val telemetry: Module =
     singleOf<OpenTelemetrySdk>({ OpenTelemetrySdk.builder().build() }, { sdk -> sdk.close() }) +
-        // The type argument is written out because `getTracer` is Java: without it the key is the
-        // platform type `Tracer!`, which nothing asking for a `Tracer` ever matches.
-        single<Tracer, OpenTelemetrySdk> { sdk -> sdk.getTracer("petshop") }
+        // boundTo rather than a type argument: `getTracer` is Java, so the inferred key is the
+        // platform type `Tracer!` that nothing matches — and naming the key as a type argument would
+        // force naming the dependency as one too.
+        single { sdk: OpenTelemetrySdk -> sdk.getTracer("petshop") }.boundTo<Tracer>()
 
 private val theShop: Module =
     singleOf<ActorSystem>({ ActorSystem.create("petshop") }, { system -> system.terminate() }) +
         // The typed view of the same system. Two types, two keys, and the one that spawns actors is
         // not the one Pelican binds a port with.
-        single<TypedSystem<Void>, ActorSystem> { classic -> Adapter.toTyped(classic) } +
+        single { classic: ActorSystem -> Adapter.toTyped(classic) }.boundTo<TypedSystem<Void>>() +
         actor<Shop>("shop") { shop(opening.associateBy { it.id }) } +
         singleOf(::ActorPetShop).boundTo<PetShop>()
             .probe("shop", timeout = 3.seconds) { shop: PetShop -> shop.all().isNotEmpty() }
