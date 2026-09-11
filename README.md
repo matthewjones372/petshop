@@ -54,11 +54,19 @@ feed can end with in its type — `Stream<Nothing, Pet>` says this one cannot fa
 ### The application is a value
 
 ```kotlin
-val petshop: Module = settings + theShop + arrivals + web
+val petshop: Module = settings + telemetry + theShop + arrivals + web
+
+object Petshop : LarkApp<PelicanServer>(typeOf<PelicanServer>()) {
+    override val module: Module = petshop
+    override fun AppScope.run(root: PelicanServer) { root.block() }
+}
 ```
 
-`main` is four lines. The load test starts the same value in its own process,
-runs two thousand requests through it, and gets the port back afterwards.
+`main` is one line, and the root is a value the build reads without running
+anything — which is what `larkWiring` checks the graph against.
+
+The load test starts the same value in its own process, runs two thousand
+requests through it, and gets the port back afterwards.
 
 ## What a test looks like
 
@@ -134,6 +142,42 @@ type argument beside a dependency, so it has nowhere to happen.
 
 **`lark-stream` and `lark-app-pekko` were unremarkable**, which is the compliment.
 Six lines each and nothing surprising.
+
+### The wiring check: cheap, and it found nothing here
+
+`lark-app-gradle` checks every graph in the project on `check` and draws each
+one. Applying it is one line in `app/build.gradle.kts`; declaring the
+application as a value so the check knows the root it starts from is ten more
+in `Wiring.kt`, and it takes seven out of `Main.kt`, which is now six lines
+including imports. Call it **net ten lines** for a gate that runs on every
+build.
+
+**It found nothing in this graph**, which is the result worth reporting. No
+missing key — that was already true. No key provided twice. And nothing
+unreachable from `PelicanServer`, which was the check most likely to produce
+noise: `Arrivals` is a background stream nothing reads, and it is *still*
+reached, because the web node takes it as a dependency rather than trusting
+start-up order. Eight nodes, no findings, no opt-outs needed.
+
+**What it caught was a bug in lark**, not in this service. The report's own
+bullet arrived as `?`: from JDK 19 `System.err` follows `stderr.encoding`,
+which is the native encoding when a build redirects the stream, and
+`-Dfile.encoding` does not reach it. That is the sort of thing only running a
+tool against a real service finds.
+
+**The report names the line**, which is the part that matters day to day.
+Deleting `telemetry` from the graph to see what it says:
+
+```
+lark-app wiring
+
+❯ error: missing Tracer
+❯     for PetShop                 Wiring.kt:180
+```
+
+Not a compile error — the graph is an expression, so nothing reads it until
+something runs it. It is a failed `./gradlew build` with a line the IDE
+hyperlinks, which is most of what a compile error was wanted for.
 
 ### Proofload: yes, and it was the least work
 

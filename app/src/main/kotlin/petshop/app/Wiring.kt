@@ -1,8 +1,10 @@
 package petshop.app
 
 import arrow.core.Either
+import io.github.matthewjones372.lark.app.AppScope
 import io.github.matthewjones372.lark.app.Health
 import io.github.matthewjones372.lark.app.HealthRegistry
+import io.github.matthewjones372.lark.app.LarkApp
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.probe
 import arrow.core.Option
@@ -30,6 +32,7 @@ import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.PetShopError
 import petshop.domain.Species
+import kotlin.reflect.typeOf
 import kotlin.time.Duration
 import org.apache.pekko.actor.typed.ActorSystem as TypedSystem
 import kotlin.time.Duration.Companion.seconds
@@ -108,3 +111,17 @@ private fun asked(health: HealthRegistry): Healthy = when (val readiness = healt
 }
 
 val petshop: Module = settings + telemetry + theShop + arrivals + web
+
+/**
+ * The application as a value, so `main` is the leaving and the build can read the root it starts
+ * from without running anything.
+ */
+object Petshop : LarkApp<PelicanServer>() {
+
+    override val module: Module = petshop
+
+    override fun AppScope.run(root: PelicanServer) {
+        println("Petshop on ${root.baseUrl}, docs at ${root.baseUrl}/api-docs")
+        root.block()
+    }
+}
