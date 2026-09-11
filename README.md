@@ -107,41 +107,52 @@ drift from. Nothing here writes YAML.
 The cost was two lookups: `errorJson` for a declared failure and an import for
 `orFail`. Both once.
 
-### Lark: mixed, and honest about which parts
+### Lark: yes, and not for the reason first measured
 
-**The graph earned its place twice.** The bound port is a resource, so the load
-test can start the whole application in its own process and get the port back
-after — that test is the best thing in this repository and it is not writable
-without something that owns start-up and shutdown. And `probe` means the shop
-answers `/pets` before anything is told it is ready.
+What changed is what cannot happen any more, and each of these is a test in this
+repository rather than a claim about one.
 
-**It did not make the wiring shorter, and `singleOf` did not change that.**
-`app/Wiring.kt` is 84 lines for eight nodes; by hand in `main` it would be
-about sixty.
+**A pet is sold once.** Twenty adopters race for one tortoise on a subgraph that
+binds no port; exactly one wins. Two hundred a second try to adopt one already
+gone; every single one is told so, and a `200` in there would fail the run. That
+is a correctness claim checked under load, which is not a thing a load tool or a
+test framework does alone.
 
-`singleOf(::Thing)` and `boundTo<Interface>()` were added to Lark after this
-repository was first written, precisely because two services had come out
-longer. Rewriting the wiring with them moved it by **nothing**: eleven lines
-added, eleven removed.
+**An actor cannot answer "no such pet" with null.** It did once, and the
+endpoint that had carefully declared a 404 returned a 500 — everything compiled,
+and only running it found the bug. `ask` binds its reply to `Any`, so the code
+that did it no longer compiles, and a does-not-compile fixture in Lark holds
+that.
 
-The reason is worth having. `singleOf` reads a key and its dependencies off a
-constructor reference, which shortens a node that is a plain constructor call —
-and **one of the eight nodes here is one**. The rest are a resource with a
-release, a factory, an adapter between two Pekko systems, a stream being run,
-and a config section: none is a constructor, and none gets shorter. A service's
-wiring turns out to be mostly not constructor-shaped.
+**The wiring is checked on every build.** `larkWiring` walks the graph on
+`check`: a missing key fails the build and names the recipe that asked for it,
+with the file and line it was written on. A dependency nothing provides is a red
+build rather than a start-up that dies in staging.
 
-`ask` did help, for a different reason: it removed the
-`Adapter.toTyped(system).scheduler()` line that each of three calls needed. That
-is boilerplate deleted rather than a node made shorter.
+**A dependency nothing reads cannot hide.** The actor took a `Settings` it never
+looked at, and `render()` drew that edge as though it were real. A test asserts
+every node taking the settings uses them, and `overriding` refuses a fake it is
+handed.
 
-**The papercut is fixed.** `single<Type> { dependency: Other -> … }` does not
-compile — Kotlin has no partial type-argument inference — and it caught me three
-times in three codebases. `singleOf(::Thing).boundTo<Interface>()` never gives a
-type argument beside a dependency, so it has nowhere to happen.
+**Nothing is left open.** The port, the actor system and the SDK are released in
+reverse dependency order, which is what lets the load test start the whole
+application in its own process and get the port back afterwards.
 
-**`lark-stream` and `lark-app-pekko` were unremarkable**, which is the compliment.
-Six lines each and nothing surprising.
+**A bad configuration file says everything that is wrong with it, at once**, in
+Typesafe Config's own words, which name the file and the line.
+
+#### What it costs
+
+`app/Wiring.kt` is 84 lines for eight nodes, against maybe sixty written by hand
+in `main`. Line count is roughly a wash and is not the point: none of the six
+things above is available at sixty lines, and most of them are not available at
+any number of lines without something that owns the graph.
+
+`singleOf(::Thing)` shortens a node that is a plain constructor call, and one of
+the eight here is one. The rest are a resource with a release, a factory, an
+adapter between two Pekko systems, a stream being run and a config section —
+which is worth knowing before expecting a dependency graph to delete code. It
+does not delete code. It makes a set of mistakes impossible.
 
 ### The wiring check: cheap, and it found nothing here
 
@@ -203,12 +214,10 @@ what found it.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.1.1-SNAPSHOT`, Proofload `0.1.0-rc4`, Kotlin 2.4.10,
-JDK 21.
+Pelican `1.0.0-RC1`, Lark `0.1.1`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
 
-Lark is a snapshot because `singleOf`, `boundTo` and `ask` were written for this
-repository and are not in `0.1.0`. `./gradlew publishToMavenLocal` in Lark's
-checkout installs it.
+`singleOf`, `boundTo`, `ask`, `config<T>` and the wiring check were all written
+while this repository was being built, which is what it is for.
 
 All three are early. Lark says so on its own front page, and this repository is
 the first thing to use it for anything.
