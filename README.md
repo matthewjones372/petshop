@@ -56,14 +56,15 @@ feed can end with in its type — `Stream<Nothing, Pet>` says this one cannot fa
 ```kotlin
 val petshop: Module = settings + telemetry + theShop + arrivals + web
 
-object Petshop : LarkApp<PelicanServer>(typeOf<PelicanServer>()) {
+object Petshop : LarkApp<PelicanServer>() {
     override val module: Module = petshop
     override fun AppScope.run(root: PelicanServer) { root.block() }
 }
 ```
 
-`main` is one line, and the root is a value the build reads without running
-anything — which is what `larkWiring` checks the graph against.
+`main` is one line, and the root is a value read without running anything —
+which is what the compiler checks the graph against as you type, and what
+`larkWiring` checks it against by running it.
 
 The load test starts the same value in its own process, runs two thousand
 requests through it, and gets the port back afterwards.
@@ -106,6 +107,10 @@ drift from. Nothing here writes YAML.
 
 The cost was two lookups: `errorJson` for a declared failure and an import for
 `orFail`. Both once.
+
+Re-read after everything below: unchanged. Pelican's claim was always a
+compile-time one and it was always kept, which is the least interesting verdict
+here and the one that has needed the least revision.
 
 ### Lark: yes, and not for the reason first measured
 
@@ -153,6 +158,15 @@ the eight here is one. The rest are a resource with a release, a factory, an
 adapter between two Pekko systems, a stream being run and a config section —
 which is worth knowing before expecting a dependency graph to delete code. It
 does not delete code. It makes a set of mistakes impossible.
+
+The cost that arrived with `0.2.0` is a different kind. The compiler plugin is
+written against Kotlin's compiler internals, which have no stability promise, so
+it is a thing that will break on Kotlin upgrades in a way the rest of this stack
+will not. Lark keeps it in a module nothing else depends on and refuses to read
+a graph in a compiler it was not built for, which is the right shape for that
+bargain — but a service taking it on should know it is taking on a moving part
+in exchange for an earlier error, and that `larkWiring` is what it would fall
+back to.
 
 ### The wiring check: cheap, and it found nothing here
 
@@ -229,6 +243,10 @@ buys earliness where it can get it. It buys no correctness, and is not asked to.
 
 ### Proofload: yes, and it was the least work
 
+Nothing about this changed with `0.2.0`, which is worth saying rather than
+leaving to be inferred: the load test is the one part of this repository that
+has not been touched since it was first written.
+
 One scenario, one assertion, one HTML report. It ran two thousand requests at
 two hundred a second against the real service, and the report says whether the
 generator kept its own schedule — which is the number that decides whether the
@@ -248,6 +266,21 @@ Pelican's declared failure — the mistake was below both of them. The reply is 
 It is worth saying plainly: **everything compiled before that bug, and the bug
 was in the one place three type systems all thought was fine.** Running it is
 what found it.
+
+**Three ways a compiler plugin fails without telling anyone.** This graph is
+what `lark-app-compiler` was developed against, and getting it to work here took
+four attempts that all looked identical from outside — the build green, the
+editor silent. A relocated `PsiElement` that the compiler has and the editor does
+not; a positioning strategy that casts its source to a declaration, which the
+compiler tolerates on a call and the editor answers by dropping the diagnostic
+entirely; a republished snapshot served from a cached classloader; and an
+incremental compilation with nothing to read. A green `compileKotlin` turned out
+to be no evidence at all about the half the plugin exists for.
+
+The consequence is in the design rather than only in the story: the plugin now
+says when it has not read a graph, which is the difference between a tool that
+is working and a tool that has stopped. Without that line, every incremental
+build in this repository would have looked exactly like a clean bill of health.
 
 ## Versions
 
