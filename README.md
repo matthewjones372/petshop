@@ -166,11 +166,14 @@ adapter between two Pekko systems, a stream being run and a config section —
 which is worth knowing before expecting a dependency graph to delete code. It
 does not delete code. It makes a set of mistakes impossible.
 
-Logging is the one place the graph gives nothing back. No node takes a logger,
-which is right, but `0.2.0` ships no adapter either — so every service writes the
-same twenty lines to reach a backend, and this one had not: `logInfo` went to
-stderr while Pekko's lines went through the logback already on the classpath, in
-a different format, and `main` printed its start-up line with `println`.
+Logging was the one place the graph gave nothing back. No node takes a logger,
+which is right, but `0.2.0` shipped no adapter either — so every service wrote
+the same twenty lines to reach a backend, and this one had not: `logInfo` went
+to stderr while Pekko's lines went through the logback already on the classpath,
+in a different format, and `main` printed its start-up line with `println`.
+`0.3.0` ships `lark-slf4j`, and the twenty lines became a dependency: it
+registers itself, so `main` is back to one line and a test here says the
+classpath still answers.
 
 The cost that arrived with `0.2.0` is a different kind. The compiler plugin is
 written against Kotlin's compiler internals, which have no stability promise, so
@@ -301,16 +304,17 @@ where an MDC cannot. Writing the adapter is where that claim is kept or lost,
 and the obvious version loses it: flatten the pairs onto the end of the message
 — which is what the library's own cookbook showed — and every line still reads
 correctly to a human while `%X{pet_id}`, a JSON encoder and every field search
-see nothing. The adapter here puts them in the MDC for the duration of the call
-and puts the previous map back, because the thread is one a pool hands to
-something else next.
+see nothing. The adapter puts them in the MDC for the duration of the call and
+puts the previous map back, because the thread is one a pool hands to something
+else next. That adapter was written here first and is now `lark-slf4j`, which is
+the shorter version of what this repository is for.
 
 The general shape of it: a propagation guarantee is only worth what the thing at
 the edge does with it, and the edge is the part a service writes itself.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.2.0`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
+Pelican `1.0.0-RC1`, Lark `0.3.0`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
 
 `singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler
 plugin that reports it as you type were all written while this repository was
