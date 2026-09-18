@@ -146,6 +146,13 @@ application in its own process and get the port back afterwards.
 **A bad configuration file says everything that is wrong with it, at once**, in
 Typesafe Config's own words, which name the file and the line.
 
+**A line about one pet can be found by that pet.** `adopt` annotates `pet_id`
+and `adopted_by` rather than spelling them into the message, and the refusal
+carries the same pair as the success — so a search for one pet returns the whole
+story and not the half of it that went well. The pairs survive the fork the ask
+runs on, which an MDC cannot do by itself, and a test asserts that rather than
+the wording.
+
 #### What it costs
 
 `app/Wiring.kt` is 84 lines for eight nodes, against maybe sixty written by hand
@@ -158,6 +165,15 @@ the eight here is one. The rest are a resource with a release, a factory, an
 adapter between two Pekko systems, a stream being run and a config section —
 which is worth knowing before expecting a dependency graph to delete code. It
 does not delete code. It makes a set of mistakes impossible.
+
+Logging was the one place the graph gave nothing back. No node takes a logger,
+which is right, but `0.2.0` shipped no adapter either — so every service wrote
+the same twenty lines to reach a backend, and this one had not: `logInfo` went
+to stderr while Pekko's lines went through the logback already on the classpath,
+in a different format, and `main` printed its start-up line with `println`.
+`0.3.0` ships `lark-slf4j`, and the twenty lines became a dependency: it
+registers itself, so `main` is back to one line and a test here says the
+classpath still answers.
 
 The cost that arrived with `0.2.0` is a different kind. The compiler plugin is
 written against Kotlin's compiler internals, which have no stability promise, so
@@ -282,9 +298,23 @@ says when it has not read a graph, which is the difference between a tool that
 is working and a tool that has stopped. Without that line, every incremental
 build in this repository would have looked exactly like a clean bill of health.
 
+**An annotation that survives a fork can still die at the backend.** Lark's
+strongest logging claim is that `logAnnotated` carries a pair across a `parMap`
+where an MDC cannot. Writing the adapter is where that claim is kept or lost,
+and the obvious version loses it: flatten the pairs onto the end of the message
+— which is what the library's own cookbook showed — and every line still reads
+correctly to a human while `%X{pet_id}`, a JSON encoder and every field search
+see nothing. The adapter puts them in the MDC for the duration of the call and
+puts the previous map back, because the thread is one a pool hands to something
+else next. That adapter was written here first and is now `lark-slf4j`, which is
+the shorter version of what this repository is for.
+
+The general shape of it: a propagation guarantee is only worth what the thing at
+the edge does with it, and the edge is the part a service writes itself.
+
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.2.0`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
+Pelican `1.0.0-RC1`, Lark `0.3.0`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
 
 `singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler
 plugin that reports it as you type were all written while this repository was
