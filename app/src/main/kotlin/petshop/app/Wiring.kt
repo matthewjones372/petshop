@@ -12,7 +12,10 @@ import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.pekko.ask
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.logAnnotated
 import io.github.matthewjones372.lark.logInfo
+import io.github.matthewjones372.lark.logSpan
+import io.github.matthewjones372.lark.logWarn
 import io.github.matthewjones372.lark.otel.tracedSpan
 import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.sdk.OpenTelemetrySdk
@@ -63,11 +66,18 @@ class ActorPetShop(
      * A span whose trace id is on every line written inside it, including the ones a fork writes:
      * OpenTelemetry's context lives in a `LarkLocal` while `lark-otel` is on the classpath, and a
      * `ThreadLocal` would not survive the ask.
+     *
+     * The pet and the adopter are annotations rather than words in the message, so a search for one
+     * pet finds every line about it — the refusal included.
      */
     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> =
-        tracer.tracedSpan("adopt") {
-            logInfo("$by is adopting ${id.value}")
-            ref.ask(system, asking) { replyTo -> Adopt(id, by, replyTo) }
+        logAnnotated("pet_id" to id.value.toString(), "adopted_by" to by) {
+            tracer.tracedSpan("adopt") {
+                logSpan("adopt") {
+                    ref.ask(system, asking) { replyTo -> Adopt(id, by, replyTo) }
+                        .also { it.fold({ no -> logWarn(no.message) }, { pet -> logInfo("adopted ${pet.name}") }) }
+                }
+            }
         }
 }
 
@@ -121,7 +131,7 @@ object Petshop : LarkApp<PelicanServer>() {
     override val module: Module = petshop
 
     override fun AppScope.run(root: PelicanServer) {
-        println("Petshop on ${root.baseUrl}, docs at ${root.baseUrl}/api-docs")
+        logInfo("Petshop on ${root.baseUrl}, docs at ${root.baseUrl}/api-docs")
         root.block()
     }
 }

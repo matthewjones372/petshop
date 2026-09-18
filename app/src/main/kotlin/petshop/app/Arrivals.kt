@@ -2,6 +2,8 @@ package petshop.app
 
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.single
+import io.github.matthewjones372.lark.logAnnotated
+import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.map
 import io.github.matthewjones372.lark.stream.run
@@ -33,7 +35,16 @@ val arrivals: Module =
                 val id = next.incrementAndGet()
                 Pet(PetId(id), names[(id % names.size).toInt()], Species.entries[(id % 4).toInt()])
             }
-            .runWith(Sink.foreach { pet -> ref.tell(Arrived(pet)) })
+            .runWith(
+                Sink.foreach { pet ->
+                    // Written on a Pekko thread, not a request's: the pair is on the line because
+                    // it is bound here, which is the only way this one could carry it.
+                    logAnnotated("pet_id" to pet.id.value.toString()) {
+                        logInfo("${pet.name} the ${pet.species} arrived")
+                    }
+                    ref.tell(Arrived(pet))
+                },
+            )
             .run(system)
         Arrivals()
     }
