@@ -1,0 +1,33 @@
+# Prometheus and Grafana, pointed at a petshop running on the host.
+#
+# The application is not in here on purpose: it is the thing being demonstrated,
+# and running it with `./gradlew :app:run` is how a reader would run it anyway.
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      # Five seconds of history is nothing; the demo is watched, not kept.
+      - --storage.tsdb.retention.time=1h
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    # Linux has no host.docker.internal of its own; Docker Desktop ignores this.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    depends_on: [prometheus]
+    environment:
+      # A demo nobody logs into. Do not copy this into anything that matters.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/petshop.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"

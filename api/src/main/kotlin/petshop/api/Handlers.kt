@@ -14,9 +14,10 @@ import petshop.domain.PetShop
  * The endpoints answered. A handler names the declared failure it is producing, so returning one the
  * endpoint never declared does not compile.
  */
-fun petshopApi(shop: PetShop, health: () -> Healthy) = api(
+fun petshopApi(shop: PetShop, health: () -> Healthy, scrape: () -> String) = api(
     endpoints = listOf(
         petshop.api.health handledNow { health() },
+        metrics handledNow { scrape() },
         listPets handledNow { shop.all() },
         getPet handledOrFail { id ->
             shop.find(PetId(id))?.let { pet -> ok(pet) } ?: petMissing(NoSuchPet(id))

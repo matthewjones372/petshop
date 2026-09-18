@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.json
+import io.github.matthewjones372.pelican.text
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
 import petshop.domain.AlreadyAdopted
@@ -46,4 +47,16 @@ val adoptPet = endpoint(petId) {
     post("pets" / petId / "adoption")
     summary = "Take a pet home"
     json<Pet>().orFail(petMissing, petTaken)
+}
+
+/**
+ * What Prometheus scrapes, in the format it expects.
+ *
+ * `text` rather than `json`: the exposition format is line-oriented text, and a scraper handed a
+ * JSON string would read a quoted blob it cannot parse.
+ */
+val metrics = endpoint {
+    get("metrics")
+    summary = "Every meter, in Prometheus' exposition format"
+    text()
 }

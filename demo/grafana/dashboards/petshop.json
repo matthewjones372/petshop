@@ -1,0 +1,261 @@
+{
+  "uid": "petshop-demo",
+  "title": "Petshop",
+  "tags": [
+    "lark",
+    "demo"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Pets in the shop",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "petshop-prometheus"
+      },
+      "description": "A gauge: set by the arrivals stream on the Pekko thread it runs on.",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "petshop-prometheus"
+          },
+          "expr": "petshop_pets_in_shop",
+          "legendFormat": "in shop",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Adoptions",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "petshop-prometheus"
+      },
+      "description": "Every attempt, taken or refused.",
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "petshop-prometheus"
+          },
+          "expr": "sum(petshop_adoptions_total)",
+          "legendFormat": "all outcomes",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Refused share",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "petshop-prometheus"
+      },
+      "description": "One query over the outcome label, which is why outcome is a tag and not a metric name.",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "petshop-prometheus"
+          },
+          "expr": "sum(petshop_adoptions_total{outcome!=\"taken\"}) / clamp_min(sum(petshop_adoptions_total), 1)",
+          "legendFormat": "refused",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "unit": "percentunit"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Mean adopt duration",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "petshop-prometheus"
+      },
+      "description": "Every adoption since start, not a rate: a demo watched for a minute has too few samples for a window, and an empty stat reads as broken. lark's timed records milliseconds; Prometheus convention is seconds.",
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "petshop-prometheus"
+          },
+          "expr": "sum(petshop_adopt_duration_sum) / clamp_min(sum(petshop_adopt_duration_count), 1)",
+          "legendFormat": "mean ms",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "unit": "ms"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Adoptions per second, by outcome",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "petshop-prometheus"
+      },
+      "description": "taken, already_adopted and no_such_pet are one counter and one label.",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "petshop-prometheus"
+          },
+          "expr": "sum by (outcome) (rate(petshop_adoptions_total[1m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Arrivals per second",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "petshop-prometheus"
+      },
+      "description": "The background stream, ticking every arrivalsEvery.",
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "petshop-prometheus"
+          },
+          "expr": "rate(petshop_arrivals_total[1m])",
+          "legendFormat": "arrivals",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "title": "Adopt duration",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "petshop-prometheus"
+      },
+      "description": "Recorded in a finally, so a refusal that took three seconds is in here too.",
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "petshop-prometheus"
+          },
+          "expr": "petshop_adopt_duration_max",
+          "legendFormat": "max",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "petshop-prometheus"
+          },
+          "expr": "sum(petshop_adopt_duration_sum) / clamp_min(sum(petshop_adopt_duration_count), 1)",
+          "legendFormat": "mean, all time",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "unit": "ms"
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
