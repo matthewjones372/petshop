@@ -12,12 +12,19 @@ import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.pekko.ask
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.counter
+import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.logAnnotated
+import io.github.matthewjones372.lark.metricTagged
+import io.github.matthewjones372.lark.timed
 import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.logSpan
 import io.github.matthewjones372.lark.logWarn
 import io.github.matthewjones372.lark.otel.tracedSpan
 import io.opentelemetry.api.trace.Tracer
+import io.micrometer.core.instrument.Metrics as MicrometerRegistries
+import io.micrometer.prometheus.PrometheusConfig
+import io.micrometer.prometheus.PrometheusMeterRegistry
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.github.matthewjones372.lark.app.pekko.actor
 import io.github.matthewjones372.lark.app.typesafe.config
@@ -30,6 +37,8 @@ import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.javadsl.Adapter
 import petshop.api.Healthy
 import petshop.api.petshopApi
+import petshop.domain.AlreadyAdopted
+import petshop.domain.NoSuchPet
 import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.PetShop
@@ -74,8 +83,32 @@ class ActorPetShop(
         logAnnotated("pet_id" to id.value.toString(), "adopted_by" to by) {
             tracer.tracedSpan("adopt") {
                 logSpan("adopt") {
-                    ref.ask(system, asking) { replyTo -> Adopt(id, by, replyTo) }
-                        .also { it.fold({ no -> logWarn(no.message) }, { pet -> logInfo("adopted ${pet.name}") }) }
+                    // Timed around the ask, so a refusal is in the distribution too: the slow calls
+                    // are the ones worth seeing and most of them are the ones that failed.
+                    timed("petshop.adopt.duration") {
+                        ref.ask(system, asking) { replyTo -> Adopt(id, by, replyTo) }.also { answer ->
+                            answer.fold(
+                                { no ->
+                                    logWarn(no.message)
+                                    // The outcome is a tag and not a name, so one query answers
+                                    // "how many adoptions" and one answers "how many were refused".
+                                    //
+                                    // Every branch tags the same key and only that key: Prometheus
+                                    // requires one set of label names per metric name, and a series
+                                    // registered with a different set is dropped without a word.
+                                    metricTagged("outcome" to no.outcome()) {
+                                        counter("petshop.adoptions").increment()
+                                    }
+                                },
+                                { pet ->
+                                    logInfo("adopted ${pet.name}")
+                                    metricTagged("outcome" to "taken") {
+                                        counter("petshop.adoptions").increment()
+                                    }
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -83,10 +116,22 @@ class ActorPetShop(
 
 private val asking = 3.seconds
 
+/** The shape of a refusal as a tag: few values, known before the code runs, which is what a tag is. */
+private fun PetShopError.outcome(): String = when (this) {
+    is NoSuchPet -> "no_such_pet"
+    is AlreadyAdopted -> "already_adopted"
+}
+
 private val settings: Module =
     loadedConfig() + config<Settings>("petshop") { Settings(int("port"), duration("arrivalsEvery")) }
 
 private val telemetry: Module =
+    // Added to Micrometer's global composite, which is where lark-micrometer writes unless it is
+    // handed a registry: the graph owns the registry's life, and nothing has to bind anything.
+    singleOf<PrometheusMeterRegistry>(
+        { PrometheusMeterRegistry(PrometheusConfig.DEFAULT).also(MicrometerRegistries::addRegistry) },
+        { registry -> MicrometerRegistries.removeRegistry(registry); registry.close() },
+    ) +
     singleOf<OpenTelemetrySdk>({ OpenTelemetrySdk.builder().build() }, { sdk -> sdk.close() }) +
         // boundTo rather than a type argument: `getTracer` is Java, so the inferred key is the
         // platform type `Tracer!` that nothing matches — and naming the key as a type argument would
@@ -106,8 +151,9 @@ private val web: Module =
     // The port is a resource like any other: bound here, unbound when the graph is given back, which
     // is what lets a load test start the whole application in its own process.
     singleOf(
-        { shop: PetShop, config: Settings, system: TypedSystem<Void>, health: HealthRegistry, _: Arrivals ->
-            petshopApi(shop) { asked(health) }
+        { shop: PetShop, config: Settings, system: TypedSystem<Void>, health: HealthRegistry,
+            registry: PrometheusMeterRegistry, _: Arrivals ->
+            petshopApi(shop, { asked(health) }, registry::scrape)
                 .startWithDocs(system, port = config.port, docs = docs { docsPath = "/api-docs" })
         },
         { server -> server.stop() },

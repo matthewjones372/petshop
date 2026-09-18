@@ -2,6 +2,9 @@ package petshop.app
 
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.single
+import io.github.matthewjones372.lark.counter
+import io.github.matthewjones372.lark.gauge
+import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.logAnnotated
 import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.stream.Stream
@@ -42,6 +45,10 @@ val arrivals: Module =
                     logAnnotated("pet_id" to pet.id.value.toString()) {
                         logInfo("${pet.name} the ${pet.species} arrived")
                     }
+                    counter("petshop.arrivals").increment()
+                    // The shop's size as a number rather than a rate: the id is the count, since
+                    // every pet that has ever arrived got the next one.
+                    gauge("petshop.pets.in.shop").set(pet.id.value.toDouble())
                     ref.tell(Arrived(pet))
                 },
             )

@@ -37,8 +37,11 @@ class ContractSpec {
 
     private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 
-    private val app = petshopApi(OnePet(nibbles)) { Healthy(ready = true, failing = emptyList()) }
-        .inMemory("petshop-contract")
+    private val app = petshopApi(
+        shop = OnePet(nibbles),
+        health = { Healthy(ready = true, failing = emptyList()) },
+        scrape = { "petshop_adoptions_total 1.0" },
+    ).inMemory("petshop-contract")
 
     @Test
     fun `a test names the endpoint, not the URL`() {
@@ -51,6 +54,7 @@ class ContractSpec {
         app.request(adoptPet, 1L) shouldBuild "POST /pets/1/adoption"
         app.request(listPets, Unit) shouldBuild "GET /pets"
         app.request(health, Unit) shouldBuild "GET /health"
+        app.request(metrics, Unit) shouldBuild "GET /metrics"
     }
 
     @Test
@@ -59,4 +63,5 @@ class ContractSpec {
 
         app.outcome(adoptPet, 1L).shouldBeError() shouldBe AlreadyAdopted(1)
     }
+
 }
