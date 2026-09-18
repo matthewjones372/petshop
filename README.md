@@ -146,6 +146,12 @@ application in its own process and get the port back afterwards.
 **A bad configuration file says everything that is wrong with it, at once**, in
 Typesafe Config's own words, which name the file and the line.
 
+**A number is a call, not a node.** `0.4.0` ships `lark-micrometer`, so counting
+an adoption is `counter("petshop.adoptions").increment()` and nothing takes a
+`MeterRegistry` as a dependency. The outcome is a label rather than three metric
+names, so one query answers how many adoptions and how many were refused — and
+`demo/` is Prometheus and Grafana watching exactly that.
+
 **A line about one pet can be found by that pet.** `adopt` annotates `pet_id`
 and `adopted_by` rather than spelling them into the message, and the refusal
 carries the same pair as the success — so a search for one pet returns the whole
@@ -314,7 +320,7 @@ the edge does with it, and the edge is the part a service writes itself.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.3.0`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
+Pelican `1.0.0-RC1`, Lark `0.4.0`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
 
 `singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler
 plugin that reports it as you type were all written while this repository was
