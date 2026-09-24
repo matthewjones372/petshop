@@ -21,7 +21,7 @@ it, and a load test that runs the whole thing in its own process.
 | Module | What it holds | Library |
 |---|---|---|
 | `domain` | `Pet`, `PetShop`, and the two ways adopting can fail | none |
-| `api` | the endpoints, their failures, the handlers | Pelican |
+| `api` | the endpoints, their failures, the handlers, the DTOs | Pelican, kimney |
 | `app` | the actor, the arrivals stream, the wiring, `main` | Lark |
 | `loadtest` | the shop under load, started in-process | Proofload |
 
@@ -38,6 +38,23 @@ The route, the OpenAPI document at `/openapi.json` and the Swagger page at
 `/api-docs` all come from that. The handler must answer with `ok`, `petMissing`
 or `petTaken` — a `when` over the sealed error type is exhaustive, and returning
 a failure the endpoint never declared does not compile.
+
+### The wire is not the domain
+
+`Pet` stays in `domain`; the endpoints answer a `PetDto`, and the declared
+failures are a sealed `ProblemDto`. [kimney](https://github.com/matthewjones372/kimney)
+writes each crossing at compile time:
+
+```kotlin
+fun Pet.toDto(): PetDto = transformInto()                // PetId unwrapped, Species by name
+fun List<Pet>.toDto(): List<PetDto> = transformInto()
+fun PetShopError.toDto(): ProblemDto = transformInto()   // one case per case, by name
+```
+
+The JSON is unchanged — `id` was already a plain number. What changed is that a
+species added to the domain, or a field added to a DTO, is a compile error at
+the crossing rather than a new value on the wire — on a full compile, at least;
+[an incremental one misses it](#what-building-it-found).
 
 ### One writer, no locks
 
@@ -276,6 +293,34 @@ p99 belongs to the shop or to the tool.
 
 The whole load test is thirty lines including imports.
 
+### kimney: not yet judged
+
+Added so there is something real to check it against, and the first question is
+the one its README leaves open: whether its errors show in the editor, or only
+when Gradle compiles. To find out:
+
+1. In IntelliJ, Help → Find Action → Registry, and uncheck
+   `kotlin.k2.only.bundled.compiler.plugins.enabled`. Restart, reimport.
+2. Add `Rabbit` to `Species` in `domain/Pets.kt`. Nothing else in the project
+   has an opinion about that, so the only thing left to complain is kimney.
+3. Open `api/Dtos.kt`. A full compile, `./gradlew :api:compileKotlin --rerun`,
+   says this on the two calls that meet a `Species`:
+
+```
+e: .../api/src/main/kotlin/petshop/api/Dtos.kt:28:27 Cannot transform Pet → PetDto:
+    PetDto.species: SpeciesDto — Species.Rabbit has no entry of the same name in SpeciesDto.
+e: .../api/src/main/kotlin/petshop/api/Dtos.kt:30:39 Cannot transform List<Pet> → List<PetDto>:
+    List<PetDto>[].species: SpeciesDto — Species.Rabbit has no entry of the same name in SpeciesDto. Or map Pet → PetDto with .withTransformer(Transformer<Pet, PetDto> { … }).
+```
+
+A red underline there without running a build is the answer that turns
+"errors appear on build only" into a setup step. No underline, and it stays a
+limitation. For a longer list, add a field to `PetDto` and rename
+`ProblemDto.AlreadyAdopted` as well — every failure should arrive at once.
+
+The `--rerun` in step 3 is not decoration. A plain `./gradlew build` after
+adding `Rabbit` is **green**: see below.
+
 ## What building it found
 
 **A 500 where a 404 was declared.** `Find(id, replyTo: ActorRef<Pet?>)` compiles.
@@ -288,6 +333,18 @@ Pelican's declared failure — the mistake was below both of them. The reply is 
 It is worth saying plainly: **everything compiled before that bug, and the bug
 was in the one place three type systems all thought was fine.** Running it is
 what found it.
+
+**A derivation the incremental compiler does not know about.** Adding
+`Species.Rabbit` in `domain` and running `./gradlew build` is green. `Dtos.kt`
+names `Pet` and never `Species`, and `Pet`'s own shape did not change, so
+Kotlin's incremental compilation decides nothing in `api` needs compiling
+again — it has no way to know that kimney walked from `Pet` into `Species` to
+write the `when`. The error arrives only on a compile from scratch
+(`--rerun`, a clean build, or CI with no cache). This is the same shape as
+Lark's incremental limit above, with one difference that matters: Lark says
+out loud when it has not read a graph, and kimney is silent, so the green build
+looks exactly like a checked one. It belongs in kimney — the plugin has to
+tell the compiler which types each derivation read.
 
 **Three ways a compiler plugin fails without telling anyone.** This graph is
 what `lark-app-compiler` was developed against, and getting it to work here took
@@ -320,7 +377,9 @@ the edge does with it, and the edge is the part a service writes itself.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.4.0`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
+Pelican `1.0.0-RC1`, Lark `0.4.0`, Proofload `0.1.0-rc4`, kimney `0.1.0`, Kotlin
+2.4.10, JDK 21. kimney is `0.1.0` because `0.2.0` is not on Central yet; `0.1.0`
+supports Kotlin 2.4.10 alone, which is the one this uses.
 
 `singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler
 plugin that reports it as you type were all written while this repository was

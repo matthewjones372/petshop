@@ -16,9 +16,9 @@ import io.github.matthewjones372.proofload.step
 import io.kotest.assertions.withClue
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
+import petshop.api.ProblemDto
 import petshop.api.adoptPet
 import petshop.api.listPets
-import petshop.domain.AlreadyAdopted
 import petshop.app.petshop
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
@@ -80,7 +80,7 @@ class PetshopLoadTest {
                         when (val answer = client.outcome(adoptPet, 1L)) {
                             is Outcome.Ok -> step.fail("the tortoise was sold twice")
                             is Outcome.Err ->
-                                if (answer.error !is AlreadyAdopted) step.fail("not the declared failure")
+                                if (answer.error !is ProblemDto.AlreadyAdopted) step.fail("not the declared failure")
                         }
                     }
                 }

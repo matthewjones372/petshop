@@ -5,7 +5,6 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOrFail
-import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.PetId
 import petshop.domain.PetShop
@@ -18,19 +17,19 @@ fun petshopApi(shop: PetShop, health: () -> Healthy, scrape: () -> String) = api
     endpoints = listOf(
         petshop.api.health handledNow { health() },
         metrics handledNow { scrape() },
-        listPets handledNow { shop.all() },
+        listPets handledNow { shop.all().toDto() },
         getPet handledOrFail { id ->
-            shop.find(PetId(id))?.let { pet -> ok(pet) } ?: petMissing(NoSuchPet(id))
+            shop.find(PetId(id))?.let { pet -> ok(pet.toDto()) } ?: petMissing(NoSuchPet(id).toDto())
         },
         adoptPet handledOrFail { id ->
             shop.adopt(PetId(id), by = "the internet").fold(
                 { failure ->
-                    when (failure) {
-                        is NoSuchPet -> petMissing(failure)
-                        is AlreadyAdopted -> petTaken(failure)
+                    when (val problem = failure.toDto()) {
+                        is ProblemDto.NoSuchPet -> petMissing(problem)
+                        is ProblemDto.AlreadyAdopted -> petTaken(problem)
                     }
                 },
-                { pet -> ok(pet) },
+                { pet -> ok(pet.toDto()) },
             )
         },
     ),
