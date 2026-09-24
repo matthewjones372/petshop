@@ -53,8 +53,7 @@ fun PetShopError.toDto(): ProblemDto = transformInto()   // one case per case, b
 
 The JSON is unchanged — `id` was already a plain number. What changed is that a
 species added to the domain, or a field added to a DTO, is a compile error at
-the crossing rather than a new value on the wire — on a full compile, at least;
-[an incremental one misses it](#what-building-it-found).
+the crossing rather than a new value on the wire.
 
 ### One writer, no locks
 
@@ -293,19 +292,15 @@ p99 belongs to the shop or to the tool.
 
 The whole load test is thirty lines including imports.
 
-### kimney: the errors reach the editor
+### kimney: errors in the editor
 
-The question its README left open was whether its errors show in the editor, or
-only when Gradle compiles. They show in the editor, once the IDE is allowed to
-load it. To see it:
+kimney's errors show in IntelliJ as you type, once the IDE is allowed to load a
+third-party compiler plugin: Help → Find Action → Registry, uncheck
+`kotlin.k2.only.bundled.compiler.plugins.enabled`, and restart. It is the same
+flag Lark's underline needs, unchecked once per developer.
 
-1. In IntelliJ, Help → Find Action → Registry, and uncheck
-   `kotlin.k2.only.bundled.compiler.plugins.enabled`. Restart, reimport.
-2. Add `Rabbit` to `Species` in `domain/Pets.kt`. Nothing else in the project
-   has an opinion about that, so the only thing left to complain is kimney.
-3. `api/Dtos.kt` goes red on the two calls that meet a `Species`, with no
-   build run. A full compile, `./gradlew :api:compileKotlin --rerun`, says the
-   same:
+To see one, add `Rabbit` to `Species` in `domain/Pets.kt`. `api/Dtos.kt` goes
+red on the two calls that meet a `Species`:
 
 ```
 e: .../api/src/main/kotlin/petshop/api/Dtos.kt:28:27 Cannot transform Pet → PetDto:
@@ -313,14 +308,6 @@ e: .../api/src/main/kotlin/petshop/api/Dtos.kt:28:27 Cannot transform Pet → Pe
 e: .../api/src/main/kotlin/petshop/api/Dtos.kt:30:39 Cannot transform List<Pet> → List<PetDto>:
     List<PetDto>[].species: SpeciesDto — Species.Rabbit has no entry of the same name in SpeciesDto. Or map Pet → PetDto with .withTransformer(Transformer<Pet, PetDto> { … }).
 ```
-
-So "errors appear on build only" is a setup step rather than a limitation: the
-same registry flag Lark's underline already needs, unchecked once per
-developer. For a longer list, add a field to `PetDto` and rename
-`ProblemDto.AlreadyAdopted` as well — every failure arrives at once.
-
-The `--rerun` in step 3 is not decoration. The editor is right, but a plain
-`./gradlew build` after adding `Rabbit` is **green**: see below.
 
 ## What building it found
 
@@ -334,30 +321,6 @@ Pelican's declared failure — the mistake was below both of them. The reply is 
 It is worth saying plainly: **everything compiled before that bug, and the bug
 was in the one place three type systems all thought was fine.** Running it is
 what found it.
-
-**A derivation the incremental compiler does not know about.** Adding
-`Species.Rabbit` in `domain` and running `./gradlew build` is green. `Dtos.kt`
-names `Pet` and never `Species`, and `Pet`'s own shape did not change, so
-Kotlin's incremental compilation decides nothing in `api` needs compiling
-again — it has no way to know that kimney walked from `Pet` into `Species` to
-write the `when`. The error arrives only on a compile from scratch
-(`--rerun`, a clean build, or CI with no cache). This is the same shape as
-Lark's incremental limit above, with one difference that matters: Lark says
-out loud when it has not read a graph, and kimney is silent, so the green build
-looks exactly like a checked one. It belongs in kimney — the plugin has to
-tell the compiler which types each derivation read.
-
-It does now, on kimney's `main` ([spec 0020](https://github.com/matthewjones372/kimney/blob/main/specs/0020-incremental-compilation.md)),
-not yet released: `0.1.0`, which this builds against, still has the bug. Built
-from `main`, the incremental build fails as a clean one would on every change
-tried here — an enum entry, a sealed case, a property renamed or retyped two
-classes down, a constructor parameter in another file of the same module, a
-supertype removed one class up — and goes green again when the change is
-reverted. The case that mattered most was the quiet one: with `Hamster`
-already in `SpeciesDto`, adding it to `Species` is a legal change, and on
-`0.1.0` the incremental build is green and mapping a hamster throws
-`NoWhenBranchMatchedException`, because the `when` was never regenerated. From
-`main` it maps.
 
 **Three ways a compiler plugin fails without telling anyone.** This graph is
 what `lark-app-compiler` was developed against, and getting it to work here took
