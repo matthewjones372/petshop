@@ -347,6 +347,18 @@ out loud when it has not read a graph, and kimney is silent, so the green build
 looks exactly like a checked one. It belongs in kimney — the plugin has to
 tell the compiler which types each derivation read.
 
+It does now, on kimney's `main` ([spec 0020](https://github.com/matthewjones372/kimney/blob/main/specs/0020-incremental-compilation.md)),
+not yet released: `0.1.0`, which this builds against, still has the bug. Built
+from `main`, the incremental build fails as a clean one would on every change
+tried here — an enum entry, a sealed case, a property renamed or retyped two
+classes down, a constructor parameter in another file of the same module, a
+supertype removed one class up — and goes green again when the change is
+reverted. The case that mattered most was the quiet one: with `Hamster`
+already in `SpeciesDto`, adding it to `Species` is a legal change, and on
+`0.1.0` the incremental build is green and mapping a hamster throws
+`NoWhenBranchMatchedException`, because the `when` was never regenerated. From
+`main` it maps.
+
 **Three ways a compiler plugin fails without telling anyone.** This graph is
 what `lark-app-compiler` was developed against, and getting it to work here took
 four attempts that all looked identical from outside — the build green, the
