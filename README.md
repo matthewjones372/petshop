@@ -293,18 +293,19 @@ p99 belongs to the shop or to the tool.
 
 The whole load test is thirty lines including imports.
 
-### kimney: not yet judged
+### kimney: the errors reach the editor
 
-Added so there is something real to check it against, and the first question is
-the one its README leaves open: whether its errors show in the editor, or only
-when Gradle compiles. To find out:
+The question its README left open was whether its errors show in the editor, or
+only when Gradle compiles. They show in the editor, once the IDE is allowed to
+load it. To see it:
 
 1. In IntelliJ, Help → Find Action → Registry, and uncheck
    `kotlin.k2.only.bundled.compiler.plugins.enabled`. Restart, reimport.
 2. Add `Rabbit` to `Species` in `domain/Pets.kt`. Nothing else in the project
    has an opinion about that, so the only thing left to complain is kimney.
-3. Open `api/Dtos.kt`. A full compile, `./gradlew :api:compileKotlin --rerun`,
-   says this on the two calls that meet a `Species`:
+3. `api/Dtos.kt` goes red on the two calls that meet a `Species`, with no
+   build run. A full compile, `./gradlew :api:compileKotlin --rerun`, says the
+   same:
 
 ```
 e: .../api/src/main/kotlin/petshop/api/Dtos.kt:28:27 Cannot transform Pet → PetDto:
@@ -313,13 +314,13 @@ e: .../api/src/main/kotlin/petshop/api/Dtos.kt:30:39 Cannot transform List<Pet> 
     List<PetDto>[].species: SpeciesDto — Species.Rabbit has no entry of the same name in SpeciesDto. Or map Pet → PetDto with .withTransformer(Transformer<Pet, PetDto> { … }).
 ```
 
-A red underline there without running a build is the answer that turns
-"errors appear on build only" into a setup step. No underline, and it stays a
-limitation. For a longer list, add a field to `PetDto` and rename
-`ProblemDto.AlreadyAdopted` as well — every failure should arrive at once.
+So "errors appear on build only" is a setup step rather than a limitation: the
+same registry flag Lark's underline already needs, unchecked once per
+developer. For a longer list, add a field to `PetDto` and rename
+`ProblemDto.AlreadyAdopted` as well — every failure arrives at once.
 
-The `--rerun` in step 3 is not decoration. A plain `./gradlew build` after
-adding `Rabbit` is **green**: see below.
+The `--rerun` in step 3 is not decoration. The editor is right, but a plain
+`./gradlew build` after adding `Rabbit` is **green**: see below.
 
 ## What building it found
 
