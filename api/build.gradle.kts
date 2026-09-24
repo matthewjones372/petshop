@@ -1,6 +1,6 @@
 plugins {
     // Writes the domain → DTO crossings in Dtos.kt, and refuses to compile one it cannot.
-    id("io.github.matthewjones372.kimney") version "0.1.0"
+    id("io.github.matthewjones372.kimney") version "0.3.0"
 }
 
 val pelicanVersion = "1.0.0-RC1"

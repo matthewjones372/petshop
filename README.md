@@ -304,9 +304,9 @@ red on the two calls that meet a `Species`:
 
 ```
 e: .../api/src/main/kotlin/petshop/api/Dtos.kt:28:27 Cannot transform Pet → PetDto:
-    PetDto.species: SpeciesDto — Species.Rabbit has no entry of the same name in SpeciesDto.
+    PetDto.species: SpeciesDto — Species.Rabbit has no entry of the same name in SpeciesDto. Map it with .withEnumEntryRenamed(Species.Rabbit, SpeciesDto.…), or send every unmatched entry to one with .withEnumFallback(SpeciesDto.…).
 e: .../api/src/main/kotlin/petshop/api/Dtos.kt:30:39 Cannot transform List<Pet> → List<PetDto>:
-    List<PetDto>[].species: SpeciesDto — Species.Rabbit has no entry of the same name in SpeciesDto. Or map Pet → PetDto with .withTransformer(Transformer<Pet, PetDto> { … }).
+    List<PetDto>[].species: SpeciesDto — Species.Rabbit has no entry of the same name in SpeciesDto. Map it with .withEnumEntryRenamed(Species.Rabbit, SpeciesDto.…), or send every unmatched entry to one with .withEnumFallback(SpeciesDto.…). Or map Pet → PetDto with .withTransformer(Transformer<Pet, PetDto> { … }).
 ```
 
 ## What building it found
@@ -353,9 +353,8 @@ the edge does with it, and the edge is the part a service writes itself.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.4.0`, Proofload `0.1.0-rc4`, kimney `0.1.0`, Kotlin
-2.4.10, JDK 21. kimney is `0.1.0` because `0.2.0` is not on Central yet; `0.1.0`
-supports Kotlin 2.4.10 alone, which is the one this uses.
+Pelican `1.0.0-RC1`, Lark `0.4.0`, Proofload `0.1.0-rc4`, kimney `0.3.0`, Kotlin
+2.4.10, JDK 21.
 
 `singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler
 plugin that reports it as you type were all written while this repository was
