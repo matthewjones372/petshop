@@ -292,15 +292,17 @@ p99 belongs to the shop or to the tool.
 
 The whole load test is thirty lines including imports.
 
-### kimney: errors in the editor
+### kimney: yes, for the drift rather than the lines
 
-kimney's errors show in IntelliJ as you type, once the IDE is allowed to load a
-third-party compiler plugin: Help → Find Action → Registry, uncheck
-`kotlin.k2.only.bundled.compiler.plugins.enabled`, and restart. It is the same
-flag Lark's underline needs, unchecked once per developer.
+Five mappings in `api/Dtos.kt`, one line each, where the hand-written version is
+a constructor call, a `when` over four species and a `when` over two failures.
+At this size that saves little typing, and typing is not the point.
 
-To see one, add `Rabbit` to `Species` in `domain/Pets.kt`. `api/Dtos.kt` goes
-red on the two calls that meet a `Species`:
+What it buys is that the wire cannot drift from the domain without the build
+saying so. A species added to `Species`, a field added to a DTO, a failure added
+to `PetShopError`: each is a compile error on the call that meets it, on an
+incremental build as on a clean one, and every failure on a call arrives at
+once. Adding `Rabbit`:
 
 ```
 e: .../api/src/main/kotlin/petshop/api/Dtos.kt:28:27 Cannot transform Pet → PetDto:
@@ -308,6 +310,23 @@ e: .../api/src/main/kotlin/petshop/api/Dtos.kt:28:27 Cannot transform Pet → Pe
 e: .../api/src/main/kotlin/petshop/api/Dtos.kt:30:39 Cannot transform List<Pet> → List<PetDto>:
     List<PetDto>[].species: SpeciesDto — Species.Rabbit has no entry of the same name in SpeciesDto. Map it with .withEnumEntryRenamed(Species.Rabbit, SpeciesDto.…), or send every unmatched entry to one with .withEnumFallback(SpeciesDto.…). Or map Pet → PetDto with .withTransformer(Transformer<Pet, PetDto> { … }).
 ```
+
+The fix it names is the one to write: `.withEnumEntryRenamed(Species.Rabbit,
+SpeciesDto.Bunny)` or `.withEnumFallback(SpeciesDto.Other)` on an `into` chain
+compiles as suggested and maps as it says.
+
+The errors show in IntelliJ as you type once the IDE may load a third-party
+compiler plugin: Help → Find Action → Registry, uncheck
+`kotlin.k2.only.bundled.compiler.plugins.enabled`, restart. It is the same flag
+Lark's underline needs, unchecked once per developer.
+
+#### What it costs
+
+A second compiler plugin, with the bargain Lark's already has: it supports
+Kotlin 2.4 and stops the build on another minor until a release supports it.
+One setting per developer for the editor. And some repetition in the errors —
+`List<Pet> → List<PetDto>` is its own call, so a broken `Pet → PetDto` is
+reported once for each.
 
 ## What building it found
 
