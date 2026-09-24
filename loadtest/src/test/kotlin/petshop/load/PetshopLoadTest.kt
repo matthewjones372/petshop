@@ -1,5 +1,13 @@
 package petshop.load
 
+import com.github.tomakehurst.wiremock.WireMockServer
+import com.github.tomakehurst.wiremock.client.WireMock.get
+import com.github.tomakehurst.wiremock.client.WireMock.okJson
+import com.github.tomakehurst.wiremock.client.WireMock.post
+import com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
+import io.github.matthewjones372.lark.app.Module
+import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.use
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.pekko.PelicanServer
@@ -16,6 +24,7 @@ import io.github.matthewjones372.proofload.step
 import io.kotest.assertions.withClue
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
+import org.junit.jupiter.api.AfterEach
 import petshop.api.adoptPet
 import petshop.api.listPets
 import petshop.domain.AlreadyAdopted
@@ -26,8 +35,9 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * The whole application under load, started by its own graph in this process: the actor, the arrivals
- * stream and the endpoints, exactly as `main` starts them. Nothing is stubbed, and the graph is given
- * back when the block returns.
+ * stream and the endpoints, exactly as `main` starts them. Nothing of the shop's is stubbed, and the
+ * graph is given back when the block returns. The chip registry is somebody else's service, so it is
+ * a WireMock server that knows every chip — the one line of configuration that differs from `main`.
  *
  * The load runs through Pelican's own typed client, so no URL appears in this file at all: a step
  * names the endpoint it calls, and what it expects back is the failure the endpoint declared rather
@@ -35,13 +45,24 @@ import kotlin.time.Duration.Companion.seconds
  */
 class PetshopLoadTest {
 
+    private val registry = WireMockServer(wireMockConfig().dynamicPort()).apply {
+        start()
+        stubFor(get(urlPathMatching("/chips/.+")).willReturn(okJson("""{"number":"981000000000001","keeper":"Petshop"}""")))
+        stubFor(post(urlPathMatching("/chips/.+/keeper")).willReturn(okJson("""{"number":"981000000000001","keeper":"someone"}""")))
+    }
+
+    private val theShop: Module = petshop.overridingConfig("""petshop.registry.baseUrl = "${registry.baseUrl()}"""")
+
+    @AfterEach
+    fun stopRegistry() = registry.stop()
+
     private val browse = step("browse the shop")
 
     private val adoptTaken = step("adopt a pet somebody already has")
 
     @LoadTest
     fun `browsing holds up at two hundred a second`(proofload: Proofload) {
-        val outcome = petshop.use { server: PelicanServer ->
+        val outcome = theShop.use { server: PelicanServer ->
             apiClient(server.baseUrl, JacksonCodecs).use { client ->
                 // `response` rather than `call`: decoding every catalogue into a `List<Pet>` would put
                 // the generator's own Jackson time inside a number that is about the shop.
@@ -69,7 +90,7 @@ class PetshopLoadTest {
      */
     @LoadTest
     fun `a pet already adopted is never sold again`(proofload: Proofload) {
-        val outcome = petshop.use { server: PelicanServer ->
+        val outcome = theShop.use { server: PelicanServer ->
             apiClient(server.baseUrl, JacksonCodecs).use { client ->
                 // The first adoption is the setup, and it has to have worked: a rush against a pet
                 // nobody took would answer 200s and never reach the claim.

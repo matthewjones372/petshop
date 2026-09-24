@@ -1,8 +1,18 @@
-# Prometheus and Grafana, pointed at a petshop running on the host.
+# Prometheus and Grafana, pointed at a petshop running on the host, and a stand-in
+# for the chip registry the petshop calls out to.
 #
 # The application is not in here on purpose: it is the thing being demonstrated,
 # and running it with `./gradlew :app:run` is how a reader would run it anyway.
 services:
+  # The chip registry is somebody else's service; this is WireMock answering in its place, from
+  # the same kind of stub the tests use. application.conf points at it by default.
+  registry:
+    image: wiremock/wiremock:3.13.1
+    volumes:
+      - ./registry/mappings:/home/wiremock/mappings:ro
+    ports:
+      - "8089:8080"
+
   prometheus:
     image: prom/prometheus:v2.54.1
     command:

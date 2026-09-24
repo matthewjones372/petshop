@@ -22,7 +22,7 @@ it, and a load test that runs the whole thing in its own process.
 |---|---|---|
 | `domain` | `Pet`, `PetShop`, and the two ways adopting can fail | none |
 | `api` | the endpoints, their failures, the handlers | Pelican |
-| `app` | the actor, the arrivals stream, the wiring, `main` | Lark |
+| `app` | the actor, the arrivals stream, the chip registry's client, the wiring, `main` | Lark |
 | `loadtest` | the shop under load, started in-process | Proofload |
 
 ### The contract is a value
@@ -69,6 +69,17 @@ which is what the compiler checks the graph against as you type, and what
 The load test starts the same value in its own process, runs two thousand
 requests through it, and gets the port back afterwards.
 
+### Somebody else's service
+
+An adoption is recorded with the national chip registry: a `GET` for the pet's
+chip, then a `POST` naming its new keeper. The actor settles who gets the pet
+first, so the losers of a race never reach the registry, and a registry that
+cannot record the keeper puts the pet back on the shelf.
+
+The client, `HttpChipRegistry`, is hand-written, the way most clients for
+somebody else's API are. That makes it the code worth testing over the wire:
+the path, the body, the status codes and the timeout are all decisions it makes.
+
 ## What a test looks like
 
 ```kotlin
@@ -79,6 +90,21 @@ testApp(petshop.subgraph<PetShop>()) { shop: PetShop ->
 
 // one setting changed; application.conf keeps the rest
 testApp(petshop.subgraph<Settings>().overridingConfig("petshop.arrivalsEvery = 1s")) { it }
+```
+
+Somebody else's service is replaced in one of two places, depending on what the test is about:
+
+```kotlin
+// about the shop: swap the node. `overriding` refuses a key the graph does not hold,
+// so a fake bound under the wrong type cannot leave the real client running beside it.
+petshop.overriding(single<ChipRegistry> { FakeRegistry() }).subgraph<PetShop>()
+
+// about the client: keep the node, swap the server. WireMock plays the registry on a
+// random port, and the shop's own client, JSON and timeout are the ones under test.
+registry.stubFor(post("/chips/981000000000001/keeper").willReturn(aResponse().withFault(CONNECTION_RESET_BY_PEER)))
+testApp(petshop.subgraph<PetShop>().overridingConfig("""petshop.registry.baseUrl = "${registry.baseUrl()}"""")) { shop: PetShop ->
+    shop.adopt(PetId(1), by = "Ada")
+} shouldBe Left(RegistryDown(1))
 ```
 
 and what the load test asks:
