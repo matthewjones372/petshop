@@ -75,9 +75,10 @@ Adopt ─▶ shop actor ─▶ { pets, outbox }      one transition, no dual wri
   (`mapPar`, because the ask blocks), publishes each event, and tells the actor
   `Sent` only once the bus has taken it. A refusal is `divertLefts`-ed to a sink
   that logs and counts it, and the event stays in the outbox for the next tick.
-- **The bus** is a bounded queue into a Pekko `BroadcastHub` in the same process,
-  standing where a broker would. It refuses the way one does: when full, and
-  once closed.
+- **The bus** is a bounded queue per subscriber in the same process, standing
+  where a broker would. It refuses the way one does: when full, and once
+  closed. What is published before anyone subscribes waits for the first
+  subscriber rather than being dropped.
 - **The consumer** is `bus.subscribe()`: `statefulMap` remembers every `seq` it
   has seen, because at-least-once means some arrive twice, and `scan` folds the
   rest into a `Tally`. `/stats` reports how many duplicates it dropped.
@@ -89,7 +90,7 @@ here stands in for that transaction.
 ### The application is a value
 
 ```kotlin
-val petshop: Module = settings + telemetry + registry + theShop + arrivals + events + web
+val petshop: Module = settings + telemetry + registry + theShop + streams + arrivals + events + web
 
 object Petshop : LarkApp<PelicanServer>() {
     override val module: Module = petshop
@@ -301,6 +302,24 @@ spec and a change in `0.5.0`:
   the delay the schedule decides, with a warn line each time, and keeps the
   declared failure in the type. Starting again loses nothing here: whatever was
   not marked sent is still in the outbox.
+
+### The streams run on Forks, not Pekko
+
+The arrivals feed, the relay and the projection are descriptions, so which
+backend runs them is one node in the graph: `streams` binds `Forks`, lark's pull
+loop on virtual threads, to `StreamBackend`. The actor and the HTTP server still
+run on Pekko; only the streams moved, and nothing that describes one changed.
+
+The bus changed with them. It was a queue into a Pekko `BroadcastHub`, which
+needs a materializer; now each subscriber reads its own bounded queue, and
+`BusSpec` holds it to what the hub did: early events reach the first
+subscriber in order, a full queue refuses rather than drops, and closing the
+bus or stopping the reader ends a subscription at once.
+
+Moving found one bug, in lark: on Forks, a `restartOnDefect` waiting on its next
+tick took the stop's interrupt for a defect and restarted, so stopping the relay
+hung the test run. Lark `0.6.0` fixes it, with a test that stopped a run in
+exactly that state, and this service needs that version.
 
 ### The wiring check: cheap, and it found nothing here
 
