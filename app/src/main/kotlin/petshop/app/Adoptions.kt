@@ -35,9 +35,18 @@ data class Find(val id: PetId, val replyTo: ActorRef<Option<Pet>>) : Shop
 
 data class Adopt(val id: PetId, val by: String, val replyTo: ActorRef<Either<PetShopError, Pet>>) : Shop
 
+/**
+ * An adoption undone: the actor said yes, and then the registry would not record the new keeper. The
+ * pet goes back on the shelf rather than out of the door untraceable.
+ */
+data class Returned(val id: PetId) : Shop
+
 fun shop(pets: Map<PetId, Pet> = emptyMap()): Behavior<Shop> =
     Behaviors.receive(Shop::class.java)
         .onMessage(Arrived::class.java) { arrival -> shop(pets + (arrival.pet.id to arrival.pet)) }
+        .onMessage(Returned::class.java) { returned ->
+            pets[returned.id]?.let { pet -> shop(pets + (pet.id to pet.copy(adopted = false))) } ?: Behaviors.same()
+        }
         .onMessage(Everything::class.java) { asked ->
             asked.replyTo.tell(pets.values.sortedBy { it.id.value })
             Behaviors.same()

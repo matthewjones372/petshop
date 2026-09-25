@@ -1,0 +1,12 @@
+POST /pets/404/adoption
+
+
+--- response
+
+404
+Content-Type: application/json
+
+{
+  "id": 404,
+  "message": "No pet 404"
+}

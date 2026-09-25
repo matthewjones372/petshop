@@ -10,6 +10,7 @@ val larkVersion = "0.4.0"
 
 dependencies {
     api(project(":api"))
+    implementation(project(":registry"))
     implementation("io.github.matthewjones372:lark-app:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-pekko:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
@@ -17,6 +18,9 @@ dependencies {
     implementation("io.github.matthewjones372:lark-pekko:$larkVersion")
     implementation("io.github.matthewjones372:lark-otel:$larkVersion")
     implementation("io.opentelemetry:opentelemetry-sdk:1.51.0")
+
+    // The shop's client for the chip registry sends through Pekko HTTP, on the system it already runs.
+    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1")
 
     // On the classpath and nothing else: each registers itself through a
     // ServiceLoader, so the service's own lines and numbers go where its
@@ -33,4 +37,8 @@ dependencies {
 
     // A claim about a backend is worth having only against the real one.
     testImplementation("ch.qos.logback:logback-classic:1.5.20")
+
+    // A real HTTP server playing the registry, stubbed in the registry's own endpoints.
+    testImplementation(project(":pelican-wiremock"))
+    testImplementation(project(":registry"))
 }

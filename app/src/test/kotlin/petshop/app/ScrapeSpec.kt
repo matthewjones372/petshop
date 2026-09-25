@@ -21,7 +21,7 @@ import petshop.domain.PetShop
  */
 class ScrapeSpec {
 
-    private val settled: Module = petshop.subgraph<PetShop>()
+    private val settled: Module = shopWith(FakeRegistry())
 
     @Test
     fun `an adoption is a line in the scrape, with the outcome as a label`() {

@@ -11,10 +11,12 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
+import petshop.domain.NotChipped
 import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.PetShopError
+import petshop.domain.RegistryDown
 import petshop.domain.Species
 
 private class OnePet(private var pet: Pet) : PetShop {
@@ -62,6 +64,21 @@ class ContractSpec {
         app.outcome(adoptPet, 1L).shouldBeOk() shouldBe nibbles.copy(adopted = true)
 
         app.outcome(adoptPet, 1L).shouldBeError() shouldBe AlreadyAdopted(1)
+    }
+
+    @Test
+    fun `the registry's refusals reach the caller as failures the endpoint declared`() {
+        listOf(NotChipped(1), RegistryDown(1)).forEach { refusal ->
+            val refusing = petshopApi(
+                shop = object : PetShop by OnePet(nibbles) {
+                    override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = refusal.left()
+                },
+                health = { Healthy(ready = true, failing = emptyList()) },
+                scrape = { "" },
+            ).inMemory("petshop-refusing-${refusal::class.simpleName}")
+
+            refusing.outcome(adoptPet, 1L).shouldBeError() shouldBe refusal
+        }
     }
 
 }

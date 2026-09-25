@@ -31,7 +31,7 @@ class LoggingSpec {
 
     private val backend = (LoggerFactory.getILoggerFactory() as LoggerContext).getLogger("lark")
 
-    private val settled: Module = petshop.subgraph<PetShop>()
+    private val settled: Module = shopWith(FakeRegistry())
 
     @BeforeEach
     fun attach() {
