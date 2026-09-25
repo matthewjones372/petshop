@@ -29,6 +29,7 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import petshop.api.adoptPet
 import petshop.api.listPets
 import petshop.app.RegistrySettings
+import petshop.app.onAFreshDatabase
 import petshop.app.petshop
 import petshop.domain.AlreadyAdopted
 import petshop.registry.ChipRecord
@@ -40,7 +41,8 @@ import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
  * The whole application under load, started by its own graph in this process: the actor, the arrivals
  * stream and the endpoints, exactly as `main` starts them. Nothing of the shop's is stubbed, and the
  * graph is given back when the block returns. The chip registry is somebody else's service, so it is
- * a WireMock server that knows every chip — the one node that differs from `main`.
+ * a WireMock server that knows every chip, and the outbox is in a Postgres the test starts — the two
+ * nodes that differ from `main`.
  *
  * The load runs through Pelican's own typed client, so no URL appears in this file at all: a step
  * names the endpoint it calls, and what it expects back is the failure the endpoint declared rather
@@ -58,6 +60,7 @@ class PetshopLoadTest {
 
     private val theShop: Module =
         petshop.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
+            .onAFreshDatabase()
 
     private val browse = step("browse the shop")
 
