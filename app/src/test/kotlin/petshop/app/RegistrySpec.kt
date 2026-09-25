@@ -4,12 +4,17 @@ import com.github.tomakehurst.wiremock.http.Fault
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.parMap
 import io.github.matthewjones372.pelican.In2
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
+import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.withClue
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.measureTimedValue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import petshop.domain.NotChipped
@@ -22,10 +27,6 @@ import petshop.registry.Problem
 import petshop.registry.lookupChip
 import petshop.registry.noSuchChip
 import petshop.registry.recordKeeper
-import petshop.wiremock.PelicanWireMock
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.measureTimedValue
 
 /**
  * The shop against a registry that is a real HTTP server, with the shop's own client talking to it.
@@ -40,7 +41,7 @@ class RegistrySpec {
 
     @JvmField
     @RegisterExtension
-    val registry = PelicanWireMock()
+    val registry = PelicanWireMockExtension(JacksonCodecs)
 
     private val shop = shopCalling(registry)
 

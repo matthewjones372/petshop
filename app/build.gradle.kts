@@ -11,8 +11,7 @@ plugins {
 
 application { mainClass.set("petshop.app.MainKt") }
 
-// `-PlarkVersion=0.4.1-SNAPSHOT` builds against a lark installed with `publishToMavenLocal`.
-val larkVersion: String = providers.gradleProperty("larkVersion").getOrElse("0.7.0")
+val larkVersion: String = providers.gradleProperty("larkVersion").get()
 
 dependencies {
     api(project(":api"))
@@ -37,7 +36,7 @@ dependencies {
     implementation("io.opentelemetry:opentelemetry-sdk:1.51.0")
 
     // The shop's client for the chip registry sends through Pekko HTTP, on the system it already runs.
-    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC3")
 
     // On the classpath and nothing else: each registers itself through a
     // ServiceLoader, so the service's own lines and numbers go where its
@@ -63,6 +62,6 @@ dependencies {
     testImplementation("io.github.embeddedkafka:embedded-kafka_2.13:3.8.0")
 
     // A real HTTP server playing the registry, stubbed in the registry's own endpoints.
-    testImplementation(project(":pelican-wiremock"))
+    testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC3")
     testImplementation(project(":registry"))
 }

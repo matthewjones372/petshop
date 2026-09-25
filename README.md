@@ -22,7 +22,6 @@ it, and a load test that runs the whole thing in its own process.
 |---|---|---|
 | `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | none |
 | `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
-| `pelican-wiremock` | WireMock, stubbed and verified in endpoint values rather than URLs | Pelican, WireMock |
 | `api` | the endpoints, their failures, the handlers | Pelican |
 | `app` | the actor, the arrivals stream, the chip registry's client, the outbox relay, the bus (in process, or Kafka carrying Avro) and its consumer, the wiring, `main` | Lark, kimney |
 | `loadtest` | the shop under load, started in-process | Proofload |
@@ -173,7 +172,7 @@ petshop.overriding(single<ChipRegistry> { FakeRegistry() }).subgraph<PetShop>()
 
 // about the client: keep the node, swap the server. The stubs are the registry's own
 // endpoints, so they move with its contract; the answers are values it declares.
-@RegisterExtension val registry = PelicanWireMock()
+@RegisterExtension val registry = PelicanWireMockExtension(JacksonCodecs)
 
 registry.stub(lookupChip, 1L) answers ok(ChipRecord("981000000000001", keeper = "Petshop"))
 registry.stub(recordKeeper, In2("981000000000001", NewKeeper("Ada"))) fails Fault.CONNECTION_RESET_BY_PEER
