@@ -6,6 +6,7 @@ import arrow.core.right
 import io.github.matthewjones372.lark.TestClock
 import io.github.matthewjones372.lark.stream.Exit
 import io.github.matthewjones372.lark.stream.Running
+import io.github.matthewjones372.lark.stream.Run
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.TestStreams
 import io.github.matthewjones372.lark.stream.start
@@ -66,7 +67,7 @@ private class Taking(private val refuses: (ShopEvent) -> Boolean = { false }) : 
             event.right()
         }
 
-    override fun subscribe(): Stream<Nothing, ShopEvent> = error("nothing reads the bus in these tests")
+    override fun consume(each: (ShopEvent) -> Unit): Run<Nothing, Long> = error("nothing reads the bus in these tests")
 }
 
 private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)

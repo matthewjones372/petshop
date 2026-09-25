@@ -3,6 +3,11 @@ plugins {
     `java-test-fixtures`
     // Checks every graph in this project on `check`, and renders each one.
     id("io.github.matthewjones372.lark.wiring") version "0.2.0"
+    // The shop's events on the wire are Avro records, derived by avro4k from @Serializable classes.
+    kotlin("plugin.serialization")
+    // Domain events to wire records and back, derived at compile time: a field that cannot be mapped
+    // does not compile.
+    id("io.github.matthewjones372.kimney") version "0.3.0"
 }
 
 application { mainClass.set("petshop.app.MainKt") }
@@ -19,6 +24,15 @@ dependencies {
     // the graph decides, and RelaySpec runs the same description on a clock the test moves.
     implementation("io.github.matthewjones372:lark-stream-pekko:$larkVersion")
     implementation("io.github.matthewjones372:lark-pekko:$larkVersion")
+    // The bus on Kafka: a consumer loop on whichever backend the graph names, committing what it handled.
+    implementation("io.github.matthewjones372:lark-kafka:$larkVersion")
+    // Avro records carried in the schema registry's wire format, and derived from Kotlin classes.
+    // 7.8 is built on Kafka 3.8, the client lark-kafka is.
+    implementation("io.confluent:kafka-avro-serializer:7.8.0")
+    // Confluent 7.8 asks for its own build of the 3.8 client, 7.8.0-ccs; the Apache one it is built from is
+    // the one lark-kafka is built against, so there is one Kafka client on the classpath.
+    implementation("org.apache.kafka:kafka-clients") { version { strictly("3.8.0") } }
+    implementation("com.github.avro-kotlin.avro4k:avro4k-core:2.12.0")
     implementation("io.github.matthewjones372:lark-otel:$larkVersion")
     implementation("io.opentelemetry:opentelemetry-sdk:1.51.0")
 
@@ -54,6 +68,10 @@ dependencies {
 
     // The relay on time the test owns: an interval of ticks is one clock.adjust, and nothing sleeps.
     testImplementation("io.github.matthewjones372:lark-stream-test:$larkVersion")
+
+    // The same Kafka bus on the other backend, and a broker in the test JVM so the suite needs no Docker.
+    testImplementation("io.github.matthewjones372:lark-stream-forks:$larkVersion")
+    testImplementation("io.github.embeddedkafka:embedded-kafka_2.13:3.8.0")
 
     // A real HTTP server playing the registry, stubbed in the registry's own endpoints.
     testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC3")
