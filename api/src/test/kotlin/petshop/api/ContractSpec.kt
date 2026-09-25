@@ -11,10 +11,12 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
+import petshop.domain.NotChipped
 import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.PetShopError
+import petshop.domain.RegistryDown
 import petshop.domain.Species
 
 private class OnePet(private var pet: Pet) : PetShop {
@@ -41,6 +43,7 @@ class ContractSpec {
         shop = OnePet(nibbles),
         health = { Healthy(ready = true, failing = emptyList()) },
         scrape = { "petshop_adoptions_total 1.0" },
+        tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
     ).inMemory("petshop-contract")
 
     @Test
@@ -55,6 +58,7 @@ class ContractSpec {
         app.request(listPets, Unit) shouldBuild "GET /pets"
         app.request(health, Unit) shouldBuild "GET /health"
         app.request(metrics, Unit) shouldBuild "GET /metrics"
+        app.request(stats, Unit) shouldBuild "GET /stats"
     }
 
     @Test
@@ -72,6 +76,22 @@ class ContractSpec {
     @Test
     fun `the DTO carries the id inside PetId, so the JSON id is a plain number`() {
         nibbles.toDto() shouldBe PetDto(1, "Nibbles", SpeciesDto.Tortoise, adopted = false)
+    }
+
+    @Test
+    fun `the registry's refusals reach the caller as failures the endpoint declared`() {
+        listOf(NotChipped(1), RegistryDown(1)).forEach { refusal ->
+            val refusing = petshopApi(
+                shop = object : PetShop by OnePet(nibbles) {
+                    override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = refusal.left()
+                },
+                health = { Healthy(ready = true, failing = emptyList()) },
+                scrape = { "" },
+                tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+            ).inMemory("petshop-refusing-${refusal::class.simpleName}")
+
+            refusing.outcome(adoptPet, 1L).shouldBeError() shouldBe refusal.toDto()
+        }
     }
 
 }

@@ -1,0 +1,58 @@
+{
+  "paths": {
+    "/metrics": {
+      "get": {
+        "summary": "Every meter, in Prometheus' exposition format",
+        "operationId": "getMetrics",
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal: this request was not answered by the operation above.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "error": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "error",
+          "status"
+        ]
+      }
+    }
+  }
+}

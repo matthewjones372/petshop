@@ -1,0 +1,204 @@
+{
+  "paths": {
+    "/pets/{petId}/adoption": {
+      "post": {
+        "summary": "Take a pet home",
+        "operationId": "postPetsByPetIdAdoption",
+        "parameters": [
+          {
+            "name": "petId",
+            "in": "path",
+            "required": true,
+            "description": "The pet's id",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PetDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No pet with that id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoSuchPet"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That pet has already been adopted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlreadyAdopted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The registry has no chip for that pet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotChipped"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The chip registry could not be reached; try again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryDown"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal: this request was not answered by the operation above.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PetDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "species": {
+            "type": "string",
+            "enum": [
+              "Cat",
+              "Dog",
+              "Parrot",
+              "Tortoise"
+            ]
+          },
+          "adopted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "adopted",
+          "id",
+          "name",
+          "species"
+        ]
+      },
+      "NoSuchPet": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "message"
+        ]
+      },
+      "AlreadyAdopted": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "message"
+        ]
+      },
+      "NotChipped": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "message"
+        ]
+      },
+      "RegistryDown": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "message"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "error": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "error",
+          "status"
+        ]
+      }
+    }
+  }
+}

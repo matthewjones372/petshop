@@ -20,9 +20,11 @@ it, and a load test that runs the whole thing in its own process.
 
 | Module | What it holds | Library |
 |---|---|---|
-| `domain` | `Pet`, `PetShop`, and the two ways adopting can fail | none |
+| `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | none |
+| `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
+| `pelican-wiremock` | WireMock, stubbed and verified in endpoint values rather than URLs | Pelican, WireMock |
 | `api` | the endpoints, their failures, the handlers, the DTOs | Pelican, kimney |
-| `app` | the actor, the arrivals stream, the wiring, `main` | Lark |
+| `app` | the actor, the arrivals stream, the chip registry's client, the outbox relay, the bus and its consumer, the wiring, `main` | Lark |
 | `loadtest` | the shop under load, started in-process | Proofload |
 
 ### The contract is a value
@@ -67,10 +69,43 @@ this repository.
 New pets keep arriving. `Stream.tick(...)` into the actor, with the failure the
 feed can end with in its type — `Stream<Nothing, Pet>` says this one cannot fail.
 
+### What happened leaves through an outbox
+
+Every arrival and every adoption is also an event, and something else in the
+service reads them: a projection that tallies arrivals and adoptions by species
+and serves the result at `/stats`.
+
+```
+Adopt ─▶ shop actor ─▶ { pets, outbox }      one transition, no dual write
+                             │
+         relay: tick ─▶ Unsent ─▶ publish ─▶ Sent        at least once
+                                     │
+                          refused ◀──┴──▶ bus ─▶ projection ─▶ /stats
+                     (next tick)            dedupe by seq, fold
+```
+
+- **The outbox is the actor's state.** The pets and the unsent events are one
+  value, so selling a pet and recording that it was sold are one transition.
+  There is no moment where one happened and the other did not.
+- **The relay is a stream.** `Stream.tick` asks the actor for what is unsent
+  (`mapPar`, because the ask blocks), publishes each event, and tells the actor
+  `Sent` only once the bus has taken it. A refusal is `divertLefts`-ed to a sink
+  that logs and counts it, and the event stays in the outbox for the next tick.
+- **The bus** is a bounded queue into a Pekko `BroadcastHub` in the same process,
+  standing where a broker would. It refuses the way one does: when full, and
+  once closed.
+- **The consumer** is `bus.subscribe()`: `statefulMap` remembers every `seq` it
+  has seen, because at-least-once means some arrive twice, and `scan` folds the
+  rest into a `Tally`. `/stats` reports how many duplicates it dropped.
+
+The outbox lives in memory, so it proves the ordering and not durability. A
+real one is a table written in the same transaction as the sale, and the actor
+here stands in for that transaction.
+
 ### The application is a value
 
 ```kotlin
-val petshop: Module = settings + telemetry + theShop + arrivals + web
+val petshop: Module = settings + telemetry + registry + theShop + arrivals + events + web
 
 object Petshop : LarkApp<PelicanServer>() {
     override val module: Module = petshop
@@ -85,6 +120,18 @@ which is what the compiler checks the graph against as you type, and what
 The load test starts the same value in its own process, runs two thousand
 requests through it, and gets the port back afterwards.
 
+### Somebody else's service
+
+An adoption is recorded with the national chip registry: a `GET` for the pet's
+chip, then a `POST` naming its new keeper. The actor settles who gets the pet
+first, so the losers of a race never reach the registry, and a registry that
+cannot record the keeper puts the pet back on the shelf.
+
+The registry's contract is written the way the shop's own is, as values, in
+`registry`. The client is generated from them by Pelican's Gradle plugin,
+committed, and checked on every build; `HttpChipRegistry` is what is left, the
+shop's decision about which answers mean "no chip" and which mean "could not ask".
+
 ## What a test looks like
 
 ```kotlin
@@ -96,6 +143,27 @@ testApp(petshop.subgraph<PetShop>()) { shop: PetShop ->
 // one setting changed; application.conf keeps the rest
 testApp(petshop.subgraph<Settings>().overridingConfig("petshop.arrivalsEvery = 1s")) { it }
 ```
+
+Somebody else's service is replaced in one of two places, depending on what the test is about:
+
+```kotlin
+// about the shop: swap the node. `overriding` refuses a key the graph does not hold,
+// so a fake bound under the wrong type cannot leave the real client running beside it.
+petshop.overriding(single<ChipRegistry> { FakeRegistry() }).subgraph<PetShop>()
+
+// about the client: keep the node, swap the server. The stubs are the registry's own
+// endpoints, so they move with its contract; the answers are values it declares.
+@RegisterExtension val registry = PelicanWireMock()
+
+registry.stub(lookupChip, 1L) answers ok(ChipRecord("981000000000001", keeper = "Petshop"))
+registry.stub(recordKeeper, In2("981000000000001", NewKeeper("Ada"))) fails Fault.CONNECTION_RESET_BY_PEER
+
+testApp(shopCalling(registry)) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") } shouldBeLeft RegistryDown(1)
+```
+
+and what the shop has promised its callers is a set of golden files:
+`golden.operations(api.spec())` fails on a change that would break somebody
+already calling, and rewrites the file on one that would not.
 
 and what the load test asks:
 
@@ -206,6 +274,50 @@ bargain — but a service taking it on should know it is taking on a moving part
 in exchange for an earlier error, and that `larkWiring` is what it would fall
 back to.
 
+### lark-stream: yes for the relay, once three rough edges were fixed
+
+The outbox relay and the projection are the first things here to use more of
+`lark-stream` than `tick` and `map`. `EventsSpec` covers the claims below: an
+adoption reaches the consumer, a refused event goes again, and an event
+delivered twice is counted once.
+
+**A refusal is not a failure, and the type says so.** `publish` answers
+`Either<BusRefused, ShopEvent>`, and `divertLefts` sends each `Left` to a named
+sink and keeps the stream `Stream<Nothing, ShopEvent>`. In plain Pekko you would
+write `divertTo` with a predicate and a cast. Here nothing is carried in the
+element past the point where it stopped mattering.
+
+**A blocking call has an obvious home.** The ask to the actor blocks. `mapPar`
+runs it on a virtual thread, so no Pekko dispatcher thread is held and there is
+no `CompletionStage` to build by hand.
+
+**An idempotent consumer is two operators.** `statefulMap` carries the seen
+`seq`s and `scan` carries the tally, both as plain Kotlin values. Duplicates are
+counted, not hidden.
+
+Writing the relay against `0.4.0` found three rough edges, and each became a lark
+spec and a change in `0.5.0`:
+
+- **`mapPar` on a stream with no failure type could not infer one from a body
+  that never raises** ([spec 0043](https://github.com/matthewjones372/lark/blob/main/specs/0043-two-signatures-a-relay-tripped-on.md)).
+  The relay had to write `mapPar<Nothing, _, _>(1)`. Now `mapPar` keeps the
+  stream's failure type, and the form that reads one out of a `raise` is
+  `mapParOrFail`, matching `mapOrFail`. The same spec moved `groupedWithin` onto
+  `kotlin.time.Duration`, which is what `tick` takes.
+- **Nothing could stop a running stream from outside**
+  ([spec 0044](https://github.com/matthewjones372/lark/blob/main/specs/0044-a-run-you-can-stop.md)).
+  The relay used to stop through a flag and `takeWhile`, at the next tick.
+  `Run.start` now answers a `Running`, and its `close` is the node's release:
+  the relay stops at once, before the bus it publishes to closes. The arrivals
+  feed, which used to end only when the actor system went, stops the same way.
+- **One `Died` ended the relay for good**
+  ([spec 0045](https://github.com/matthewjones372/lark/blob/main/specs/0045-a-stream-that-starts-again.md)).
+  A timed-out ask would have stopped the outbox draining until the process
+  restarted. `restartOnDefect(schedule)` runs the same description again after
+  the delay the schedule decides, with a warn line each time, and keeps the
+  declared failure in the type. Starting again loses nothing here: whatever was
+  not marked sent is still in the outbox.
+
 ### The wiring check: cheap, and it found nothing here
 
 `lark-app-gradle` checks every graph in the project as it compiles and draws
@@ -295,7 +407,7 @@ The whole load test is thirty lines including imports.
 ### kimney: yes, for the drift rather than the lines
 
 Five mappings in `api/Dtos.kt`, one line each, where the hand-written version is
-a constructor call, a `when` over four species and a `when` over two failures.
+a constructor call, a `when` over four species and a `when` over four failures.
 At this size that saves little typing, and typing is not the point.
 
 What it buys is that the wire cannot drift from the domain without the build
@@ -372,7 +484,7 @@ the edge does with it, and the edge is the part a service writes itself.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.4.0`, Proofload `0.1.0-rc4`, kimney `0.3.0`, Kotlin
+Pelican `1.0.0-RC1`, Lark `0.5.0`, Proofload `0.1.0-rc4`, kimney `0.3.0`, Kotlin
 2.4.10, JDK 21.
 
 `singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler

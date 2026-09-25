@@ -1,0 +1,126 @@
+{
+  "paths": {
+    "/pets/{petId}": {
+      "get": {
+        "summary": "One pet",
+        "operationId": "getPetsByPetId",
+        "parameters": [
+          {
+            "name": "petId",
+            "in": "path",
+            "required": true,
+            "description": "The pet's id",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PetDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No pet with that id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoSuchPet"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal: this request was not answered by the operation above.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PetDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "species": {
+            "type": "string",
+            "enum": [
+              "Cat",
+              "Dog",
+              "Parrot",
+              "Tortoise"
+            ]
+          },
+          "adopted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "adopted",
+          "id",
+          "name",
+          "species"
+        ]
+      },
+      "NoSuchPet": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "message"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "error": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "error",
+          "status"
+        ]
+      }
+    }
+  }
+}

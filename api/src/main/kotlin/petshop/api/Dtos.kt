@@ -23,6 +23,10 @@ sealed interface ProblemDto {
     data class NoSuchPet(override val id: Long, override val message: String) : ProblemDto
 
     data class AlreadyAdopted(override val id: Long, override val message: String) : ProblemDto
+
+    data class NotChipped(override val id: Long, override val message: String) : ProblemDto
+
+    data class RegistryDown(override val id: Long, override val message: String) : ProblemDto
 }
 
 fun Pet.toDto(): PetDto = transformInto()

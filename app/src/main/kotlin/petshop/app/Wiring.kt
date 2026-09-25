@@ -1,6 +1,8 @@
 package petshop.app
 
 import arrow.core.Either
+import arrow.core.flatMap
+import arrow.core.raise.either
 import io.github.matthewjones372.lark.app.AppScope
 import io.github.matthewjones372.lark.app.Health
 import io.github.matthewjones372.lark.app.HealthRegistry
@@ -21,6 +23,8 @@ import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.logSpan
 import io.github.matthewjones372.lark.logWarn
 import io.github.matthewjones372.lark.otel.tracedSpan
+import io.github.matthewjones372.lark.stream.PekkoStreams
+import io.github.matthewjones372.lark.stream.StreamBackend
 import io.opentelemetry.api.trace.Tracer
 import io.micrometer.core.instrument.Metrics as MicrometerRegistries
 import io.micrometer.prometheus.PrometheusConfig
@@ -38,18 +42,24 @@ import org.apache.pekko.actor.typed.javadsl.Adapter
 import petshop.api.Healthy
 import petshop.api.petshopApi
 import petshop.domain.AlreadyAdopted
+import petshop.domain.ChipRegistry
 import petshop.domain.NoSuchPet
+import petshop.domain.NotChipped
+import petshop.domain.NotRegistered
 import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.PetShopError
+import petshop.domain.RegistryDown
+import petshop.domain.RegistryError
+import petshop.domain.Unreachable
 import petshop.domain.Species
 import kotlin.reflect.typeOf
 import kotlin.time.Duration
 import org.apache.pekko.actor.typed.ActorSystem as TypedSystem
 import kotlin.time.Duration.Companion.seconds
 
-data class Settings(val port: Int, val arrivalsEvery: Duration)
+data class Settings(val port: Int, val arrivalsEvery: Duration, val outboxEvery: Duration)
 
 /** The catalogue the shop opens with, before any arrival. */
 val opening: List<Pet> = listOf(
@@ -63,6 +73,7 @@ class ActorPetShop(
     private val ref: ActorRef<Shop>,
     private val system: ActorSystem,
     private val tracer: Tracer,
+    private val registry: ChipRegistry,
 ) : PetShop {
 
     override fun all(): List<Pet> = ref.ask(system, asking) { replyTo -> Everything(replyTo) }
@@ -86,7 +97,7 @@ class ActorPetShop(
                     // Timed around the ask, so a refusal is in the distribution too: the slow calls
                     // are the ones worth seeing and most of them are the ones that failed.
                     timed("petshop.adopt.duration") {
-                        ref.ask(system, asking) { replyTo -> Adopt(id, by, replyTo) }.also { answer ->
+                        handOver(id, by).also { answer ->
                             answer.fold(
                                 { no ->
                                     logWarn(no.message)
@@ -112,6 +123,32 @@ class ActorPetShop(
                 }
             }
         }
+
+    /**
+     * The actor decides who gets the pet, and only then is the registry asked: a race is lost in the
+     * shop without costing the loser a call to somebody else's service, and a pet somebody already has
+     * never reaches the registry at all.
+     *
+     * If the registry cannot record the new keeper, the pet goes back on the shelf. The shop does not
+     * hand over a pet nobody could trace, and it does not keep one it has already refused to sell.
+     */
+    private fun handOver(id: PetId, by: String): Either<PetShopError, Pet> = either {
+        val pet = ref.ask(system, asking) { replyTo -> Adopt(id, by, replyTo) }.bind()
+        registry.lookup(id)
+            .flatMap { chip -> registry.transfer(chip, to = by) }
+            .onLeft { failure ->
+                logWarn("registry refused pet ${id.value}: $failure")
+                ref.tell(Returned(id))
+            }
+            .mapLeft { failure -> failure.refusing(id) }
+            .bind()
+        pet
+    }
+}
+
+private fun RegistryError.refusing(id: PetId): PetShopError = when (this) {
+    NotRegistered -> NotChipped(id.value)
+    is Unreachable -> RegistryDown(id.value)
 }
 
 private val asking = 3.seconds
@@ -120,10 +157,14 @@ private val asking = 3.seconds
 private fun PetShopError.outcome(): String = when (this) {
     is NoSuchPet -> "no_such_pet"
     is AlreadyAdopted -> "already_adopted"
+    is NotChipped -> "not_chipped"
+    is RegistryDown -> "registry_down"
 }
 
 private val settings: Module =
-    loadedConfig() + config<Settings>("petshop") { Settings(int("port"), duration("arrivalsEvery")) }
+    loadedConfig() + config<Settings>("petshop") {
+        Settings(int("port"), duration("arrivalsEvery"), duration("outboxEvery"))
+    }
 
 private val telemetry: Module =
     // Added to Micrometer's global composite, which is where lark-micrometer writes unless it is
@@ -147,13 +188,22 @@ private val theShop: Module =
         singleOf(::ActorPetShop).boundTo<PetShop>()
             .probe("shop", timeout = 3.seconds) { shop: PetShop -> shop.all().isNotEmpty() }
 
+private val events: Module =
+    // What the relay runs on. The relay describes its stream and names no backend; this is the one
+    // place that decides, and a test that wants the relay on its own clock overrides it.
+    single { system: ActorSystem -> PekkoStreams(system) }.boundTo<StreamBackend>() +
+        // Closed after the relay stops publishing to it, because the relay depends on it.
+        singleOf({ system: ActorSystem -> HubBus(system) }, { bus -> bus.close() }).boundTo<EventBus>() +
+        outbox +
+        projection
+
 private val web: Module =
     // The port is a resource like any other: bound here, unbound when the graph is given back, which
     // is what lets a load test start the whole application in its own process.
     singleOf(
         { shop: PetShop, config: Settings, system: TypedSystem<Void>, health: HealthRegistry,
-            registry: PrometheusMeterRegistry, _: Arrivals ->
-            petshopApi(shop, { asked(health) }, registry::scrape)
+            registry: PrometheusMeterRegistry, projection: Projection, _: Arrivals, _: OutboxRelay ->
+            petshopApi(shop, { asked(health) }, registry::scrape, projection::tally)
                 .startWithDocs(system, port = config.port, docs = docs { docsPath = "/api-docs" })
         },
         { server -> server.stop() },
@@ -166,7 +216,7 @@ private fun asked(health: HealthRegistry): Healthy = when (val readiness = healt
     is Health.Down -> Healthy(ready = false, failing = readiness.failing)
 }
 
-val petshop: Module = settings + telemetry + theShop + arrivals + web
+val petshop: Module = settings + telemetry + registry + theShop + arrivals + events + web
 
 /**
  * The application as a value, so `main` is the leaving and the build can read the root it starts
