@@ -10,6 +10,7 @@ val larkVersion = "0.4.0"
 
 dependencies {
     api(project(":api"))
+    implementation(project(":registry"))
     implementation("io.github.matthewjones372:lark-app:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-pekko:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
@@ -37,7 +38,7 @@ dependencies {
     // A claim about a backend is worth having only against the real one.
     testImplementation("ch.qos.logback:logback-classic:1.5.20")
 
-    // A real HTTP server playing the registry. The standalone jar shades its Jetty and Jackson, so the
-    // versions the shop runs are the versions under test.
-    testImplementation("org.wiremock:wiremock-standalone:3.13.1")
+    // A real HTTP server playing the registry, stubbed in the registry's own endpoints.
+    testImplementation(project(":pelican-wiremock"))
+    testImplementation(project(":registry"))
 }

@@ -3,9 +3,9 @@ val proofloadVersion = "0.1.0-rc4"
 dependencies {
     testImplementation(project(":app"))
     testImplementation("io.github.matthewjones372:lark-app:0.4.0")
-    testImplementation("io.github.matthewjones372:lark-app-typesafe:0.4.0")
     // The chip registry the shop calls out to, played by a real HTTP server.
-    testImplementation("org.wiremock:wiremock-standalone:3.13.1")
+    testImplementation(project(":pelican-wiremock"))
+    testImplementation(project(":registry"))
     // Pelican's typed client, pointed at a real server: the load names endpoints and never a URL,
     // which is also why `proofload-http` is not here.
     testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC1")

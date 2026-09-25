@@ -20,7 +20,9 @@ it, and a load test that runs the whole thing in its own process.
 
 | Module | What it holds | Library |
 |---|---|---|
-| `domain` | `Pet`, `PetShop`, and the two ways adopting can fail | none |
+| `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | none |
+| `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
+| `pelican-wiremock` | WireMock, stubbed and verified in endpoint values rather than URLs | Pelican, WireMock |
 | `api` | the endpoints, their failures, the handlers | Pelican |
 | `app` | the actor, the arrivals stream, the chip registry's client, the wiring, `main` | Lark |
 | `loadtest` | the shop under load, started in-process | Proofload |
@@ -76,9 +78,10 @@ chip, then a `POST` naming its new keeper. The actor settles who gets the pet
 first, so the losers of a race never reach the registry, and a registry that
 cannot record the keeper puts the pet back on the shelf.
 
-The client, `HttpChipRegistry`, is hand-written, the way most clients for
-somebody else's API are. That makes it the code worth testing over the wire:
-the path, the body, the status codes and the timeout are all decisions it makes.
+The registry's contract is written the way the shop's own is, as values, in
+`registry`. The client is generated from them by Pelican's Gradle plugin,
+committed, and checked on every build; `HttpChipRegistry` is what is left, the
+shop's decision about which answers mean "no chip" and which mean "could not ask".
 
 ## What a test looks like
 
@@ -99,13 +102,20 @@ Somebody else's service is replaced in one of two places, depending on what the 
 // so a fake bound under the wrong type cannot leave the real client running beside it.
 petshop.overriding(single<ChipRegistry> { FakeRegistry() }).subgraph<PetShop>()
 
-// about the client: keep the node, swap the server. WireMock plays the registry on a
-// random port, and the shop's own client, JSON and timeout are the ones under test.
-registry.stubFor(post("/chips/981000000000001/keeper").willReturn(aResponse().withFault(CONNECTION_RESET_BY_PEER)))
-testApp(petshop.subgraph<PetShop>().overridingConfig("""petshop.registry.baseUrl = "${registry.baseUrl()}"""")) { shop: PetShop ->
-    shop.adopt(PetId(1), by = "Ada")
-} shouldBe Left(RegistryDown(1))
+// about the client: keep the node, swap the server. The stubs are the registry's own
+// endpoints, so they move with its contract; the answers are values it declares.
+@RegisterExtension val registry = PelicanWireMock()
+
+registry.stub(lookupChip, 1L) answers ok(ChipRecord("981000000000001", keeper = "Petshop"))
+registry.stub(recordKeeper, In2("981000000000001", NewKeeper("Ada"))) fails Fault.CONNECTION_RESET_BY_PEER
+
+testApp(shopCalling(registry)) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") } shouldBeLeft RegistryDown(1)
 ```
+
+and what the shop has promised its callers, and what it believes the registry
+accepts, are both golden files: `golden.operations(api.spec())` fails on a
+change that would break somebody already calling, and rewrites the file on one
+that would not.
 
 and what the load test asks:
 

@@ -7,6 +7,7 @@ import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.parMap
+import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -49,7 +50,7 @@ class AdoptionSpec {
             shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1))
         }
 
-        first.leftOrNull() shouldBe RegistryDown(1)
+        first shouldBeLeft RegistryDown(1)
         withClue("the actor said yes before the registry said no, and the no has to undo it") {
             after?.adopted shouldBe false
         }

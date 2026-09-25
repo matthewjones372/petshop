@@ -12,6 +12,9 @@ import petshop.domain.ChipRegistry
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.RegistryError
+import petshop.wiremock.PelicanWireMock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * A registry that knows every pet and records every keeper, for a test about the shop rather than
@@ -35,3 +38,11 @@ class FakeRegistry(private val refusing: RegistryError? = null) : ChipRegistry {
  */
 fun shopWith(registry: ChipRegistry = FakeRegistry()): Module =
     petshop.overriding(single<ChipRegistry> { registry }).subgraph<PetShop>()
+
+/**
+ * The shop exactly as `main` starts it — the real client, its JSON and its timeout — calling
+ * [registry] instead of the real registry. The override is the settings node itself, typed, so there
+ * is no configuration text to get wrong and nothing else about the graph changes.
+ */
+fun shopCalling(registry: PelicanWireMock, timeout: Duration = 2.seconds): Module =
+    petshop.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, timeout) }).subgraph<PetShop>()

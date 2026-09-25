@@ -1,17 +1,13 @@
 package petshop.load
 
-import com.github.tomakehurst.wiremock.WireMockServer
-import com.github.tomakehurst.wiremock.client.WireMock.get
-import com.github.tomakehurst.wiremock.client.WireMock.okJson
-import com.github.tomakehurst.wiremock.client.WireMock.post
-import com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
 import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.typesafe.overridingConfig
+import io.github.matthewjones372.lark.app.overriding
+import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.use
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
-import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.Outcome
+import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.ok
+import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.proofload.at
@@ -21,23 +17,29 @@ import io.github.matthewjones372.proofload.perSecond
 import io.github.matthewjones372.proofload.report.writeHtmlReport
 import io.github.matthewjones372.proofload.scenario
 import io.github.matthewjones372.proofload.step
+import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.withClue
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
-import org.junit.jupiter.api.AfterEach
-import petshop.api.adoptPet
-import petshop.api.listPets
-import petshop.domain.AlreadyAdopted
-import petshop.app.petshop
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import org.junit.jupiter.api.extension.RegisterExtension
+import petshop.api.adoptPet
+import petshop.api.listPets
+import petshop.app.RegistrySettings
+import petshop.app.petshop
+import petshop.domain.AlreadyAdopted
+import petshop.registry.ChipRecord
+import petshop.registry.lookupChip
+import petshop.registry.recordKeeper
+import petshop.wiremock.PelicanWireMock
 
 /**
  * The whole application under load, started by its own graph in this process: the actor, the arrivals
  * stream and the endpoints, exactly as `main` starts them. Nothing of the shop's is stubbed, and the
  * graph is given back when the block returns. The chip registry is somebody else's service, so it is
- * a WireMock server that knows every chip — the one line of configuration that differs from `main`.
+ * a WireMock server that knows every chip — the one node that differs from `main`.
  *
  * The load runs through Pelican's own typed client, so no URL appears in this file at all: a step
  * names the endpoint it calls, and what it expects back is the failure the endpoint declared rather
@@ -45,16 +47,16 @@ import kotlin.time.Duration.Companion.seconds
  */
 class PetshopLoadTest {
 
-    private val registry = WireMockServer(wireMockConfig().dynamicPort()).apply {
-        start()
-        stubFor(get(urlPathMatching("/chips/.+")).willReturn(okJson("""{"number":"981000000000001","keeper":"Petshop"}""")))
-        stubFor(post(urlPathMatching("/chips/.+/keeper")).willReturn(okJson("""{"number":"981000000000001","keeper":"someone"}""")))
+    /** Every pet has a chip and every keeper is recorded: the registry is not what this measures. */
+    @JvmField
+    @RegisterExtension
+    val registry = PelicanWireMock().apply {
+        stub(lookupChip) { petId -> ok(ChipRecord("98100000000000$petId", keeper = "Petshop")) }
+        stub(recordKeeper) { (number, keeper) -> ok(ChipRecord(number, keeper.keeper)) }
     }
 
-    private val theShop: Module = petshop.overridingConfig("""petshop.registry.baseUrl = "${registry.baseUrl()}"""")
-
-    @AfterEach
-    fun stopRegistry() = registry.stop()
+    private val theShop: Module =
+        petshop.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
 
     private val browse = step("browse the shop")
 
@@ -76,7 +78,7 @@ class PetshopLoadTest {
             }
         }
 
-        val result = outcome.getOrNull() ?: error("the petshop did not start")
+        val result = outcome.shouldBeRight()
 
         result.writeHtmlReport(Path.of("build/reports/proofload/browsing.html"))
         result.failed shouldBe 0L
@@ -110,7 +112,7 @@ class PetshopLoadTest {
             }
         }
 
-        val result = outcome.getOrNull() ?: error("the petshop did not start")
+        val result = outcome.shouldBeRight()
 
         result.writeHtmlReport(Path.of("build/reports/proofload/the-rush.html"))
         withClue("every one of them was told the tortoise was gone") { result.failed shouldBe 0L }
