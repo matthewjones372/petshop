@@ -52,7 +52,10 @@ writes each crossing at compile time:
 ```kotlin
 fun Pet.toDto(): PetDto = transformInto()                // PetId unwrapped, Species by name
 fun List<Pet>.toDto(): List<PetDto> = transformInto()
-fun PetShopError.toDto(): ProblemDto = transformInto()   // one case per case, by name
+fun PetShopError.toDto(): ProblemDto = into<_, ProblemDto>()
+    .withSealedCaseRenamed(RegistryDown::class, ProblemDto.Unavailable::class)
+    .withSealedCaseRenamed(NotRecorded::class, ProblemDto.Unavailable::class)
+    .transform()                                          // the rest by name
 ```
 
 The JSON is unchanged — `id` was already a plain number. What changed is that a
@@ -451,7 +454,7 @@ The whole load test is thirty lines including imports.
 ### kimney: yes, for the drift rather than the lines
 
 Five mappings in `api/Dtos.kt`, one line each, where the hand-written version is
-a constructor call, a `when` over four species and a `when` over four failures.
+a constructor call, a `when` over four species and a `when` over five failures.
 At this size that saves little typing, and typing is not the point.
 
 What it buys is that the wire cannot drift from the domain without the build

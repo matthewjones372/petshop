@@ -6,11 +6,8 @@ import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOrFail
 import petshop.domain.NoSuchPet
-import petshop.domain.NotChipped
-import petshop.domain.NotRecorded
 import petshop.domain.PetId
 import petshop.domain.PetShop
-import petshop.domain.RegistryDown
 
 /**
  * The endpoints answered. A handler names the declared failure it is producing, so returning one the

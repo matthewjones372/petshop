@@ -18,7 +18,7 @@ enum class SpeciesDto { Cat, Dog, Parrot, Tortoise }
 /** `id` is the `Long` inside `PetId`: kimney unwraps the value class, so the JSON is a plain number. */
 data class PetDto(val id: Long, val name: String, val species: SpeciesDto, val adopted: Boolean)
 
-/** The declared failures, one case per domain case, matched by name. */
+/** The declared failures: a case per domain failure by name, except where the crossing renames one. */
 sealed interface ProblemDto {
     val id: Long
     val message: String
