@@ -10,8 +10,11 @@ import org.apache.pekko.actor.typed.javadsl.Behaviors
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.Pet
+import petshop.domain.PetAdopted
+import petshop.domain.PetArrived
 import petshop.domain.PetId
 import petshop.domain.PetShopError
+import petshop.domain.ShopEvent
 
 /**
  * The shop's only writer.
@@ -35,19 +38,39 @@ data class Find(val id: PetId, val replyTo: ActorRef<Option<Pet>>) : Shop
 
 data class Adopt(val id: PetId, val by: String, val replyTo: ActorRef<Either<PetShopError, Pet>>) : Shop
 
-fun shop(pets: Map<PetId, Pet> = emptyMap()): Behavior<Shop> =
+/** Up to [limit] of the events nobody has confirmed publishing, oldest first. */
+data class Unsent(val limit: Int, val replyTo: ActorRef<List<ShopEvent>>) : Shop
+
+/** The relay's word that [seq] reached the bus, so it can leave the outbox. */
+data class Sent(val seq: Long) : Shop
+
+/**
+ * The pets and the outbox are one value, so a change and the event saying it happened are one
+ * transition: there is no moment where the shop has sold a pet and not yet recorded that it did.
+ */
+private data class State(val pets: Map<PetId, Pet>, val outbox: List<ShopEvent>, val recorded: Long) {
+
+    fun record(pet: Pet, event: (seq: Long) -> ShopEvent): State =
+        State(pets + (pet.id to pet), outbox + event(recorded + 1), recorded + 1)
+}
+
+fun shop(pets: Map<PetId, Pet> = emptyMap()): Behavior<Shop> = shop(State(pets, emptyList(), 0))
+
+private fun shop(state: State): Behavior<Shop> =
     Behaviors.receive(Shop::class.java)
-        .onMessage(Arrived::class.java) { arrival -> shop(pets + (arrival.pet.id to arrival.pet)) }
+        .onMessage(Arrived::class.java) { arrival ->
+            shop(state.record(arrival.pet) { seq -> PetArrived(seq, arrival.pet) })
+        }
         .onMessage(Everything::class.java) { asked ->
-            asked.replyTo.tell(pets.values.sortedBy { it.id.value })
+            asked.replyTo.tell(state.pets.values.sortedBy { it.id.value })
             Behaviors.same()
         }
         .onMessage(Find::class.java) { asked ->
-            asked.replyTo.tell(Option.fromNullable(pets[asked.id]))
+            asked.replyTo.tell(Option.fromNullable(state.pets[asked.id]))
             Behaviors.same()
         }
         .onMessage(Adopt::class.java) { asked ->
-            val pet = pets[asked.id]
+            val pet = state.pets[asked.id]
             when {
                 pet == null -> {
                     asked.replyTo.tell(NoSuchPet(asked.id.value).left())
@@ -60,8 +83,15 @@ fun shop(pets: Map<PetId, Pet> = emptyMap()): Behavior<Shop> =
                 else -> {
                     val taken = pet.copy(adopted = true)
                     asked.replyTo.tell(taken.right())
-                    shop(pets + (taken.id to taken))
+                    shop(state.record(taken) { seq -> PetAdopted(seq, taken, asked.by) })
                 }
             }
+        }
+        .onMessage(Unsent::class.java) { asked ->
+            asked.replyTo.tell(state.outbox.take(asked.limit))
+            Behaviors.same()
+        }
+        .onMessage(Sent::class.java) { sent ->
+            shop(state.copy(outbox = state.outbox.filterNot { it.seq == sent.seq }))
         }
         .build()

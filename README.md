@@ -22,7 +22,7 @@ it, and a load test that runs the whole thing in its own process.
 |---|---|---|
 | `domain` | `Pet`, `PetShop`, and the two ways adopting can fail | none |
 | `api` | the endpoints, their failures, the handlers | Pelican |
-| `app` | the actor, the arrivals stream, the wiring, `main` | Lark |
+| `app` | the actor, the arrivals stream, the outbox relay, the bus and its consumer, the wiring, `main` | Lark |
 | `loadtest` | the shop under load, started in-process | Proofload |
 
 ### The contract is a value
@@ -51,10 +51,43 @@ this repository.
 New pets keep arriving. `Stream.tick(...)` into the actor, with the failure the
 feed can end with in its type — `Stream<Nothing, Pet>` says this one cannot fail.
 
+### What happened leaves through an outbox
+
+Every arrival and every adoption is also an event, and something else in the
+service reads them: a projection that tallies arrivals and adoptions by species
+and serves the result at `/stats`.
+
+```
+Adopt ─▶ shop actor ─▶ { pets, outbox }      one transition, no dual write
+                             │
+         relay: tick ─▶ Unsent ─▶ publish ─▶ Sent        at least once
+                                     │
+                          refused ◀──┴──▶ bus ─▶ projection ─▶ /stats
+                     (next tick)            dedupe by seq, fold
+```
+
+- **The outbox is the actor's state.** The pets and the unsent events are one
+  value, so selling a pet and recording that it was sold are one transition.
+  There is no moment where one happened and the other did not.
+- **The relay is a stream.** `Stream.tick` asks the actor for what is unsent
+  (`mapPar`, because the ask blocks), publishes each event, and tells the actor
+  `Sent` only once the bus has taken it. A refusal is `divertLefts`-ed to a sink
+  that logs and counts it, and the event stays in the outbox for the next tick.
+- **The bus** is a bounded queue into a Pekko `BroadcastHub` in the same process,
+  standing where a broker would. It refuses the way one does: when full, and
+  once closed.
+- **The consumer** is `bus.subscribe()`: `statefulMap` remembers every `seq` it
+  has seen, because at-least-once means some arrive twice, and `scan` folds the
+  rest into a `Tally`. `/stats` reports how many duplicates it dropped.
+
+The outbox lives in memory, so it proves the ordering and not durability. A
+real one is a table written in the same transaction as the sale, and the actor
+here stands in for that transaction.
+
 ### The application is a value
 
 ```kotlin
-val petshop: Module = settings + telemetry + theShop + arrivals + web
+val petshop: Module = settings + telemetry + theShop + arrivals + events + web
 
 object Petshop : LarkApp<PelicanServer>() {
     override val module: Module = petshop
@@ -189,6 +222,47 @@ a graph in a compiler it was not built for, which is the right shape for that
 bargain — but a service taking it on should know it is taking on a moving part
 in exchange for an earlier error, and that `larkWiring` is what it would fall
 back to.
+
+### lark-stream: yes for the relay, with three rough edges
+
+The outbox relay and the projection are the first things here to use more of
+`lark-stream` than `tick` and `map`. `EventsSpec` covers the claims below: an
+adoption reaches the consumer, a refused event goes again, and an event
+delivered twice is counted once.
+
+**A refusal is not a failure, and the type says so.** `publish` answers
+`Either<BusRefused, ShopEvent>`, and `divertLefts` sends each `Left` to a named
+sink and keeps the stream `Stream<Nothing, ShopEvent>`. In plain Pekko you would
+write `divertTo` with a predicate and a cast. Here nothing is carried in the
+element past the point where it stopped mattering.
+
+**A blocking call has an obvious home.** The ask to the actor blocks. `mapPar`
+runs it on a virtual thread, so no Pekko dispatcher thread is held and there is
+no `CompletionStage` to build by hand.
+
+**An idempotent consumer is two operators.** `statefulMap` carries the seen
+`seq`s and `scan` carries the tally, both as plain Kotlin values. Duplicates are
+counted, not hidden.
+
+The rough edges, each found while writing this:
+
+- **`mapPar` on a stream with no failure type cannot infer one from a body that
+  never raises.** On `Stream<Nothing, A>` the overload that reads the failure
+  from the body wins, finds nothing to read, and asks for `F` explicitly. The
+  relay writes `mapPar<Nothing, _, _>(1)`. The obvious call is the one that does
+  not compile.
+- **Nothing stops a running stream from outside.** `run` hands back the `Exit`
+  and nothing to cancel with, because the materialised value is dropped. The
+  relay stops through `takeWhile { open.get() }`, which takes effect at the next
+  tick and not at once. Its node's release flips that flag and waits for the
+  `Exit`, which is how the bus is closed only after the relay stops publishing.
+- **One `Died` ends the relay for good.** There is no resume by design, and no
+  restart either. A timed-out ask stops the outbox from draining until the
+  process restarts. Pekko's `RestartSource` would do it, but only on the far
+  side of `toSource()`, where the typed failure is already gone.
+
+A smaller one: in `0.4.0`, `groupedWithin` takes a `java.time.Duration` while
+`tick` takes a `kotlin.time.Duration`.
 
 ### The wiring check: cheap, and it found nothing here
 

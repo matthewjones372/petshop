@@ -41,6 +41,7 @@ class ContractSpec {
         shop = OnePet(nibbles),
         health = { Healthy(ready = true, failing = emptyList()) },
         scrape = { "petshop_adoptions_total 1.0" },
+        tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
     ).inMemory("petshop-contract")
 
     @Test
@@ -55,6 +56,7 @@ class ContractSpec {
         app.request(listPets, Unit) shouldBuild "GET /pets"
         app.request(health, Unit) shouldBuild "GET /health"
         app.request(metrics, Unit) shouldBuild "GET /metrics"
+        app.request(stats, Unit) shouldBuild "GET /stats"
     }
 
     @Test

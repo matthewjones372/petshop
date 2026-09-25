@@ -49,7 +49,7 @@ import kotlin.time.Duration
 import org.apache.pekko.actor.typed.ActorSystem as TypedSystem
 import kotlin.time.Duration.Companion.seconds
 
-data class Settings(val port: Int, val arrivalsEvery: Duration)
+data class Settings(val port: Int, val arrivalsEvery: Duration, val outboxEvery: Duration)
 
 /** The catalogue the shop opens with, before any arrival. */
 val opening: List<Pet> = listOf(
@@ -123,7 +123,9 @@ private fun PetShopError.outcome(): String = when (this) {
 }
 
 private val settings: Module =
-    loadedConfig() + config<Settings>("petshop") { Settings(int("port"), duration("arrivalsEvery")) }
+    loadedConfig() + config<Settings>("petshop") {
+        Settings(int("port"), duration("arrivalsEvery"), duration("outboxEvery"))
+    }
 
 private val telemetry: Module =
     // Added to Micrometer's global composite, which is where lark-micrometer writes unless it is
@@ -147,13 +149,19 @@ private val theShop: Module =
         singleOf(::ActorPetShop).boundTo<PetShop>()
             .probe("shop", timeout = 3.seconds) { shop: PetShop -> shop.all().isNotEmpty() }
 
+private val events: Module =
+    // Closed after the relay stops publishing to it, because the relay depends on it.
+    singleOf({ system: ActorSystem -> HubBus(system) }, { bus -> bus.close() }).boundTo<EventBus>() +
+        outbox +
+        projection
+
 private val web: Module =
     // The port is a resource like any other: bound here, unbound when the graph is given back, which
     // is what lets a load test start the whole application in its own process.
     singleOf(
         { shop: PetShop, config: Settings, system: TypedSystem<Void>, health: HealthRegistry,
-            registry: PrometheusMeterRegistry, _: Arrivals ->
-            petshopApi(shop, { asked(health) }, registry::scrape)
+            registry: PrometheusMeterRegistry, projection: Projection, _: Arrivals, _: OutboxRelay ->
+            petshopApi(shop, { asked(health) }, registry::scrape, projection::tally)
                 .startWithDocs(system, port = config.port, docs = docs { docsPath = "/api-docs" })
         },
         { server -> server.stop() },
@@ -166,7 +174,7 @@ private fun asked(health: HealthRegistry): Healthy = when (val readiness = healt
     is Health.Down -> Healthy(ready = false, failing = readiness.failing)
 }
 
-val petshop: Module = settings + telemetry + theShop + arrivals + web
+val petshop: Module = settings + telemetry + theShop + arrivals + events + web
 
 /**
  * The application as a value, so `main` is the leaving and the build can read the root it starts
