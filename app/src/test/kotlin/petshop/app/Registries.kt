@@ -12,7 +12,7 @@ import petshop.domain.ChipRegistry
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.RegistryError
-import petshop.wiremock.PelicanWireMock
+import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 

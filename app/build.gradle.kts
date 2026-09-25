@@ -23,7 +23,7 @@ dependencies {
     implementation("io.opentelemetry:opentelemetry-sdk:1.51.0")
 
     // The shop's client for the chip registry sends through Pekko HTTP, on the system it already runs.
-    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC1")
+    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC3")
 
     // On the classpath and nothing else: each registers itself through a
     // ServiceLoader, so the service's own lines and numbers go where its
@@ -45,6 +45,6 @@ dependencies {
     testImplementation("io.github.matthewjones372:lark-stream-test:$larkVersion")
 
     // A real HTTP server playing the registry, stubbed in the registry's own endpoints.
-    testImplementation(project(":pelican-wiremock"))
+    testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC3")
     testImplementation(project(":registry"))
 }

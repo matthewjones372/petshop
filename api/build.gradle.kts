@@ -1,4 +1,4 @@
-val pelicanVersion = "1.0.0-RC1"
+val pelicanVersion = "1.0.0-RC3"
 val pekkoVersion = "1.2.1"
 
 dependencies {

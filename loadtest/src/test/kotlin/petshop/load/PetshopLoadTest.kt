@@ -33,7 +33,7 @@ import petshop.domain.AlreadyAdopted
 import petshop.registry.ChipRecord
 import petshop.registry.lookupChip
 import petshop.registry.recordKeeper
-import petshop.wiremock.PelicanWireMock
+import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
 
 /**
  * The whole application under load, started by its own graph in this process: the actor, the arrivals
@@ -50,7 +50,7 @@ class PetshopLoadTest {
     /** Every pet has a chip and every keeper is recorded: the registry is not what this measures. */
     @JvmField
     @RegisterExtension
-    val registry = PelicanWireMock().apply {
+    val registry = PelicanWireMockExtension(JacksonCodecs).apply {
         stub(lookupChip) { petId -> ok(ChipRecord("98100000000000$petId", keeper = "Petshop")) }
         stub(recordKeeper) { (number, keeper) -> ok(ChipRecord(number, keeper.keeper)) }
     }
