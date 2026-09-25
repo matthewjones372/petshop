@@ -35,3 +35,23 @@ object TestPostgres {
 
 /** This graph with its outbox in an empty schema of the test Postgres, rather than application.conf's. */
 fun Module.onAFreshDatabase(): Module = overriding(single<DatabaseSettings> { TestPostgres.fresh() })
+
+/**
+ * This graph with its outbox in [database], rather than application.conf's. Two graphs on the same
+ * settings are two instances of the service writing one table, and running one relay each.
+ */
+fun Module.onDatabase(database: DatabaseSettings): Module = overriding(single<DatabaseSettings> { database })
+
+/** How many events have ever been written to the outbox: the last `seq` Postgres handed out. */
+fun DatabaseSettings.recorded(): Long =
+    asking("SELECT coalesce(pg_sequence_last_value(pg_get_serial_sequence('outbox', 'seq')::regclass), 0)")
+
+/** How many events are in the outbox still, waiting for a relay. */
+fun DatabaseSettings.unsent(): Long = asking("SELECT count(*) FROM outbox")
+
+private fun DatabaseSettings.asking(query: String): Long =
+    DriverManager.getConnection(url, user, password).use { connection ->
+        connection.createStatement().use { statement ->
+            statement.executeQuery(query).use { rows -> rows.next(); rows.getLong(1) }
+        }
+    }

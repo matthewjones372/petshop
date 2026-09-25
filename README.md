@@ -103,7 +103,11 @@ Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only 
   not locked. Neither waits for the other, and they never publish the same row
   at the same time. If the process dies before the commit, the locks go with
   the connection and the rows are claimed again. `PostgresOutboxSpec` holds one
-  claim open and shows a second one skipping past it.
+  claim open and shows a second one skipping past it. The load test runs two
+  whole instances on one table while it browses both. Each instance's
+  projection sees only its own relay's bus, so the two tallies must add up to
+  exactly the number of events recorded. With the locking clause removed, they
+  add up to more.
 - **The relay is a stream.** `Stream.tick` makes the claim on a virtual thread
   (`mapPar`, because JDBC blocks). A refusal is logged and counted, and the
   event stays in the table for the next tick. `restartOnDefect` starts the
