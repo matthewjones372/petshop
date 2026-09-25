@@ -1,15 +1,15 @@
 package petshop.app
 
 import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.single
+import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.counter
 import io.github.matthewjones372.lark.increment
-import io.github.matthewjones372.lark.stream.run
-import io.github.matthewjones372.lark.stream.runWith
+import io.github.matthewjones372.lark.stream.Running
+import io.github.matthewjones372.lark.stream.StreamBackend
+import io.github.matthewjones372.lark.stream.runFold
 import io.github.matthewjones372.lark.stream.scan
+import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.stream.statefulMap
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream.javadsl.Sink
 import petshop.api.SpeciesTally
 import petshop.api.Tally
 import petshop.domain.PetAdopted
@@ -20,7 +20,10 @@ import petshop.domain.Species
 import java.util.concurrent.atomic.AtomicReference
 
 /** The read side of the bus: the tally as of the last event the projection folded in. */
-class Projection internal constructor(private val latest: AtomicReference<Tally>) {
+class Projection internal constructor(
+    private val latest: AtomicReference<Tally>,
+    internal val running: Running<Nothing, Tally>,
+) {
 
     fun tally(): Tally = latest.get()
 }
@@ -38,18 +41,22 @@ private val nothingYet = Tally(events = 0, duplicates = 0, bySpecies = Species.e
  * the highest, because a retried event arrives after later ones and a high-water mark would drop it.
  */
 val projection: Module =
-    single { bus: EventBus, system: ActorSystem ->
-        val latest = AtomicReference(nothingYet)
-        bus.subscribe()
-            .statefulMap(
-                create = { emptySet<Long>() },
-                f = { seen, event -> (seen + event.seq) to Delivery(event, again = event.seq in seen) },
-            )
-            .scan(nothingYet) { tally, delivery -> tally + delivery }
-            .runWith(Sink.foreach { tally -> latest.set(tally) })
-            .run(system)
-        Projection(latest)
-    }
+    singleOf(
+        { bus: EventBus, streams: StreamBackend ->
+            val latest = AtomicReference(nothingYet)
+            val running = bus.subscribe()
+                .statefulMap(
+                    create = { emptySet<Long>() },
+                    f = { seen, event -> (seen + event.seq) to Delivery(event, again = event.seq in seen) },
+                )
+                .scan(nothingYet) { tally, delivery -> tally + delivery }
+                .runFold(nothingYet) { _, tally -> tally.also(latest::set) }
+                .start(streams)
+            Projection(latest, running)
+        },
+        // Stopped before the bus it reads is closed, because it depends on the bus.
+        { projection -> projection.running.close() },
+    )
 
 private operator fun Tally.plus(delivery: Delivery): Tally {
     if (delivery.again) {

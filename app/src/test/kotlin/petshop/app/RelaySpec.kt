@@ -66,7 +66,7 @@ private val returned = PetReturned(seq = 3, pet = nibbles)
 
 /**
  * The relay on a clock the test owns. Each `adjust` returns once every tick due by then has run, so a
- * test says which tick an event went on, where EventsSpec, on Pekko's clock, can only wait for it.
+ * test says which tick an event went on, where EventsSpec, on the real clock, can only wait for it.
  */
 class RelaySpec {
 

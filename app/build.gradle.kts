@@ -7,7 +7,7 @@ plugins {
 application { mainClass.set("petshop.app.MainKt") }
 
 // `-PlarkVersion=0.4.1-SNAPSHOT` builds against a lark installed with `publishToMavenLocal`.
-val larkVersion: String = providers.gradleProperty("larkVersion").getOrElse("0.5.0")
+val larkVersion: String = providers.gradleProperty("larkVersion").getOrElse("0.6.0")
 
 dependencies {
     api(project(":api"))
@@ -15,9 +15,9 @@ dependencies {
     implementation("io.github.matthewjones372:lark-app:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-pekko:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
-    // The Pekko backend, which brings lark-stream with it. The relay's description names no backend:
-    // the graph decides, and RelaySpec runs the same description on a clock the test moves.
-    implementation("io.github.matthewjones372:lark-stream-pekko:$larkVersion")
+    // lark's own forks as the backend every stream runs on, which brings lark-stream with it. No
+    // stream names its backend: the graph decides, and RelaySpec runs the relay on a clock it moves.
+    implementation("io.github.matthewjones372:lark-stream-forks:$larkVersion")
     implementation("io.github.matthewjones372:lark-pekko:$larkVersion")
     implementation("io.github.matthewjones372:lark-otel:$larkVersion")
     implementation("io.opentelemetry:opentelemetry-sdk:1.51.0")
