@@ -60,7 +60,8 @@ import kotlin.time.Duration
 import org.apache.pekko.actor.typed.ActorSystem as TypedSystem
 import kotlin.time.Duration.Companion.seconds
 
-data class Settings(val port: Int, val arrivalsEvery: Duration, val outboxEvery: Duration)
+/** [host] is the interface the port is bound on: loopback unless something outside this machine has to reach it. */
+data class Settings(val host: String, val port: Int, val arrivalsEvery: Duration, val outboxEvery: Duration)
 
 /** The catalogue the shop opens with, before any arrival. */
 val opening: List<Pet> = listOf(
@@ -165,7 +166,7 @@ private fun PetShopError.outcome(): String = when (this) {
 
 private val settings: Module =
     loadedConfig() + config<Settings>("petshop") {
-        Settings(int("port"), duration("arrivalsEvery"), duration("outboxEvery"))
+        Settings(string("host"), int("port"), duration("arrivalsEvery"), duration("outboxEvery"))
     }
 
 private val telemetry: Module =
@@ -206,7 +207,7 @@ private val web: Module =
         { shop: PetShop, config: Settings, system: TypedSystem<Void>, health: HealthRegistry,
             registry: PrometheusMeterRegistry, projection: Projection, _: Arrivals, _: OutboxRelay ->
             petshopApi(shop, { asked(health) }, registry::scrape, projection::tally)
-                .startWithDocs(system, port = config.port, docs = docs { docsPath = "/api-docs" })
+                .startWithDocs(system, port = config.port, host = config.host, docs = docs { docsPath = "/api-docs" })
         },
         { server -> server.stop() },
     )
