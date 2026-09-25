@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "2.4.10" apply false
+    kotlin("plugin.serialization") version "2.4.10" apply false
 }
 
 subprojects {
@@ -7,6 +8,8 @@ subprojects {
 
     repositories {
         mavenCentral()
+        // Confluent's Avro serializer and schema-registry client, which are not on Maven Central.
+        maven("https://packages.confluent.io/maven/") { content { includeGroup("io.confluent") } }
         // A lark change is tried here before it is released by installing it locally as a snapshot.
         if (providers.gradleProperty("larkVersion").getOrElse("").endsWith("-SNAPSHOT")) mavenLocal()
     }

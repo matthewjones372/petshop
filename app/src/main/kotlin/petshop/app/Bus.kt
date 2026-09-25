@@ -3,8 +3,11 @@ package petshop.app
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
+import io.github.matthewjones372.lark.stream.Run
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.from
+import io.github.matthewjones372.lark.stream.map
+import io.github.matthewjones372.lark.stream.runFold
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.javadsl.BroadcastHub
 import org.apache.pekko.stream.javadsl.Keep
@@ -16,7 +19,12 @@ interface EventBus {
 
     fun publish(event: ShopEvent): Either<BusRefused, ShopEvent>
 
-    fun subscribe(): Stream<Nothing, ShopEvent>
+    /**
+     * Every event handed to [each], one at a time, until the run is stopped. A bus that remembers where a
+     * reader got to moves that on only once [each] has returned, so an event [each] was not given comes
+     * round again; the run answers with how many it handed over.
+     */
+    fun consume(each: (ShopEvent) -> Unit): Run<Nothing, Long>
 }
 
 /** The bus said no. The event is still in the outbox, so no is "not yet" rather than "lost". */
@@ -41,7 +49,13 @@ class HubBus(system: ActorSystem, capacity: Int = 256) : EventBus, AutoCloseable
         return if (offered.isEnqueued) event.right() else BusRefused(event.seq, "$offered").left()
     }
 
-    override fun subscribe(): Stream<Nothing, ShopEvent> = Stream.from(queueAndHub.second())
+    override fun consume(each: (ShopEvent) -> Unit): Run<Nothing, Long> =
+        Stream.from(queueAndHub.second())
+            .map { event ->
+                each(event)
+                1L
+            }
+            .runFold(0L, Long::plus)
 
     override fun close() = queueAndHub.first().complete()
 }

@@ -24,7 +24,7 @@ it, and a load test that runs the whole thing in its own process.
 | `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
 | `pelican-wiremock` | WireMock, stubbed and verified in endpoint values rather than URLs | Pelican, WireMock |
 | `api` | the endpoints, their failures, the handlers | Pelican |
-| `app` | the actor, the arrivals stream, the chip registry's client, the outbox relay, the bus and its consumer, the wiring, `main` | Lark |
+| `app` | the actor, the arrivals stream, the chip registry's client, the outbox relay, the bus (in process, or Kafka carrying Avro) and its consumer, the wiring, `main` | Lark, kimney |
 | `loadtest` | the shop under load, started in-process | Proofload |
 
 ### The contract is a value
@@ -85,6 +85,42 @@ Adopt ─▶ shop actor ─▶ { pets, outbox }      one transition, no dual wri
 The outbox lives in memory, so it proves the ordering and not durability. A
 real one is a table written in the same transaction as the sale, and the actor
 here stands in for that transaction.
+
+### The bus can be Kafka, carrying Avro
+
+`KafkaBus` is the same `EventBus` on a real broker, and the projection does not
+change. Each event goes out as an Avro record in the schema registry's wire
+format, keyed by its `seq`, and comes back through `lark-kafka`'s consumer loop,
+which commits an offset only once the projection has folded that event in.
+
+```
+ShopEvent ──kimney──▶ wire record ──avro4k──▶ GenericRecord ──Confluent──▶ [0][schema id][Avro]
+                                                                              │
+ShopEvent ◀──kimney── wire record ◀──avro4k── GenericRecord ◀──Confluent──────┘
+    │                                        (a record that will not read: dead letters, committed past)
+    └─▶ projection, on whichever backend the graph names ─▶ runCommitting()
+```
+
+- **The wire records are their own types.** `petshop.app.wire` holds
+  `@Serializable` classes whose schema avro4k derives, committed as
+  `golden/shop-event.avsc`. The domain's `ShopEvent` knows nothing of Avro, and
+  kimney derives both mappings at compile time: `ShopEvent.toWire()` and
+  `WireEvent.toDomain()` are one `transformInto()` each, and a field either side
+  cannot fill does not compile.
+- **One schema per topic.** The three events are a union inside one
+  `ShopEventRecord`, so the registry holds one subject's worth of versions
+  rather than a record type per case.
+- **Two failures, told apart.** A record that is not the shop's Avro is a
+  `DecodeError`, diverted to dead letters and committed past. A registry that
+  cannot be asked is a defect, and the run ends for its owner to start again.
+  Confluent throws the same exception for both; `registryDown` reads what it
+  wraps.
+- **Either backend.** `KafkaBusSpec` runs the whole service over Kafka on Forks
+  and on Pekko, against a broker in the test JVM and Confluent's `mock://`
+  registry: the real serializers and wire format, no registry server.
+
+The service still starts on the in-process bus. Choosing Kafka from
+configuration is the next step, and `KafkaBusSpec` shows the one node it swaps.
 
 ### The application is a value
 
@@ -432,7 +468,8 @@ the edge does with it, and the edge is the part a service writes itself.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.5.0`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
+Pelican `1.0.0-RC1`, Lark `0.7.0`, kimney `0.3.0`, Proofload `0.1.0-rc4`, avro4k `2.12.0`,
+Confluent's Avro serializer `7.8.0`, Kotlin 2.4.10, JDK 21.
 
 `singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler
 plugin that reports it as you type were all written while this repository was
