@@ -58,11 +58,11 @@
             }
           },
           "503": {
-            "description": "The chip registry could not be reached; try again",
+            "description": "The adoption could not be finished just now; try again",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RegistryDown"
+                  "$ref": "#/components/schemas/Unavailable"
                 }
               }
             }
@@ -161,7 +161,7 @@
           "message"
         ]
       },
-      "RegistryDown": {
+      "Unavailable": {
         "type": "object",
         "properties": {
           "id": {

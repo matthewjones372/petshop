@@ -1,14 +1,21 @@
 val proofloadVersion = "0.1.0-rc4"
+val larkVersion: String = providers.gradleProperty("larkVersion").get()
 
 dependencies {
     testImplementation(project(":app"))
-    testImplementation("io.github.matthewjones372:lark-app:0.4.0")
+    // The shop keeps its outbox in Postgres, so the load test starts one.
+    testImplementation(testFixtures(project(":app")))
+    testImplementation("io.github.matthewjones372:lark-app:$larkVersion")
+    // A second instance is the same graph on another port, which is one line of configuration.
+    testImplementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
+    // Stopping an instance's arrivals, so the relays can finish what was recorded.
+    testImplementation("io.github.matthewjones372:lark-stream:$larkVersion")
     // The chip registry the shop calls out to, played by a real HTTP server.
-    testImplementation(project(":pelican-wiremock"))
+    testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC3")
     testImplementation(project(":registry"))
     // Pelican's typed client, pointed at a real server: the load names endpoints and never a URL,
     // which is also why `proofload-http` is not here.
-    testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC1")
+    testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC3")
     testImplementation("io.github.matthewjones372:proofload-junit5:$proofloadVersion")
     testImplementation("io.github.matthewjones372:proofload-report-html:$proofloadVersion")
 }

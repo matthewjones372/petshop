@@ -1,5 +1,5 @@
-# Prometheus and Grafana, pointed at a petshop running on the host, and a stand-in
-# for the chip registry the petshop calls out to.
+# Prometheus and Grafana, pointed at a petshop running on the host, a stand-in
+# for the chip registry the petshop calls out to, and the Postgres its outbox is in.
 #
 # The application is not in here on purpose: it is the thing being demonstrated,
 # and running it with `./gradlew :app:run` is how a reader would run it anyway.
@@ -12,6 +12,18 @@ services:
       - ./registry/mappings:/home/wiremock/mappings:ro
     ports:
       - "8089:8080"
+
+  # Where the outbox table lives. The petshop creates the table itself on start.
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: petshop
+      POSTGRES_USER: petshop
+      POSTGRES_PASSWORD: petshop
+    ports:
+      # 55432 on the host rather than 5432, which a Postgres installed on the machine is usually
+      # already holding. application.conf points at this one.
+      - "55432:5432"
 
   prometheus:
     image: prom/prometheus:v2.54.1

@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOrFail
 import petshop.domain.NoSuchPet
 import petshop.domain.NotChipped
+import petshop.domain.NotRecorded
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.RegistryDown
@@ -31,7 +32,7 @@ fun petshopApi(shop: PetShop, health: () -> Healthy, scrape: () -> String, tally
                         is ProblemDto.NoSuchPet -> petMissing(problem)
                         is ProblemDto.AlreadyAdopted -> petTaken(problem)
                         is ProblemDto.NotChipped -> petNotChipped(problem)
-                        is ProblemDto.RegistryDown -> registryDown(problem)
+                        is ProblemDto.Unavailable -> unavailable(problem)
                     }
                 },
                 { pet -> ok(pet.toDto()) },

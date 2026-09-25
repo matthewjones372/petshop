@@ -12,6 +12,7 @@ the state, a stream of background work, a dependency graph that starts and stops
 it, and a load test that runs the whole thing in its own process.
 
 ```bash
+docker compose -f demo/docker-compose.yml up -d postgres registry
 ./gradlew :app:run          # http://127.0.0.1:8080 — docs at /api-docs
 ./gradlew :loadtest:test    # 200 requests a second at the real graph
 ```
@@ -24,7 +25,8 @@ it, and a load test that runs the whole thing in its own process.
 | `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
 | `pelican-wiremock` | WireMock, stubbed and verified in endpoint values rather than URLs | Pelican, WireMock |
 | `api` | the endpoints, their failures, the handlers, the DTOs | Pelican, kimney |
-| `app` | the actor, the arrivals stream, the chip registry's client, the outbox relay, the bus and its consumer, the wiring, `main` | Lark |
+| `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus and its consumer, the wiring, `main` | Lark |
+| `outbox-table` | the outbox's row and its SQL, in an included build on the Kotlin ExoQuery is built for | ExoQuery |
 | `loadtest` | the shop under load, started in-process | Proofload |
 
 ### The contract is a value
@@ -76,21 +78,57 @@ service reads them: a projection that tallies arrivals and adoptions by species
 and serves the result at `/stats`.
 
 ```
-Adopt ─▶ shop actor ─▶ { pets, outbox }      one transition, no dual write
-                             │
-         relay: tick ─▶ Unsent ─▶ publish ─▶ Sent        at least once
-                                     │
-                          refused ◀──┴──▶ bus ─▶ projection ─▶ /stats
-                     (next tick)            dedupe by seq, fold
+Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only if the row went in
+                              │
+   relay: tick ─▶ BEGIN; SELECT … FOR UPDATE SKIP LOCKED
+                   ─▶ publish ─▶ DELETE what the bus took; COMMIT     at least once
+                          │
+               refused ◀──┴──▶ bus ─▶ projection ─▶ /stats
+          (stays, next tick)          dedupe by seq, fold
 ```
 
-- **The outbox is the actor's state.** The pets and the unsent events are one
-  value, so selling a pet and recording that it was sold are one transition.
-  There is no moment where one happened and the other did not.
-- **The relay is a stream.** `Stream.tick` asks the actor for what is unsent
-  (`mapPar`, because the ask blocks), publishes each event, and tells the actor
-  `Sent` only once the bus has taken it. A refusal is `divertLefts`-ed to a sink
-  that logs and counts it, and the event stays in the outbox for the next tick.
+- **The outbox is a Postgres table.** The actor writes the event's row first
+  and changes the pet only once the row is in, so the shop never sells a pet it
+  has not recorded selling. If the write throws, the actor carries on as it was
+  and answers `NotRecorded`, a 503: the pet is still on the shelf, and the
+  registry is never asked. That 503 is the same response as a registry that
+  cannot be reached (`Unavailable`, with a message saying which), because
+  Pelican lets a status name only one response.
+  `seq` is an identity column, so it keeps counting across restarts.
+- **Every statement is ExoQuery**, apart from the `CREATE TABLE` the pool runs
+  when it opens. The insert is `insert<OutboxRow> { setParams(row).excluding(seq) }.returning { it.seq }`.
+  The claim is a `@SqlFragment` that wraps the query in a free block, because
+  ExoQuery has no locking clause of its own:
+  ```kotlin
+  @SqlFragment
+  fun <T> forUpdateSkipLocked(rows: SqlQuery<T>): SqlQuery<T> = sql {
+      free("$rows FOR UPDATE SKIP LOCKED").asPure<SqlQuery<T>>()
+  }
+  ```
+- **The SQL is built separately, in `outbox-table/`.** ExoQuery's compiler
+  plugin is built for Kotlin 2.3.0 and does not load in 2.4.10: it fails with a
+  `ClassCastException` while registering, and Terpal fails the same way. So the
+  table, the row and the queries are in an included build on Kotlin 2.3.0,
+  which has its own Kotlin Gradle plugin. `app`, still on 2.4.10, depends on it
+  as `petshop:outbox-table` and converts events to rows and back
+  (`PostgresOutbox`). When ExoQuery ships a plugin for Kotlin 2.4,
+  `outbox-table/` can move back into `app`.
+- **A claim is one transaction.** The relay selects the oldest hundred rows
+  `FOR UPDATE SKIP LOCKED`, offers each to the bus while it still holds them,
+  deletes the ones the bus took, and commits. Two relays (two instances, or a
+  restarted one beside one still finishing) each take the rows the other has
+  not locked. Neither waits for the other, and they never publish the same row
+  at the same time. If the process dies before the commit, the locks go with
+  the connection and the rows are claimed again. `PostgresOutboxSpec` holds one
+  claim open and shows a second one skipping past it. The load test runs two
+  whole instances on one table while it browses both. Each instance's
+  projection sees only its own relay's bus, so the two tallies must add up to
+  exactly the number of events recorded. With the locking clause removed, they
+  add up to more.
+- **The relay is a stream.** `Stream.tick` makes the claim on a virtual thread
+  (`mapPar`, because JDBC blocks). A refusal is logged and counted, and the
+  event stays in the table for the next tick. `restartOnDefect` starts the
+  relay again after a claim that throws, and the rolled-back claim loses nothing.
 - **The bus** is a bounded queue into a Pekko `BroadcastHub` in the same process,
   standing where a broker would. It refuses the way one does: when full, and
   once closed.
@@ -98,9 +136,15 @@ Adopt ─▶ shop actor ─▶ { pets, outbox }      one transition, no dual wri
   has seen, because at-least-once means some arrive twice, and `scan` folds the
   rest into a `Tally`. `/stats` reports how many duplicates it dropped.
 
-The outbox lives in memory, so it proves the ordering and not durability. A
-real one is a table written in the same transaction as the sale, and the actor
-here stands in for that transaction.
+The pets are still the actor's and still in memory. The table is what makes
+the events durable: a restart forgets the catalogue, but not an event it
+recorded and had yet to publish. The order within one relay is the order the
+events were recorded. With more than one relay, each one's batch is in order
+and the batches interleave.
+
+Running it needs a Postgres. `demo/docker-compose.yml` starts one with the
+credentials `application.conf` expects, and every test that builds the shop
+starts its own through Testcontainers, with a fresh schema per graph.
 
 ### The application is a value
 
@@ -153,7 +197,7 @@ petshop.overriding(single<ChipRegistry> { FakeRegistry() }).subgraph<PetShop>()
 
 // about the client: keep the node, swap the server. The stubs are the registry's own
 // endpoints, so they move with its contract; the answers are values it declares.
-@RegisterExtension val registry = PelicanWireMock()
+@RegisterExtension val registry = PelicanWireMockExtension(JacksonCodecs)
 
 registry.stub(lookupChip, 1L) answers ok(ChipRecord("981000000000001", keeper = "Petshop"))
 registry.stub(recordKeeper, In2("981000000000001", NewKeeper("Ada"))) fails Fault.CONNECTION_RESET_BY_PEER
@@ -484,8 +528,8 @@ the edge does with it, and the edge is the part a service writes itself.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.5.0`, Proofload `0.1.0-rc4`, kimney `0.3.0`, Kotlin
-2.4.10, JDK 21.
+Pelican `1.0.0-RC1`, Lark `0.5.0`, Proofload `0.1.0-rc4`, ExoQuery `2.0.4.PL`, kimney `0.3.0`,
+Kotlin 2.4.10 (2.3.0 for `outbox-table/`), JDK 21.
 
 `singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler
 plugin that reports it as you type were all written while this repository was

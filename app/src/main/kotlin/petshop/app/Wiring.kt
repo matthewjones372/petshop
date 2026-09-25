@@ -45,6 +45,7 @@ import petshop.domain.AlreadyAdopted
 import petshop.domain.ChipRegistry
 import petshop.domain.NoSuchPet
 import petshop.domain.NotChipped
+import petshop.domain.NotRecorded
 import petshop.domain.NotRegistered
 import petshop.domain.Pet
 import petshop.domain.PetId
@@ -59,7 +60,8 @@ import kotlin.time.Duration
 import org.apache.pekko.actor.typed.ActorSystem as TypedSystem
 import kotlin.time.Duration.Companion.seconds
 
-data class Settings(val port: Int, val arrivalsEvery: Duration, val outboxEvery: Duration)
+/** [host] is the interface the port is bound on: loopback unless something outside this machine has to reach it. */
+data class Settings(val host: String, val port: Int, val arrivalsEvery: Duration, val outboxEvery: Duration)
 
 /** The catalogue the shop opens with, before any arrival. */
 val opening: List<Pet> = listOf(
@@ -159,11 +161,12 @@ private fun PetShopError.outcome(): String = when (this) {
     is AlreadyAdopted -> "already_adopted"
     is NotChipped -> "not_chipped"
     is RegistryDown -> "registry_down"
+    is NotRecorded -> "not_recorded"
 }
 
 private val settings: Module =
     loadedConfig() + config<Settings>("petshop") {
-        Settings(int("port"), duration("arrivalsEvery"), duration("outboxEvery"))
+        Settings(string("host"), int("port"), duration("arrivalsEvery"), duration("outboxEvery"))
     }
 
 private val telemetry: Module =
@@ -184,7 +187,7 @@ private val theShop: Module =
         // The typed view of the same system. Two types, two keys, and the one that spawns actors is
         // not the one Pelican binds a port with.
         single { classic: ActorSystem -> Adapter.toTyped(classic) }.boundTo<TypedSystem<Void>>() +
-        actor<Shop>("shop") { shop(opening.associateBy { it.id }) } +
+        actor<Shop, Outbox>("shop") { outbox -> shop(outbox, opening.associateBy { it.id }) } +
         singleOf(::ActorPetShop).boundTo<PetShop>()
             .probe("shop", timeout = 3.seconds) { shop: PetShop -> shop.all().isNotEmpty() }
 
@@ -204,7 +207,7 @@ private val web: Module =
         { shop: PetShop, config: Settings, system: TypedSystem<Void>, health: HealthRegistry,
             registry: PrometheusMeterRegistry, projection: Projection, _: Arrivals, _: OutboxRelay ->
             petshopApi(shop, { asked(health) }, registry::scrape, projection::tally)
-                .startWithDocs(system, port = config.port, docs = docs { docsPath = "/api-docs" })
+                .startWithDocs(system, port = config.port, host = config.host, docs = docs { docsPath = "/api-docs" })
         },
         { server -> server.stop() },
     )
@@ -216,7 +219,7 @@ private fun asked(health: HealthRegistry): Healthy = when (val readiness = healt
     is Health.Down -> Healthy(ready = false, failing = readiness.failing)
 }
 
-val petshop: Module = settings + telemetry + registry + theShop + arrivals + events + web
+val petshop: Module = settings + telemetry + database + registry + theShop + arrivals + events + web
 
 /**
  * The application as a value, so `main` is the leaving and the build can read the root it starts

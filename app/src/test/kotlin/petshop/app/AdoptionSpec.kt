@@ -2,6 +2,7 @@ package petshop.app
 
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.render
+import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
@@ -13,10 +14,15 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
+import petshop.domain.ChipRegistry
+import petshop.domain.NotRecorded
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.RegistryDown
+import petshop.domain.ShopEvent
 import petshop.domain.Unreachable
+import java.sql.SQLTransientConnectionException
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -57,6 +63,33 @@ class AdoptionSpec {
     }
 
     @Test
+    fun `an adoption the outbox could not record is refused, and the pet stays on the shelf`() {
+        val asked = AtomicInteger()
+        val counting = object : ChipRegistry by FakeRegistry() {
+            override fun lookup(id: PetId) = FakeRegistry().lookup(id).also { asked.incrementAndGet() }
+        }
+        val down = object : Outbox {
+            override fun record(numbered: (seq: Long) -> ShopEvent): ShopEvent =
+                throw SQLTransientConnectionException("the pool had nothing to lend")
+
+            override fun claim(limit: Int, publish: (List<ShopEvent>) -> List<ShopEvent>) = emptyList<ShopEvent>()
+        }
+        val unrecorded = petshop.overriding(single<ChipRegistry> { counting })
+            .overriding(single<Outbox> { down })
+            .subgraph<PetShop>()
+
+        val (answer, after) = testApp(unrecorded) { shop: PetShop ->
+            shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1))
+        }
+
+        answer shouldBeLeft NotRecorded(1)
+        withClue("a sale nobody could write down did not happen, so nobody else was told of it") {
+            after?.adopted shouldBe false
+            asked.get() shouldBe 0
+        }
+    }
+
+    @Test
     fun `the subgraph binds no port and serves no documents`() {
         val drawn = settled.render()
 
@@ -87,6 +120,7 @@ class SettingsSpec {
     fun `the settings come from the file rather than a default`() {
         val read = testApp(petshop.subgraph<Settings>()) { settings: Settings -> settings }
 
+        read.host shouldBe "127.0.0.1"
         read.port shouldBe 8080
         read.arrivalsEvery shouldBe 5.seconds
     }
