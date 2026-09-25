@@ -26,6 +26,13 @@ data class NotChipped(val id: Long, override val message: String = "Pet $id has 
 data class RegistryDown(val id: Long, override val message: String = "The chip registry could not be reached") :
     PetShopError
 
+/**
+ * The shop could not write the adoption down, so it did not happen: the pet is still on the shelf, and
+ * the registry was never asked.
+ */
+data class NotRecorded(val id: Long, override val message: String = "The adoption of pet $id could not be recorded") :
+    PetShopError
+
 /** What the shop can do. The HTTP layer names this and nothing about how it is stored. */
 interface PetShop {
     fun all(): List<Pet>

@@ -2,6 +2,7 @@ package petshop.app
 
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.render
+import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
@@ -13,10 +14,15 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
+import petshop.domain.ChipRegistry
+import petshop.domain.NotRecorded
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.RegistryDown
+import petshop.domain.ShopEvent
 import petshop.domain.Unreachable
+import java.sql.SQLTransientConnectionException
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -53,6 +59,33 @@ class AdoptionSpec {
         first shouldBeLeft RegistryDown(1)
         withClue("the actor said yes before the registry said no, and the no has to undo it") {
             after?.adopted shouldBe false
+        }
+    }
+
+    @Test
+    fun `an adoption the outbox could not record is refused, and the pet stays on the shelf`() {
+        val asked = AtomicInteger()
+        val counting = object : ChipRegistry by FakeRegistry() {
+            override fun lookup(id: PetId) = FakeRegistry().lookup(id).also { asked.incrementAndGet() }
+        }
+        val down = object : Outbox {
+            override fun record(numbered: (seq: Long) -> ShopEvent): ShopEvent =
+                throw SQLTransientConnectionException("the pool had nothing to lend")
+
+            override fun claim(limit: Int, publish: (List<ShopEvent>) -> List<ShopEvent>) = emptyList<ShopEvent>()
+        }
+        val unrecorded = petshop.overriding(single<ChipRegistry> { counting })
+            .overriding(single<Outbox> { down })
+            .subgraph<PetShop>()
+
+        val (answer, after) = testApp(unrecorded) { shop: PetShop ->
+            shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1))
+        }
+
+        answer shouldBeLeft NotRecorded(1)
+        withClue("a sale nobody could write down did not happen, so nobody else was told of it") {
+            after?.adopted shouldBe false
+            asked.get() shouldBe 0
         }
     }
 

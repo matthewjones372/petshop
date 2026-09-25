@@ -73,7 +73,10 @@ Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only 
 - **The outbox is a Postgres table.** The actor writes the event's row first
   and changes the pet only once the row is in, so the shop never sells a pet it
   has not recorded selling. If the write throws, the actor carries on as it was
-  and answers nothing: the caller times out, and the pet is still on the shelf.
+  and answers `NotRecorded`, a 503: the pet is still on the shelf, and the
+  registry is never asked. That 503 is the same response as a registry that
+  cannot be reached (`Unavailable`, with a message saying which), because
+  Pelican lets a status name only one response.
   `seq` is an identity column, so it keeps counting across restarts.
 - **Every statement is ExoQuery**, apart from the `CREATE TABLE` the pool runs
   when it opens. The insert is `insert<OutboxRow> { setParams(row).excluding(seq) }.returning { it.seq }`.

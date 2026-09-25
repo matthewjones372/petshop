@@ -4,12 +4,14 @@ import arrow.core.Either
 import arrow.core.Option
 import arrow.core.left
 import arrow.core.right
+import io.github.matthewjones372.lark.logWarn
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.SupervisorStrategy
 import org.apache.pekko.actor.typed.javadsl.Behaviors
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
+import petshop.domain.NotRecorded
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
@@ -51,8 +53,8 @@ data class Returned(val id: PetId) : Shop
  * there is no moment where the shop has sold a pet and not recorded that it did.
  *
  * A write that throws — Postgres down, the pool exhausted — leaves the actor as it was rather than
- * stopping it. Nothing is answered, so whoever asked times out instead of being told yes about a sale
- * nobody recorded, and the pet is still on the shelf for the next one.
+ * stopping it. An adopter is told [NotRecorded] and the pet is still on the shelf for the next one; an
+ * arrival or a return nobody is waiting on is dropped, and the supervisor logs why.
  */
 private class State(val pets: Map<PetId, Pet>, private val outbox: Outbox) {
 
@@ -88,9 +90,16 @@ private fun adopt(state: State, asked: Adopt): Behavior<Shop> {
         pet.adopted -> asked.replyTo.answered(AlreadyAdopted(asked.id.value).left())
         else -> {
             val taken = pet.copy(adopted = true)
-            val next = state.record(taken) { seq -> PetAdopted(seq, taken, asked.by) }
-            asked.replyTo.tell(taken.right())
-            shop(next)
+            Either.catch { state.record(taken) { seq -> PetAdopted(seq, taken, asked.by) } }.fold(
+                { failed ->
+                    logWarn("the adoption of pet ${asked.id.value} could not be recorded: $failed")
+                    asked.replyTo.answered(NotRecorded(asked.id.value).left())
+                },
+                { next ->
+                    asked.replyTo.tell(taken.right())
+                    shop(next)
+                },
+            )
         }
     }
 }

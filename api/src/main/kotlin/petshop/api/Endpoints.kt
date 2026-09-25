@@ -11,7 +11,6 @@ import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.NotChipped
 import petshop.domain.Pet
-import petshop.domain.RegistryDown
 import petshop.domain.Species
 
 /**
@@ -25,10 +24,17 @@ val petMissing = errorJson<NoSuchPet>(404, "No pet with that id")
 
 val petTaken = errorJson<AlreadyAdopted>(409, "That pet has already been adopted")
 
-/** The two ways the chip registry can stop an adoption, which are the registry's failures and not the shop's. */
+/** The registry has no chip, which is the registry's answer and not the shop's. */
 val petNotChipped = errorJson<NotChipped>(422, "The registry has no chip for that pet")
 
-val registryDown = errorJson<RegistryDown>(503, "The chip registry could not be reached; try again")
+/**
+ * An adoption that could not be finished just now, and is worth trying again: the chip registry could
+ * not be reached (`RegistryDown`), or the shop could not write the sale down (`NotRecorded`). One type
+ * for both because a status names exactly one response, and the [message] says which it was.
+ */
+data class Unavailable(val id: Long, val message: String)
+
+val unavailable = errorJson<Unavailable>(503, "The adoption could not be finished just now; try again")
 
 /** What the shop says when asked whether it can serve. */
 data class Healthy(val ready: Boolean, val failing: List<String>)
@@ -54,7 +60,7 @@ val getPet = endpoint(petId) {
 val adoptPet = endpoint(petId) {
     post("pets" / petId / "adoption")
     summary = "Take a pet home"
-    json<Pet>().orFail(petMissing, petTaken, petNotChipped, registryDown)
+    json<Pet>().orFail(petMissing, petTaken, petNotChipped, unavailable)
 }
 
 /**

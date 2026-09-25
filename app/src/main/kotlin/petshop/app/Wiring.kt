@@ -45,6 +45,7 @@ import petshop.domain.AlreadyAdopted
 import petshop.domain.ChipRegistry
 import petshop.domain.NoSuchPet
 import petshop.domain.NotChipped
+import petshop.domain.NotRecorded
 import petshop.domain.NotRegistered
 import petshop.domain.Pet
 import petshop.domain.PetId
@@ -159,6 +160,7 @@ private fun PetShopError.outcome(): String = when (this) {
     is AlreadyAdopted -> "already_adopted"
     is NotChipped -> "not_chipped"
     is RegistryDown -> "registry_down"
+    is NotRecorded -> "not_recorded"
 }
 
 private val settings: Module =
