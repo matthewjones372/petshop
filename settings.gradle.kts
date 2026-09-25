@@ -16,3 +16,6 @@ include("registry")
 include("api")
 include("app")
 include("loadtest")
+
+// The outbox's SQL, on the Kotlin its ExoQuery plugin is built for: see its settings.gradle.kts.
+includeBuild("outbox-table")

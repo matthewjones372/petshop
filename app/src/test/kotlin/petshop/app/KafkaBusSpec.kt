@@ -70,6 +70,7 @@ class KafkaBusSpec {
     private fun shopOnKafka(name: String, backend: String): Module {
         val kafkaBus = singleOf<KafkaBus>({ bus(name) }, { bus -> bus.close() }).boundTo<EventBus>()
         val graph = petshop.overriding(single<petshop.domain.ChipRegistry> { FakeRegistry() }).overriding(kafkaBus)
+            .onAFreshDatabase()
         val streams = if (backend == "Forks") graph.overriding(single<StreamBackend> { Forks() }) else graph
         return (streams + onKafka).subgraph<OnKafka>().overridingConfig("petshop.outboxEvery = 50ms")
     }

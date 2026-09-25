@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.NotChipped
+import petshop.domain.NotRecorded
 import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.PetShop
@@ -69,8 +70,12 @@ class ContractSpec {
     }
 
     @Test
-    fun `the registry's refusals reach the caller as failures the endpoint declared`() {
-        listOf(NotChipped(1), RegistryDown(1)).forEach { refusal ->
+    fun `the registry's refusals, and a sale the shop could not record, reach the caller as declared failures`() {
+        listOf(
+            NotChipped(1) to NotChipped(1),
+            RegistryDown(1) to Unavailable(1, RegistryDown(1).message),
+            NotRecorded(1) to Unavailable(1, NotRecorded(1).message),
+        ).forEach { (refusal, declared) ->
             val refusing = petshopApi(
                 shop = object : PetShop by OnePet(nibbles) {
                     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = refusal.left()
@@ -80,7 +85,7 @@ class ContractSpec {
                 tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
             ).inMemory("petshop-refusing-${refusal::class.simpleName}")
 
-            refusing.outcome(adoptPet, 1L).shouldBeError() shouldBe refusal
+            refusing.outcome(adoptPet, 1L).shouldBeError() shouldBe declared
         }
     }
 

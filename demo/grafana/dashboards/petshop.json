@@ -256,6 +256,100 @@
         },
         "overrides": []
       }
+    },
+    {
+      "id": 8,
+      "title": "Outbox: published and refused per second",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "petshop-prometheus"
+      },
+      "description": "What the relay carried from the outbox table to the bus, and what the bus turned away. A refused event stays in the table and goes again on a later tick, so refusals with no dip in published is the bus pushing back, not events lost.",
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "petshop-prometheus"
+          },
+          "expr": "sum(rate(petshop_outbox_published_total[1m]))",
+          "legendFormat": "published",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "petshop-prometheus"
+          },
+          "expr": "sum(rate(petshop_outbox_refused_total[1m])) or vector(0)",
+          "legendFormat": "refused",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "title": "Outbox: claimed per tick",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "petshop-prometheus"
+      },
+      "description": "How many rows the relay's last claim took, FOR UPDATE SKIP LOCKED. A claim takes at most 100, the batch: a line sitting on it means the table is filling faster than a tick drains it.",
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "petshop-prometheus"
+          },
+          "expr": "petshop_outbox_claimed",
+          "legendFormat": "claimed",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
     }
   ]
 }

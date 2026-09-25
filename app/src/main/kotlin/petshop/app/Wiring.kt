@@ -45,6 +45,7 @@ import petshop.domain.AlreadyAdopted
 import petshop.domain.ChipRegistry
 import petshop.domain.NoSuchPet
 import petshop.domain.NotChipped
+import petshop.domain.NotRecorded
 import petshop.domain.NotRegistered
 import petshop.domain.Pet
 import petshop.domain.PetId
@@ -159,6 +160,7 @@ private fun PetShopError.outcome(): String = when (this) {
     is AlreadyAdopted -> "already_adopted"
     is NotChipped -> "not_chipped"
     is RegistryDown -> "registry_down"
+    is NotRecorded -> "not_recorded"
 }
 
 private val settings: Module =
@@ -184,7 +186,7 @@ private val theShop: Module =
         // The typed view of the same system. Two types, two keys, and the one that spawns actors is
         // not the one Pelican binds a port with.
         single { classic: ActorSystem -> Adapter.toTyped(classic) }.boundTo<TypedSystem<Void>>() +
-        actor<Shop>("shop") { shop(opening.associateBy { it.id }) } +
+        actor<Shop, Outbox>("shop") { outbox -> shop(outbox, opening.associateBy { it.id }) } +
         singleOf(::ActorPetShop).boundTo<PetShop>()
             .probe("shop", timeout = 3.seconds) { shop: PetShop -> shop.all().isNotEmpty() }
 
@@ -216,7 +218,7 @@ private fun asked(health: HealthRegistry): Healthy = when (val readiness = healt
     is Health.Down -> Healthy(ready = false, failing = readiness.failing)
 }
 
-val petshop: Module = settings + telemetry + registry + theShop + arrivals + events + web
+val petshop: Module = settings + telemetry + database + registry + theShop + arrivals + events + web
 
 /**
  * The application as a value, so `main` is the leaving and the build can read the root it starts

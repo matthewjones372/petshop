@@ -30,9 +30,12 @@ private val observed: Module =
         Observed(shop, bus, projection)
     }
 
-/** The shop, the relay, the bus and the consumer, with [registry] at the node. No port, no arrivals. */
+/**
+ * The shop, the outbox table, the relay, the bus and the consumer, with [registry] at the node. No port,
+ * no arrivals.
+ */
 private fun settledWith(registry: ChipRegistry): Module =
-    (petshop.overriding(single<ChipRegistry> { registry }) + observed)
+    (petshop.overriding(single<ChipRegistry> { registry }).onAFreshDatabase() + observed)
         .subgraph<Observed>()
         .overridingConfig("petshop.outboxEvery = 50ms")
 
