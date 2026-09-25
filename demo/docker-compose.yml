@@ -21,7 +21,9 @@ services:
       POSTGRES_USER: petshop
       POSTGRES_PASSWORD: petshop
     ports:
-      - "5432:5432"
+      # 55432 on the host rather than 5432, which a Postgres installed on the machine is usually
+      # already holding. application.conf points at this one.
+      - "55432:5432"
 
   prometheus:
     image: prom/prometheus:v2.54.1

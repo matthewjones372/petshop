@@ -120,6 +120,7 @@ class SettingsSpec {
     fun `the settings come from the file rather than a default`() {
         val read = testApp(petshop.subgraph<Settings>()) { settings: Settings -> settings }
 
+        read.host shouldBe "127.0.0.1"
         read.port shouldBe 8080
         read.arrivalsEvery shouldBe 5.seconds
     }
