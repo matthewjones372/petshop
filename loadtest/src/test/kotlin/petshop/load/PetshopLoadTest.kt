@@ -87,7 +87,7 @@ class PetshopLoadTest {
 
         result.writeHtmlReport(Path.of("build/reports/proofload/browsing.html"))
         result.failed shouldBe 0L
-        result[browse].responseTime.p99 shouldBeLessThan 250.milliseconds
+        result[browse].responseTime.p99 shouldBeLessThan 100.milliseconds
     }
 
     /**
