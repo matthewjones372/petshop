@@ -1,8 +1,9 @@
 val proofloadVersion = "0.1.0-rc4"
+val larkVersion: String = providers.gradleProperty("larkVersion").get()
 
 dependencies {
     testImplementation(project(":app"))
-    testImplementation("io.github.matthewjones372:lark-app:0.4.0")
+    testImplementation("io.github.matthewjones372:lark-app:$larkVersion")
     // The chip registry the shop calls out to, played by a real HTTP server.
     testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC3")
     testImplementation(project(":registry"))

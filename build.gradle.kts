@@ -8,7 +8,7 @@ subprojects {
     repositories {
         mavenCentral()
         // A lark change is tried here before it is released by installing it locally as a snapshot.
-        if (providers.gradleProperty("larkVersion").getOrElse("").endsWith("-SNAPSHOT")) mavenLocal()
+        if (providers.gradleProperty("larkVersion").get().endsWith("-SNAPSHOT")) mavenLocal()
     }
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
