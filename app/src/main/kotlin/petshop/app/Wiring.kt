@@ -23,6 +23,8 @@ import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.logSpan
 import io.github.matthewjones372.lark.logWarn
 import io.github.matthewjones372.lark.otel.tracedSpan
+import io.github.matthewjones372.lark.stream.PekkoStreams
+import io.github.matthewjones372.lark.stream.StreamBackend
 import io.opentelemetry.api.trace.Tracer
 import io.micrometer.core.instrument.Metrics as MicrometerRegistries
 import io.micrometer.prometheus.PrometheusConfig
@@ -187,8 +189,11 @@ private val theShop: Module =
             .probe("shop", timeout = 3.seconds) { shop: PetShop -> shop.all().isNotEmpty() }
 
 private val events: Module =
-    // Closed after the relay stops publishing to it, because the relay depends on it.
-    singleOf({ system: ActorSystem -> HubBus(system) }, { bus -> bus.close() }).boundTo<EventBus>() +
+    // What the relay runs on. The relay describes its stream and names no backend; this is the one
+    // place that decides, and a test that wants the relay on its own clock overrides it.
+    single { system: ActorSystem -> PekkoStreams(system) }.boundTo<StreamBackend>() +
+        // Closed after the relay stops publishing to it, because the relay depends on it.
+        singleOf({ system: ActorSystem -> HubBus(system) }, { bus -> bus.close() }).boundTo<EventBus>() +
         outbox +
         projection
 

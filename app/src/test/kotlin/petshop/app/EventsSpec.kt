@@ -1,9 +1,6 @@
 package petshop.app
 
-import arrow.core.Either
-import arrow.core.left
 import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
@@ -11,7 +8,6 @@ import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
-import org.apache.pekko.actor.ActorSystem
 import org.junit.jupiter.api.Test
 import petshop.api.Tally
 import petshop.domain.ChipRegistry
@@ -19,10 +15,8 @@ import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetId
 import petshop.domain.PetShop
-import petshop.domain.ShopEvent
 import petshop.domain.Species
 import petshop.domain.Unreachable
-import java.util.concurrent.atomic.AtomicInteger
 
 /** What a test watches from: the shop to act on, the bus to publish to, the consumer to read. */
 private class Observed(val shop: PetShop, val bus: EventBus, val projection: Projection)
@@ -44,15 +38,10 @@ private fun settledWith(registry: ChipRegistry): Module =
 
 private val settled: Module = settledWith(FakeRegistry())
 
-/** A bus that turns away its first [refusals] events, the way a full broker does. */
-private class Refusing(private val bus: EventBus, refusals: Int) : EventBus by bus {
-
-    private val left = AtomicInteger(refusals)
-
-    override fun publish(event: ShopEvent): Either<BusRefused, ShopEvent> =
-        if (left.getAndDecrement() > 0) BusRefused(event.seq, "full").left() else bus.publish(event)
-}
-
+/**
+ * The whole path on the service's own backend and clock: shop, outbox, relay, bus, consumer. What the
+ * relay does on each tick, refusals included, is RelaySpec's, on a clock the test moves.
+ */
 class EventsSpec {
 
     @Test
@@ -64,22 +53,6 @@ class EventsSpec {
 
         tally.events shouldBe 1
         tally.duplicates shouldBe 0
-    }
-
-    @Test
-    fun `an event the bus refused is still in the outbox, and goes again`() {
-        val refusing = settled.overriding(
-            single { system: ActorSystem -> Refusing(HubBus(system), refusals = 3) }.boundTo<EventBus>(),
-        )
-
-        val tally = testApp(refusing) { app: Observed ->
-            app.shop.adopt(PetId(1), by = "Ada")
-            app.projection.settlesOn { tally -> tally.adopted(Species.Tortoise) == 1 }
-        }
-
-        withClue("three refusals on one event cost three ticks, not the event") {
-            tally.events shouldBe 1
-        }
     }
 
     @Test
