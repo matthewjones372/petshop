@@ -55,7 +55,7 @@ class OutboxTable(dataSource: DataSource) {
     }
 
     /**
-     * Up to [limit] rows, oldest first, locked while [handle] runs. The rows whose `seq` [handle]
+     * Up to [limit] rows, oldest first — none, if there are none — locked while [handle] runs. The rows whose `seq` [handle]
      * answers with are deleted; the rest are let go. Answers the deleted `seq`s.
      */
     fun claim(limit: Int, handle: (List<OutboxRow>) -> List<Long>): List<Long> = runBlocking {
@@ -63,7 +63,8 @@ class OutboxTable(dataSource: DataSource) {
             val claimed = sql { forUpdateSkipLocked(Table<OutboxRow>().sortedBy { it.seq }.take(param(limit))) }
                 .buildFor.Postgres()
                 .runOnTransaction()
-            val done = if (claimed.isEmpty()) emptyList() else handle(claimed)
+            // Handed over even when empty, so whoever counts a claim counts an empty one too.
+            val done = handle(claimed)
             if (done.isNotEmpty()) {
                 sql { delete<OutboxRow>().where { seq in params(done) } }
                     .buildFor.Postgres()

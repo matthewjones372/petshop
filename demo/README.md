@@ -1,14 +1,15 @@
 # Watching the numbers
 
-Two terminals. The application runs on the host; Prometheus and Grafana run in
-Docker and scrape it.
-
-```bash
-./gradlew :app:run
-```
+Two terminals. The application runs on the host; Prometheus, Grafana and the
+Postgres its outbox is in run in Docker. Compose goes first, because the
+application will not start without its database.
 
 ```bash
 cd demo && docker compose up -d
+```
+
+```bash
+./gradlew :app:run
 ```
 
 Then open <http://localhost:3000>. The dashboard is provisioned, so there is
@@ -32,7 +33,7 @@ Arrivals happen on their own, every `petshop.arrivalsEvery`.
 
 | | |
 |---|---|
-| `docker-compose.yml` | Prometheus, Grafana and a WireMock stand-in for the chip registry — the app is the thing being demonstrated |
+| `docker-compose.yml` | Prometheus, Grafana, the outbox's Postgres and a WireMock stand-in for the chip registry — the app is the thing being demonstrated |
 | `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
 | `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds |
 | `grafana/provisioning/` | the datasource and the dashboard provider |
@@ -40,6 +41,21 @@ Arrivals happen on their own, every `petshop.arrivalsEvery`.
 
 `extra_hosts: host.docker.internal:host-gateway` is there for Linux, where that
 name does not otherwise exist. Docker Desktop ignores it.
+
+## The outbox panels
+
+The bottom row is the relay. **Published and refused per second** is what it
+carried from the outbox table to the bus, and what the bus turned away. A
+refused event stays in the table and goes again on a later tick, so refusals
+with no dip in published are the bus pushing back, not events lost.
+`refused` reads 0 rather than nothing: the counter does not exist until the
+first refusal.
+
+**Claimed per tick** is how many rows the last claim took. A claim takes at most
+100, the batch, and the panel draws a red line there: a line sitting on it
+means the table is filling faster than a tick drains it. An adoption the shop
+could not write to the table at all shows in the adoptions panel as
+`not_recorded`.
 
 ## Two things the panels are making a point about
 
