@@ -22,7 +22,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Pet"
+                  "$ref": "#/components/schemas/PetDto"
                 }
               }
             }
@@ -53,7 +53,7 @@
   },
   "components": {
     "schemas": {
-      "Pet": {
+      "PetDto": {
         "type": "object",
         "properties": {
           "id": {
@@ -77,6 +77,7 @@
           }
         },
         "required": [
+          "adopted",
           "id",
           "name",
           "species"
@@ -94,7 +95,8 @@
           }
         },
         "required": [
-          "id"
+          "id",
+          "message"
         ]
       },
       "ApiError": {

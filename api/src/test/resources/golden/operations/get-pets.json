@@ -12,7 +12,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Pet"
+                    "$ref": "#/components/schemas/PetDto"
                   }
                 }
               }
@@ -34,7 +34,7 @@
   },
   "components": {
     "schemas": {
-      "Pet": {
+      "PetDto": {
         "type": "object",
         "properties": {
           "id": {
@@ -58,6 +58,7 @@
           }
         },
         "required": [
+          "adopted",
           "id",
           "name",
           "species"

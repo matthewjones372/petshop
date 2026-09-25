@@ -23,7 +23,8 @@ docker compose -f demo/docker-compose.yml up -d postgres registry
 |---|---|---|
 | `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | none |
 | `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
-| `api` | the endpoints, their failures, the handlers | Pelican |
+| `pelican-wiremock` | WireMock, stubbed and verified in endpoint values rather than URLs | Pelican, WireMock |
+| `api` | the endpoints, their failures, the handlers, the DTOs | Pelican, kimney |
 | `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus and its consumer, the wiring, `main` | Lark |
 | `outbox-table` | the outbox's row and its SQL, in an included build on the Kotlin ExoQuery is built for | ExoQuery |
 | `loadtest` | the shop under load, started in-process | Proofload |
@@ -41,6 +42,25 @@ The route, the OpenAPI document at `/openapi.json` and the Swagger page at
 `/api-docs` all come from that. The handler must answer with `ok`, `petMissing`
 or `petTaken` — a `when` over the sealed error type is exhaustive, and returning
 a failure the endpoint never declared does not compile.
+
+### The wire is not the domain
+
+`Pet` stays in `domain`; the endpoints answer a `PetDto`, and the declared
+failures are a sealed `ProblemDto`. [kimney](https://github.com/matthewjones372/kimney)
+writes each crossing at compile time:
+
+```kotlin
+fun Pet.toDto(): PetDto = transformInto()                // PetId unwrapped, Species by name
+fun List<Pet>.toDto(): List<PetDto> = transformInto()
+fun PetShopError.toDto(): ProblemDto = into<_, ProblemDto>()
+    .withSealedCaseRenamed(RegistryDown::class, ProblemDto.Unavailable::class)
+    .withSealedCaseRenamed(NotRecorded::class, ProblemDto.Unavailable::class)
+    .transform()                                          // the rest by name
+```
+
+The JSON is unchanged — `id` was already a plain number. What changed is that a
+species added to the domain, or a field added to a DTO, is a compile error at
+the crossing rather than a new value on the wire.
 
 ### One writer, no locks
 
@@ -431,6 +451,42 @@ p99 belongs to the shop or to the tool.
 
 The whole load test is thirty lines including imports.
 
+### kimney: yes, for the drift rather than the lines
+
+Five mappings in `api/Dtos.kt`, one line each, where the hand-written version is
+a constructor call, a `when` over four species and a `when` over five failures.
+At this size that saves little typing, and typing is not the point.
+
+What it buys is that the wire cannot drift from the domain without the build
+saying so. A species added to `Species`, a field added to a DTO, a failure added
+to `PetShopError`: each is a compile error on the call that meets it, on an
+incremental build as on a clean one, and every failure on a call arrives at
+once. Adding `Rabbit`:
+
+```
+e: .../api/src/main/kotlin/petshop/api/Dtos.kt:28:27 Cannot transform Pet → PetDto:
+    PetDto.species: SpeciesDto — Species.Rabbit has no entry of the same name in SpeciesDto. Map it with .withEnumEntryRenamed(Species.Rabbit, SpeciesDto.…), or send every unmatched entry to one with .withEnumFallback(SpeciesDto.…).
+e: .../api/src/main/kotlin/petshop/api/Dtos.kt:30:39 Cannot transform List<Pet> → List<PetDto>:
+    List<PetDto>[].species: SpeciesDto — Species.Rabbit has no entry of the same name in SpeciesDto. Map it with .withEnumEntryRenamed(Species.Rabbit, SpeciesDto.…), or send every unmatched entry to one with .withEnumFallback(SpeciesDto.…). Or map Pet → PetDto with .withTransformer(Transformer<Pet, PetDto> { … }).
+```
+
+The fix it names is the one to write: `.withEnumEntryRenamed(Species.Rabbit,
+SpeciesDto.Bunny)` or `.withEnumFallback(SpeciesDto.Other)` on an `into` chain
+compiles as suggested and maps as it says.
+
+The errors show in IntelliJ as you type once the IDE may load a third-party
+compiler plugin: Help → Find Action → Registry, uncheck
+`kotlin.k2.only.bundled.compiler.plugins.enabled`, restart. It is the same flag
+Lark's underline needs, unchecked once per developer.
+
+#### What it costs
+
+A second compiler plugin, with the bargain Lark's already has: it supports
+Kotlin 2.4 and stops the build on another minor until a release supports it.
+One setting per developer for the editor. And some repetition in the errors —
+`List<Pet> → List<PetDto>` is its own call, so a broken `Pet → PetDto` is
+reported once for each.
+
 ## What building it found
 
 **A 500 where a 404 was declared.** `Find(id, replyTo: ActorRef<Pet?>)` compiles.
@@ -475,8 +531,8 @@ the edge does with it, and the edge is the part a service writes itself.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.5.0`, Proofload `0.1.0-rc4`, ExoQuery `2.0.4.PL`, Kotlin 2.4.10
-(2.3.0 for `outbox-table/`), JDK 21.
+Pelican `1.0.0-RC1`, Lark `0.5.0`, Proofload `0.1.0-rc4`, ExoQuery `2.0.4.PL`, kimney `0.3.0`,
+Kotlin 2.4.10 (2.3.0 for `outbox-table/`), JDK 21.
 
 `singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler
 plugin that reports it as you type were all written while this repository was

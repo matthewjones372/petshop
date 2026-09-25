@@ -27,6 +27,7 @@ import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.extension.RegisterExtension
+import petshop.api.ProblemDto
 import petshop.api.adoptPet
 import petshop.api.listPets
 import petshop.api.stats
@@ -41,7 +42,6 @@ import petshop.app.recorded
 import petshop.app.unsent
 import io.kotest.matchers.longs.shouldBeGreaterThan
 import petshop.app.petshop
-import petshop.domain.AlreadyAdopted
 import petshop.registry.ChipRecord
 import petshop.registry.lookupChip
 import petshop.registry.recordKeeper
@@ -123,7 +123,7 @@ class PetshopLoadTest {
                         when (val answer = client.outcome(adoptPet, 1L)) {
                             is Outcome.Ok -> step.fail("the tortoise was sold twice")
                             is Outcome.Err ->
-                                if (answer.error !is AlreadyAdopted) step.fail("not the declared failure")
+                                if (answer.error !is ProblemDto.AlreadyAdopted) step.fail("not the declared failure")
                         }
                     }
                 }

@@ -7,10 +7,6 @@ import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.text
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
-import petshop.domain.AlreadyAdopted
-import petshop.domain.NoSuchPet
-import petshop.domain.NotChipped
-import petshop.domain.Pet
 import petshop.domain.Species
 
 /**
@@ -20,21 +16,14 @@ import petshop.domain.Species
 val petId = pathParam<Long>("petId", description = "The pet's id")
 
 /** The two ways a request about a pet can fail, each with the status the document publishes. */
-val petMissing = errorJson<NoSuchPet>(404, "No pet with that id")
+val petMissing = errorJson<ProblemDto.NoSuchPet>(404, "No pet with that id")
 
-val petTaken = errorJson<AlreadyAdopted>(409, "That pet has already been adopted")
+val petTaken = errorJson<ProblemDto.AlreadyAdopted>(409, "That pet has already been adopted")
 
 /** The registry has no chip, which is the registry's answer and not the shop's. */
-val petNotChipped = errorJson<NotChipped>(422, "The registry has no chip for that pet")
+val petNotChipped = errorJson<ProblemDto.NotChipped>(422, "The registry has no chip for that pet")
 
-/**
- * An adoption that could not be finished just now, and is worth trying again: the chip registry could
- * not be reached (`RegistryDown`), or the shop could not write the sale down (`NotRecorded`). One type
- * for both because a status names exactly one response, and the [message] says which it was.
- */
-data class Unavailable(val id: Long, val message: String)
-
-val unavailable = errorJson<Unavailable>(503, "The adoption could not be finished just now; try again")
+val unavailable = errorJson<ProblemDto.Unavailable>(503, "The adoption could not be finished just now; try again")
 
 /** What the shop says when asked whether it can serve. */
 data class Healthy(val ready: Boolean, val failing: List<String>)
@@ -48,19 +37,19 @@ val health = endpoint {
 val listPets = endpoint {
     get("pets")
     summary = "Every pet in the shop"
-    json<List<Pet>>()
+    json<List<PetDto>>()
 }
 
 val getPet = endpoint(petId) {
     get("pets" / petId)
     summary = "One pet"
-    json<Pet>() orFail petMissing
+    json<PetDto>() orFail petMissing
 }
 
 val adoptPet = endpoint(petId) {
     post("pets" / petId / "adoption")
     summary = "Take a pet home"
-    json<Pet>().orFail(petMissing, petTaken, petNotChipped, unavailable)
+    json<PetDto>().orFail(petMissing, petTaken, petNotChipped, unavailable)
 }
 
 /**
