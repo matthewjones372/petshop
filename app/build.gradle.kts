@@ -15,7 +15,9 @@ dependencies {
     implementation("io.github.matthewjones372:lark-app:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-pekko:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
-    implementation("io.github.matthewjones372:lark-stream:$larkVersion")
+    // The Pekko backend, which brings lark-stream with it. The relay's description names no backend:
+    // the graph decides, and RelaySpec runs the same description on a clock the test moves.
+    implementation("io.github.matthewjones372:lark-stream-pekko:$larkVersion")
     implementation("io.github.matthewjones372:lark-pekko:$larkVersion")
     implementation("io.github.matthewjones372:lark-otel:$larkVersion")
     implementation("io.opentelemetry:opentelemetry-sdk:1.51.0")
@@ -38,6 +40,9 @@ dependencies {
 
     // A claim about a backend is worth having only against the real one.
     testImplementation("ch.qos.logback:logback-classic:1.5.20")
+
+    // The relay on time the test owns: an interval of ticks is one clock.adjust, and nothing sleeps.
+    testImplementation("io.github.matthewjones372:lark-stream-test:$larkVersion")
 
     // A real HTTP server playing the registry, stubbed in the registry's own endpoints.
     testImplementation(project(":pelican-wiremock"))
