@@ -14,12 +14,14 @@ import io.kotest.matchers.shouldBe
 import org.apache.pekko.actor.ActorSystem
 import org.junit.jupiter.api.Test
 import petshop.api.Tally
+import petshop.domain.ChipRegistry
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.ShopEvent
 import petshop.domain.Species
+import petshop.domain.Unreachable
 import java.util.concurrent.atomic.AtomicInteger
 
 /** What a test watches from: the shop to act on, the bus to publish to, the consumer to read. */
@@ -34,9 +36,13 @@ private val observed: Module =
         Observed(shop, bus, projection)
     }
 
-/** The shop, the relay, the bus and the consumer. No port, no arrivals. */
-private val settled: Module =
-    (petshop + observed).subgraph<Observed>().overridingConfig("petshop.outboxEvery = 50ms")
+/** The shop, the relay, the bus and the consumer, with [registry] at the node. No port, no arrivals. */
+private fun settledWith(registry: ChipRegistry): Module =
+    (petshop.overriding(single<ChipRegistry> { registry }) + observed)
+        .subgraph<Observed>()
+        .overridingConfig("petshop.outboxEvery = 50ms")
+
+private val settled: Module = settledWith(FakeRegistry())
 
 /** A bus that turns away its first [refusals] events, the way a full broker does. */
 private class Refusing(private val bus: EventBus, refusals: Int) : EventBus by bus {
@@ -89,6 +95,18 @@ class EventsSpec {
         withClue("the bus is at-least-once, so the consumer knows an event by its seq") {
             tally.adopted(Species.Dog) shouldBe 1
             tally.events shouldBe 1
+        }
+    }
+
+    @Test
+    fun `an adoption the registry refused reaches the consumer as a return`() {
+        val tally = testApp(settledWith(FakeRegistry(refusing = Unreachable("down")))) { app: Observed ->
+            app.shop.adopt(PetId(1), by = "Ada")
+            app.projection.settlesOn { tally -> tally.events == 2 }
+        }
+
+        withClue("the adoption was already recorded, so the undo is an event and the count goes back") {
+            tally.adopted(Species.Tortoise) shouldBe 0
         }
     }
 }

@@ -1,0 +1,30 @@
+{
+  "mappings": [
+    {
+      "name": "every pet has a chip, except below",
+      "request": { "method": "GET", "urlPathPattern": "/chips/[0-9]+" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "number": "98100000000{{request.path.[1]}}", "keeper": "Petshop" },
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "name": "pet 3 was never chipped",
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/chips/3" },
+      "response": { "status": 404 }
+    },
+    {
+      "name": "a new keeper is recorded as asked",
+      "request": { "method": "POST", "urlPathPattern": "/chips/[0-9]+/keeper" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "number": "{{request.path.[1]}}", "keeper": "{{jsonPath request.body '$.keeper'}}" },
+        "transformers": ["response-template"]
+      }
+    }
+  ]
+}

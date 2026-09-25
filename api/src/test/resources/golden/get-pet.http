@@ -1,0 +1,14 @@
+GET /pets/1
+
+
+--- response
+
+200
+Content-Type: application/json
+
+{
+  "id": 1,
+  "name": "Nibbles",
+  "species": "Tortoise",
+  "adopted": false
+}

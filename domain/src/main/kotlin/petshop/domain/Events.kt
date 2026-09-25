@@ -13,3 +13,6 @@ sealed interface ShopEvent {
 data class PetArrived(override val seq: Long, val pet: Pet) : ShopEvent
 
 data class PetAdopted(override val seq: Long, val pet: Pet, val by: String) : ShopEvent
+
+/** An adoption undone after it was recorded, because the chip registry would not take the new keeper. */
+data class PetReturned(override val seq: Long, val pet: Pet) : ShopEvent

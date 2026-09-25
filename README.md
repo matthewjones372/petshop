@@ -20,9 +20,11 @@ it, and a load test that runs the whole thing in its own process.
 
 | Module | What it holds | Library |
 |---|---|---|
-| `domain` | `Pet`, `PetShop`, and the two ways adopting can fail | none |
+| `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | none |
+| `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
+| `pelican-wiremock` | WireMock, stubbed and verified in endpoint values rather than URLs | Pelican, WireMock |
 | `api` | the endpoints, their failures, the handlers | Pelican |
-| `app` | the actor, the arrivals stream, the outbox relay, the bus and its consumer, the wiring, `main` | Lark |
+| `app` | the actor, the arrivals stream, the chip registry's client, the outbox relay, the bus and its consumer, the wiring, `main` | Lark |
 | `loadtest` | the shop under load, started in-process | Proofload |
 
 ### The contract is a value
@@ -87,7 +89,7 @@ here stands in for that transaction.
 ### The application is a value
 
 ```kotlin
-val petshop: Module = settings + telemetry + theShop + arrivals + events + web
+val petshop: Module = settings + telemetry + registry + theShop + arrivals + events + web
 
 object Petshop : LarkApp<PelicanServer>() {
     override val module: Module = petshop
@@ -102,6 +104,18 @@ which is what the compiler checks the graph against as you type, and what
 The load test starts the same value in its own process, runs two thousand
 requests through it, and gets the port back afterwards.
 
+### Somebody else's service
+
+An adoption is recorded with the national chip registry: a `GET` for the pet's
+chip, then a `POST` naming its new keeper. The actor settles who gets the pet
+first, so the losers of a race never reach the registry, and a registry that
+cannot record the keeper puts the pet back on the shelf.
+
+The registry's contract is written the way the shop's own is, as values, in
+`registry`. The client is generated from them by Pelican's Gradle plugin,
+committed, and checked on every build; `HttpChipRegistry` is what is left, the
+shop's decision about which answers mean "no chip" and which mean "could not ask".
+
 ## What a test looks like
 
 ```kotlin
@@ -113,6 +127,27 @@ testApp(petshop.subgraph<PetShop>()) { shop: PetShop ->
 // one setting changed; application.conf keeps the rest
 testApp(petshop.subgraph<Settings>().overridingConfig("petshop.arrivalsEvery = 1s")) { it }
 ```
+
+Somebody else's service is replaced in one of two places, depending on what the test is about:
+
+```kotlin
+// about the shop: swap the node. `overriding` refuses a key the graph does not hold,
+// so a fake bound under the wrong type cannot leave the real client running beside it.
+petshop.overriding(single<ChipRegistry> { FakeRegistry() }).subgraph<PetShop>()
+
+// about the client: keep the node, swap the server. The stubs are the registry's own
+// endpoints, so they move with its contract; the answers are values it declares.
+@RegisterExtension val registry = PelicanWireMock()
+
+registry.stub(lookupChip, 1L) answers ok(ChipRecord("981000000000001", keeper = "Petshop"))
+registry.stub(recordKeeper, In2("981000000000001", NewKeeper("Ada"))) fails Fault.CONNECTION_RESET_BY_PEER
+
+testApp(shopCalling(registry)) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") } shouldBeLeft RegistryDown(1)
+```
+
+and what the shop has promised its callers is a set of golden files:
+`golden.operations(api.spec())` fails on a change that would break somebody
+already calling, and rewrites the file on one that would not.
 
 and what the load test asks:
 

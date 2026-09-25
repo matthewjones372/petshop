@@ -7,6 +7,7 @@ import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.parMap
+import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -14,6 +15,8 @@ import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.PetId
 import petshop.domain.PetShop
+import petshop.domain.RegistryDown
+import petshop.domain.Unreachable
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -22,9 +25,10 @@ import kotlin.time.Duration.Companion.seconds
  */
 class AdoptionSpec {
 
-    // The shop needs a system, an actor and a tracer. Not a port, not a config file, and — since the
-    // actor stopped pretending to depend on them — not the settings either.
-    private val settled: Module = petshop.subgraph<PetShop>()
+    // The shop needs a system, an actor, a tracer and a registry. Not a port, not a config file, and —
+    // since the actor stopped pretending to depend on them — not the settings either. The registry is
+    // a fake at the node: this file is about who gets the pet, and RegistrySpec is about the wire.
+    private val settled: Module = shopWith(FakeRegistry())
 
     @Test
     fun `twenty people adopt one tortoise and one of them gets it`() {
@@ -39,12 +43,27 @@ class AdoptionSpec {
     }
 
     @Test
+    fun `a keeper the registry will not record puts the pet back on the shelf`() {
+        val refused = shopWith(FakeRegistry(refusing = Unreachable("down for maintenance")))
+
+        val (first, after) = testApp(refused) { shop: PetShop ->
+            shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1))
+        }
+
+        first shouldBeLeft RegistryDown(1)
+        withClue("the actor said yes before the registry said no, and the no has to undo it") {
+            after?.adopted shouldBe false
+        }
+    }
+
+    @Test
     fun `the subgraph binds no port and serves no documents`() {
         val drawn = settled.render()
 
         withClue("what a test of the shop needs is the shop") {
             drawn.contains("PelicanServer") shouldBe false
             drawn.contains("Arrivals") shouldBe false
+            drawn.contains("RegistrySettings") shouldBe false
         }
     }
 }

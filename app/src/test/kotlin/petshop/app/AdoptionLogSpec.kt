@@ -21,7 +21,7 @@ import petshop.domain.PetShop
  */
 class AdoptionLogSpec {
 
-    private val settled: Module = petshop.subgraph<PetShop>()
+    private val settled: Module = shopWith(FakeRegistry())
 
     @Test
     fun `an adoption names the pet and the adopter in pairs, not in prose`() {

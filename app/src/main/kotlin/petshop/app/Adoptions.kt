@@ -13,6 +13,7 @@ import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
 import petshop.domain.PetId
+import petshop.domain.PetReturned
 import petshop.domain.PetShopError
 import petshop.domain.ShopEvent
 
@@ -38,6 +39,12 @@ data class Find(val id: PetId, val replyTo: ActorRef<Option<Pet>>) : Shop
 
 data class Adopt(val id: PetId, val by: String, val replyTo: ActorRef<Either<PetShopError, Pet>>) : Shop
 
+/**
+ * An adoption undone: the actor said yes, and then the registry would not record the new keeper. The
+ * pet goes back on the shelf rather than out of the door untraceable.
+ */
+data class Returned(val id: PetId) : Shop
+
 /** Up to [limit] of the events nobody has confirmed publishing, oldest first. */
 data class Unsent(val limit: Int, val replyTo: ActorRef<List<ShopEvent>>) : Shop
 
@@ -60,6 +67,14 @@ private fun shop(state: State): Behavior<Shop> =
     Behaviors.receive(Shop::class.java)
         .onMessage(Arrived::class.java) { arrival ->
             shop(state.record(arrival.pet) { seq -> PetArrived(seq, arrival.pet) })
+        }
+        // The adoption was already recorded, and may already be on the bus, so the undo is an event
+        // of its own rather than a quiet edit: a consumer that counted the adoption hears it reversed.
+        .onMessage(Returned::class.java) { returned ->
+            state.pets[returned.id]?.let { pet ->
+                val back = pet.copy(adopted = false)
+                shop(state.record(back) { seq -> PetReturned(seq, back) })
+            } ?: Behaviors.same()
         }
         .onMessage(Everything::class.java) { asked ->
             asked.replyTo.tell(state.pets.values.sortedBy { it.id.value })

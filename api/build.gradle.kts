@@ -15,4 +15,5 @@ dependencies {
 
     testImplementation("io.github.matthewjones372:pelican-test:$pelicanVersion")
     testImplementation("io.github.matthewjones372:pelican-test-pekko:$pelicanVersion")
+    testImplementation("io.github.matthewjones372:pelican-test-golden:$pelicanVersion")
 }

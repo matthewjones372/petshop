@@ -9,7 +9,9 @@ import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
+import petshop.domain.NotChipped
 import petshop.domain.Pet
+import petshop.domain.RegistryDown
 import petshop.domain.Species
 
 /**
@@ -22,6 +24,11 @@ val petId = pathParam<Long>("petId", description = "The pet's id")
 val petMissing = errorJson<NoSuchPet>(404, "No pet with that id")
 
 val petTaken = errorJson<AlreadyAdopted>(409, "That pet has already been adopted")
+
+/** The two ways the chip registry can stop an adoption, which are the registry's failures and not the shop's. */
+val petNotChipped = errorJson<NotChipped>(422, "The registry has no chip for that pet")
+
+val registryDown = errorJson<RegistryDown>(503, "The chip registry could not be reached; try again")
 
 /** What the shop says when asked whether it can serve. */
 data class Healthy(val ready: Boolean, val failing: List<String>)
@@ -47,7 +54,7 @@ val getPet = endpoint(petId) {
 val adoptPet = endpoint(petId) {
     post("pets" / petId / "adoption")
     summary = "Take a pet home"
-    json<Pet>().orFail(petMissing, petTaken)
+    json<Pet>().orFail(petMissing, petTaken, petNotChipped, registryDown)
 }
 
 /**

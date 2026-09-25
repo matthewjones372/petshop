@@ -7,8 +7,10 @@ import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOrFail
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
+import petshop.domain.NotChipped
 import petshop.domain.PetId
 import petshop.domain.PetShop
+import petshop.domain.RegistryDown
 
 /**
  * The endpoints answered. A handler names the declared failure it is producing, so returning one the
@@ -29,6 +31,8 @@ fun petshopApi(shop: PetShop, health: () -> Healthy, scrape: () -> String, tally
                     when (failure) {
                         is NoSuchPet -> petMissing(failure)
                         is AlreadyAdopted -> petTaken(failure)
+                        is NotChipped -> petNotChipped(failure)
+                        is RegistryDown -> registryDown(failure)
                     }
                 },
                 { pet -> ok(pet) },

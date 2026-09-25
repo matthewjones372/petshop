@@ -14,6 +14,7 @@ import petshop.api.SpeciesTally
 import petshop.api.Tally
 import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
+import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
 import java.util.concurrent.atomic.AtomicReference
@@ -58,6 +59,7 @@ private operator fun Tally.plus(delivery: Delivery): Tally {
     return when (val event = delivery.event) {
         is PetArrived -> counted(event.pet.species) { it.copy(arrived = it.arrived + 1) }
         is PetAdopted -> counted(event.pet.species) { it.copy(adopted = it.adopted + 1) }
+        is PetReturned -> counted(event.pet.species) { it.copy(adopted = it.adopted - 1) }
     }
 }
 

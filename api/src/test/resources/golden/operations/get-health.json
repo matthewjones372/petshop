@@ -1,0 +1,76 @@
+{
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Whether the shop can serve",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Healthy"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal: this request was not answered by the operation above.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Healthy": {
+        "type": "object",
+        "properties": {
+          "ready": {
+            "type": "boolean"
+          },
+          "failing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "failing",
+          "ready"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "error": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "error",
+          "status"
+        ]
+      }
+    }
+  }
+}

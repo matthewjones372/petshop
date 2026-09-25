@@ -1,6 +1,8 @@
 package petshop.app
 
 import arrow.core.Either
+import arrow.core.flatMap
+import arrow.core.raise.either
 import io.github.matthewjones372.lark.app.AppScope
 import io.github.matthewjones372.lark.app.Health
 import io.github.matthewjones372.lark.app.HealthRegistry
@@ -38,11 +40,17 @@ import org.apache.pekko.actor.typed.javadsl.Adapter
 import petshop.api.Healthy
 import petshop.api.petshopApi
 import petshop.domain.AlreadyAdopted
+import petshop.domain.ChipRegistry
 import petshop.domain.NoSuchPet
+import petshop.domain.NotChipped
+import petshop.domain.NotRegistered
 import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.PetShopError
+import petshop.domain.RegistryDown
+import petshop.domain.RegistryError
+import petshop.domain.Unreachable
 import petshop.domain.Species
 import kotlin.reflect.typeOf
 import kotlin.time.Duration
@@ -63,6 +71,7 @@ class ActorPetShop(
     private val ref: ActorRef<Shop>,
     private val system: ActorSystem,
     private val tracer: Tracer,
+    private val registry: ChipRegistry,
 ) : PetShop {
 
     override fun all(): List<Pet> = ref.ask(system, asking) { replyTo -> Everything(replyTo) }
@@ -86,7 +95,7 @@ class ActorPetShop(
                     // Timed around the ask, so a refusal is in the distribution too: the slow calls
                     // are the ones worth seeing and most of them are the ones that failed.
                     timed("petshop.adopt.duration") {
-                        ref.ask(system, asking) { replyTo -> Adopt(id, by, replyTo) }.also { answer ->
+                        handOver(id, by).also { answer ->
                             answer.fold(
                                 { no ->
                                     logWarn(no.message)
@@ -112,6 +121,32 @@ class ActorPetShop(
                 }
             }
         }
+
+    /**
+     * The actor decides who gets the pet, and only then is the registry asked: a race is lost in the
+     * shop without costing the loser a call to somebody else's service, and a pet somebody already has
+     * never reaches the registry at all.
+     *
+     * If the registry cannot record the new keeper, the pet goes back on the shelf. The shop does not
+     * hand over a pet nobody could trace, and it does not keep one it has already refused to sell.
+     */
+    private fun handOver(id: PetId, by: String): Either<PetShopError, Pet> = either {
+        val pet = ref.ask(system, asking) { replyTo -> Adopt(id, by, replyTo) }.bind()
+        registry.lookup(id)
+            .flatMap { chip -> registry.transfer(chip, to = by) }
+            .onLeft { failure ->
+                logWarn("registry refused pet ${id.value}: $failure")
+                ref.tell(Returned(id))
+            }
+            .mapLeft { failure -> failure.refusing(id) }
+            .bind()
+        pet
+    }
+}
+
+private fun RegistryError.refusing(id: PetId): PetShopError = when (this) {
+    NotRegistered -> NotChipped(id.value)
+    is Unreachable -> RegistryDown(id.value)
 }
 
 private val asking = 3.seconds
@@ -120,6 +155,8 @@ private val asking = 3.seconds
 private fun PetShopError.outcome(): String = when (this) {
     is NoSuchPet -> "no_such_pet"
     is AlreadyAdopted -> "already_adopted"
+    is NotChipped -> "not_chipped"
+    is RegistryDown -> "registry_down"
 }
 
 private val settings: Module =
@@ -174,7 +211,7 @@ private fun asked(health: HealthRegistry): Healthy = when (val readiness = healt
     is Health.Down -> Healthy(ready = false, failing = readiness.failing)
 }
 
-val petshop: Module = settings + telemetry + theShop + arrivals + events + web
+val petshop: Module = settings + telemetry + registry + theShop + arrivals + events + web
 
 /**
  * The application as a value, so `main` is the leaving and the build can read the root it starts

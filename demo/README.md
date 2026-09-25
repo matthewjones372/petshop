@@ -20,6 +20,10 @@ Make something happen:
 curl -X POST localhost:8080/pets/1/adoption   # taken
 curl -X POST localhost:8080/pets/1/adoption   # already_adopted
 curl -X POST localhost:8080/pets/999/adoption # no_such_pet
+curl -X POST localhost:8080/pets/3/adoption   # not_chipped: the registry has no chip for Mrs Peel
+docker compose stop registry
+curl -X POST localhost:8080/pets/2/adoption   # registry_down, and Barnaby stays in the shop
+docker compose start registry
 ```
 
 Arrivals happen on their own, every `petshop.arrivalsEvery`.
@@ -28,7 +32,8 @@ Arrivals happen on their own, every `petshop.arrivalsEvery`.
 
 | | |
 |---|---|
-| `docker-compose.yml` | Prometheus and Grafana, and nothing else — the app is the thing being demonstrated |
+| `docker-compose.yml` | Prometheus, Grafana and a WireMock stand-in for the chip registry — the app is the thing being demonstrated |
+| `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
 | `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds |
 | `grafana/provisioning/` | the datasource and the dashboard provider |
 | `grafana/dashboards/petshop.json` | the dashboard itself |
