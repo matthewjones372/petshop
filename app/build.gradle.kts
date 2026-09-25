@@ -6,7 +6,8 @@ plugins {
 
 application { mainClass.set("petshop.app.MainKt") }
 
-val larkVersion = "0.4.0"
+// `-PlarkVersion=0.4.1-SNAPSHOT` builds against a lark installed with `publishToMavenLocal`.
+val larkVersion: String = providers.gradleProperty("larkVersion").getOrElse("0.5.0")
 
 dependencies {
     api(project(":api"))

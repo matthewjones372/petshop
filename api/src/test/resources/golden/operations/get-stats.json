@@ -1,0 +1,109 @@
+{
+  "paths": {
+    "/stats": {
+      "get": {
+        "summary": "What the shop's events add up to, as a consumer of them sees it",
+        "operationId": "getStats",
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tally"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal: this request was not answered by the operation above.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SpeciesTally": {
+        "type": "object",
+        "properties": {
+          "species": {
+            "type": "string",
+            "enum": [
+              "Cat",
+              "Dog",
+              "Parrot",
+              "Tortoise"
+            ]
+          },
+          "arrived": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "adopted": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "adopted",
+          "arrived",
+          "species"
+        ]
+      },
+      "Tally": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duplicates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bySpecies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpeciesTally"
+            }
+          }
+        },
+        "required": [
+          "bySpecies",
+          "duplicates",
+          "events"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "error": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "error",
+          "status"
+        ]
+      }
+    }
+  }
+}

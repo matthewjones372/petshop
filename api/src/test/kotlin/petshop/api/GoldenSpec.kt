@@ -33,7 +33,12 @@ class GoldenSpec {
         override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = NoSuchPet(id.value).left()
     }
 
-    private val api = petshopApi(shop, health = { Healthy(ready = true, failing = emptyList()) }, scrape = { "" })
+    private val api = petshopApi(
+        shop,
+        health = { Healthy(ready = true, failing = emptyList()) },
+        scrape = { "" },
+        tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+    )
 
     @Test
     fun `every endpoint publishes what it published`() {

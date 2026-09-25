@@ -12,6 +12,7 @@ import petshop.domain.NoSuchPet
 import petshop.domain.NotChipped
 import petshop.domain.Pet
 import petshop.domain.RegistryDown
+import petshop.domain.Species
 
 /**
  * What the shop's HTTP contract is, as values. The server routes, the OpenAPI document and the typed
@@ -66,4 +67,19 @@ val metrics = endpoint {
     get("metrics")
     summary = "Every meter, in Prometheus' exposition format"
     text()
+}
+
+/** One species' share of what the shop's events have said so far. */
+data class SpeciesTally(val species: Species, val arrived: Int, val adopted: Int)
+
+/**
+ * What the events have added up to, read from the bus rather than the shop. `duplicates` is how many
+ * the bus delivered twice and the tally counted once.
+ */
+data class Tally(val events: Int, val duplicates: Int, val bySpecies: List<SpeciesTally>)
+
+val stats = endpoint {
+    get("stats")
+    summary = "What the shop's events add up to, as a consumer of them sees it"
+    json<Tally>()
 }

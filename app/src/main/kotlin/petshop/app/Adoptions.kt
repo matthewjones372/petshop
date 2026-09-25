@@ -10,8 +10,12 @@ import org.apache.pekko.actor.typed.javadsl.Behaviors
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.Pet
+import petshop.domain.PetAdopted
+import petshop.domain.PetArrived
 import petshop.domain.PetId
+import petshop.domain.PetReturned
 import petshop.domain.PetShopError
+import petshop.domain.ShopEvent
 
 /**
  * The shop's only writer.
@@ -41,36 +45,66 @@ data class Adopt(val id: PetId, val by: String, val replyTo: ActorRef<Either<Pet
  */
 data class Returned(val id: PetId) : Shop
 
-fun shop(pets: Map<PetId, Pet> = emptyMap()): Behavior<Shop> =
-    Behaviors.receive(Shop::class.java)
-        .onMessage(Arrived::class.java) { arrival -> shop(pets + (arrival.pet.id to arrival.pet)) }
-        .onMessage(Returned::class.java) { returned ->
-            pets[returned.id]?.let { pet -> shop(pets + (pet.id to pet.copy(adopted = false))) } ?: Behaviors.same()
+/** Up to [limit] of the events nobody has confirmed publishing, oldest first. */
+data class Unsent(val limit: Int, val replyTo: ActorRef<List<ShopEvent>>) : Shop
+
+/** The relay's word that [seq] reached the bus, so it can leave the outbox. */
+data class Sent(val seq: Long) : Shop
+
+/**
+ * The pets and the outbox are one value, so a change and the event saying it happened are one
+ * transition: there is no moment where the shop has sold a pet and not yet recorded that it did.
+ */
+private data class State(val pets: Map<PetId, Pet>, val outbox: List<ShopEvent>, val recorded: Long) {
+
+    fun record(pet: Pet, event: (seq: Long) -> ShopEvent): State =
+        State(pets + (pet.id to pet), outbox + event(recorded + 1), recorded + 1)
+}
+
+fun shop(pets: Map<PetId, Pet> = emptyMap()): Behavior<Shop> = shop(State(pets, emptyList(), 0))
+
+/**
+ * One `when` over the sealed [Shop], so a new message is a compile error here until it is handled.
+ * The state is the argument: a change is the next behaviour, and nothing in here is reassigned.
+ */
+private fun shop(state: State): Behavior<Shop> =
+    Behaviors.receiveMessage<Shop> { message ->
+        when (message) {
+            is Arrived -> shop(state.record(message.pet) { seq -> PetArrived(seq, message.pet) })
+            is Adopt -> adopt(state, message)
+            is Returned -> returned(state, message.id)
+            is Everything -> message.replyTo.answered(state.pets.values.sortedBy { it.id.value })
+            is Find -> message.replyTo.answered(Option.fromNullable(state.pets[message.id]))
+            is Unsent -> message.replyTo.answered(state.outbox.take(message.limit))
+            is Sent -> shop(state.copy(outbox = state.outbox.filterNot { it.seq == message.seq }))
         }
-        .onMessage(Everything::class.java) { asked ->
-            asked.replyTo.tell(pets.values.sortedBy { it.id.value })
-            Behaviors.same()
+    }
+
+private fun adopt(state: State, asked: Adopt): Behavior<Shop> {
+    val pet = state.pets[asked.id]
+    return when {
+        pet == null -> asked.replyTo.answered(NoSuchPet(asked.id.value).left())
+        pet.adopted -> asked.replyTo.answered(AlreadyAdopted(asked.id.value).left())
+        else -> {
+            val taken = pet.copy(adopted = true)
+            asked.replyTo.tell(taken.right())
+            shop(state.record(taken) { seq -> PetAdopted(seq, taken, asked.by) })
         }
-        .onMessage(Find::class.java) { asked ->
-            asked.replyTo.tell(Option.fromNullable(pets[asked.id]))
-            Behaviors.same()
-        }
-        .onMessage(Adopt::class.java) { asked ->
-            val pet = pets[asked.id]
-            when {
-                pet == null -> {
-                    asked.replyTo.tell(NoSuchPet(asked.id.value).left())
-                    Behaviors.same()
-                }
-                pet.adopted -> {
-                    asked.replyTo.tell(AlreadyAdopted(asked.id.value).left())
-                    Behaviors.same()
-                }
-                else -> {
-                    val taken = pet.copy(adopted = true)
-                    asked.replyTo.tell(taken.right())
-                    shop(pets + (taken.id to taken))
-                }
-            }
-        }
-        .build()
+    }
+}
+
+/**
+ * The adoption was already recorded, and may already be on the bus, so the undo is an event of its own
+ * rather than a quiet edit: a consumer that counted the adoption hears it reversed.
+ */
+private fun returned(state: State, id: PetId): Behavior<Shop> =
+    state.pets[id]?.let { pet ->
+        val back = pet.copy(adopted = false)
+        shop(state.record(back) { seq -> PetReturned(seq, back) })
+    } ?: Behaviors.same()
+
+/** A question changes nothing: the reply goes, and the behaviour stays as it was. */
+private fun <A : Any> ActorRef<A>.answered(reply: A): Behavior<Shop> {
+    tell(reply)
+    return Behaviors.same()
+}

@@ -5,7 +5,11 @@ plugins {
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
 
-    repositories { mavenCentral() }
+    repositories {
+        mavenCentral()
+        // A lark change is tried here before it is released by installing it locally as a snapshot.
+        if (providers.gradleProperty("larkVersion").getOrElse("").endsWith("-SNAPSHOT")) mavenLocal()
+    }
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
         jvmToolchain(21)
