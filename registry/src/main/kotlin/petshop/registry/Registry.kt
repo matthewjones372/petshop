@@ -15,9 +15,8 @@ import io.github.matthewjones372.pelican.pathParam
  * The national chip registry's HTTP contract, as values.
  *
  * The registry is somebody else's service. This file is the shop's reading of what the registry
- * publishes, and three things are built from it: the client in `src/main/generated` (generated,
- * committed, and checked on every build), the WireMock stubs the tests answer with, and the golden
- * files that say when the shop's reading changed.
+ * publishes, and two things are built from it: the client in `src/main/generated` (generated,
+ * committed, and checked on every build) and the WireMock stubs the tests answer with.
  */
 
 val petId = pathParam<Long>("petId", description = "The id the shop registered the pet under")
@@ -50,7 +49,7 @@ val recordKeeper = endpoint(chipNumber, newKeeper) {
     json<ChipRecord>() orFail noSuchChip
 }
 
-/** What the generated client and the golden files are read from. */
+/** What the generated client is read from. */
 fun registrySpec(): ApiSpec = apiSpec(listOf(lookupChip, recordKeeper), schemas = JacksonCodecs) {
     title = "Registry"
     version = "1.0.0"

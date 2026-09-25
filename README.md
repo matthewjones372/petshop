@@ -112,10 +112,9 @@ registry.stub(recordKeeper, In2("981000000000001", NewKeeper("Ada"))) fails Faul
 testApp(shopCalling(registry)) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") } shouldBeLeft RegistryDown(1)
 ```
 
-and what the shop has promised its callers, and what it believes the registry
-accepts, are both golden files: `golden.operations(api.spec())` fails on a
-change that would break somebody already calling, and rewrites the file on one
-that would not.
+and what the shop has promised its callers is a set of golden files:
+`golden.operations(api.spec())` fails on a change that would break somebody
+already calling, and rewrites the file on one that would not.
 
 and what the load test asks:
 

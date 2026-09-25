@@ -14,8 +14,6 @@ dependencies {
     api("io.github.matthewjones372:pelican-core:$pelicanVersion")
     api("io.github.matthewjones372:pelican-jackson:$pelicanVersion")
     codegen("io.github.matthewjones372:pelican-codegen:$pelicanVersion")
-
-    testImplementation("io.github.matthewjones372:pelican-test-golden:$pelicanVersion")
 }
 
 kotlin.sourceSets.named("main") { kotlin.srcDir("src/main/generated") }
