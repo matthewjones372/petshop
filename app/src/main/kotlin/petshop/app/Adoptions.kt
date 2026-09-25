@@ -6,6 +6,7 @@ import arrow.core.left
 import arrow.core.right
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.SupervisorStrategy
 import org.apache.pekko.actor.typed.javadsl.Behaviors
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
@@ -45,23 +46,25 @@ data class Adopt(val id: PetId, val by: String, val replyTo: ActorRef<Either<Pet
  */
 data class Returned(val id: PetId) : Shop
 
-/** Up to [limit] of the events nobody has confirmed publishing, oldest first. */
-data class Unsent(val limit: Int, val replyTo: ActorRef<List<ShopEvent>>) : Shop
-
-/** The relay's word that [seq] reached the bus, so it can leave the outbox. */
-data class Sent(val seq: Long) : Shop
-
 /**
- * The pets and the outbox are one value, so a change and the event saying it happened are one
- * transition: there is no moment where the shop has sold a pet and not yet recorded that it did.
+ * The event goes into the outbox table before the pet changes, and the pet changes only if it went:
+ * there is no moment where the shop has sold a pet and not recorded that it did.
+ *
+ * A write that throws — Postgres down, the pool exhausted — leaves the actor as it was rather than
+ * stopping it. Nothing is answered, so whoever asked times out instead of being told yes about a sale
+ * nobody recorded, and the pet is still on the shelf for the next one.
  */
-private data class State(val pets: Map<PetId, Pet>, val outbox: List<ShopEvent>, val recorded: Long) {
+private class State(val pets: Map<PetId, Pet>, private val outbox: Outbox) {
 
-    fun record(pet: Pet, event: (seq: Long) -> ShopEvent): State =
-        State(pets + (pet.id to pet), outbox + event(recorded + 1), recorded + 1)
+    fun record(pet: Pet, event: (seq: Long) -> ShopEvent): State {
+        outbox.record(event)
+        return State(pets + (pet.id to pet), outbox)
+    }
 }
 
-fun shop(pets: Map<PetId, Pet> = emptyMap()): Behavior<Shop> = shop(State(pets, emptyList(), 0))
+fun shop(outbox: Outbox, pets: Map<PetId, Pet> = emptyMap()): Behavior<Shop> =
+    Behaviors.supervise(shop(State(pets, outbox)))
+        .onFailure(Exception::class.java, SupervisorStrategy.resume())
 
 /**
  * One `when` over the sealed [Shop], so a new message is a compile error here until it is handled.
@@ -75,8 +78,6 @@ private fun shop(state: State): Behavior<Shop> =
             is Returned -> returned(state, message.id)
             is Everything -> message.replyTo.answered(state.pets.values.sortedBy { it.id.value })
             is Find -> message.replyTo.answered(Option.fromNullable(state.pets[message.id]))
-            is Unsent -> message.replyTo.answered(state.outbox.take(message.limit))
-            is Sent -> shop(state.copy(outbox = state.outbox.filterNot { it.seq == message.seq }))
         }
     }
 
@@ -87,8 +88,9 @@ private fun adopt(state: State, asked: Adopt): Behavior<Shop> {
         pet.adopted -> asked.replyTo.answered(AlreadyAdopted(asked.id.value).left())
         else -> {
             val taken = pet.copy(adopted = true)
+            val next = state.record(taken) { seq -> PetAdopted(seq, taken, asked.by) }
             asked.replyTo.tell(taken.right())
-            shop(state.record(taken) { seq -> PetAdopted(seq, taken, asked.by) })
+            shop(next)
         }
     }
 }

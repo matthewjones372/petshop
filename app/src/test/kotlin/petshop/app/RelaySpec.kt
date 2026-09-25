@@ -20,12 +20,16 @@ import petshop.domain.PetId
 import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
-import java.util.concurrent.TimeoutException
+import java.sql.SQLTransientConnectionException
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
-/** The shop's side of the relay: the events it has not sent, oldest first, and a way to mark one sent. */
-private class Recorded(vararg events: ShopEvent) {
+/**
+ * An outbox in a list, for a test about what the relay does on each tick rather than about the table:
+ * PostgresOutboxSpec is about the table. [claiming] runs before each claim, so a test can make one
+ * throw.
+ */
+private class Recorded(vararg events: ShopEvent, private val claiming: () -> Unit = {}) : Outbox {
 
     private val waiting = events.toMutableList()
 
@@ -33,9 +37,15 @@ private class Recorded(vararg events: ShopEvent) {
 
     fun record(event: ShopEvent) = synchronized(waiting) { waiting += event }
 
-    fun unsent(): List<ShopEvent> = synchronized(waiting) { waiting.toList() }
+    override fun record(numbered: (seq: Long) -> ShopEvent): ShopEvent =
+        synchronized(waiting) { numbered(waiting.size + 1L).also { waiting += it } }
 
-    fun sent(event: ShopEvent) = synchronized(waiting) { waiting.removeIf { it.seq == event.seq } }
+    override fun claim(limit: Int, publish: (List<ShopEvent>) -> List<ShopEvent>): List<ShopEvent> {
+        claiming()
+        val taken = publish(synchronized(waiting) { waiting.take(limit) })
+        synchronized(waiting) { waiting.removeAll { event -> taken.any { it.seq == event.seq } } }
+        return taken
+    }
 }
 
 /** A bus that keeps what it took, and turns an event away while [refuses] says so. */
@@ -73,8 +83,7 @@ class RelaySpec {
     private val every = 50.milliseconds
     private val clock = TestClock()
 
-    private fun relaying(outbox: Recorded, bus: EventBus, unsent: () -> List<ShopEvent> = outbox::unsent) =
-        relay(every, unsent, bus, outbox::sent).start(TestStreams(clock))
+    private fun relaying(outbox: Outbox, bus: EventBus) = relay(every, outbox, bus).start(TestStreams(clock))
 
     private val Running<Nothing, Long>.stopped: Exit<Nothing, Long>
         get() {
@@ -141,17 +150,16 @@ class RelaySpec {
     }
 
     @Test
-    fun `a timed-out ask restarts the relay one interval later, and nothing recorded is lost`() {
+    fun `a claim that throws restarts the relay one interval later, and nothing recorded is lost`() {
         val asks = java.util.concurrent.atomic.AtomicInteger()
-        val outbox = Recorded(arrived)
+        val outbox = Recorded(arrived) {
+            if (asks.incrementAndGet() == 1) throw SQLTransientConnectionException("the pool had nothing to lend")
+        }
         val bus = Taking()
-        val relay = relaying(outbox, bus, unsent = {
-            if (asks.incrementAndGet() == 1) throw TimeoutException("the shop did not answer")
-            outbox.unsent()
-        })
+        val relay = relaying(outbox, bus)
 
         clock.adjust(every)
-        withClue("the first ask timed out, and the restart waits one interval") {
+        withClue("the first claim threw, and the restart waits one interval") {
             asks.get() shouldBe 1
             bus.took.shouldBeEmpty()
         }
@@ -168,10 +176,10 @@ class RelaySpec {
     }
 
     @Test
-    fun `an hour of an empty outbox is one ask a tick and nothing published, without waiting the hour`() {
+    fun `an hour of an empty outbox is one claim a tick and nothing published, without waiting the hour`() {
         val asks = java.util.concurrent.atomic.AtomicInteger()
         val bus = Taking()
-        val relay = relaying(Recorded(), bus, unsent = { asks.incrementAndGet(); emptyList() })
+        val relay = relaying(Recorded { asks.incrementAndGet() }, bus)
 
         clock.adjust(every * 72_000)
 

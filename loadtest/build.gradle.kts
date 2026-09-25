@@ -3,6 +3,8 @@ val larkVersion: String = providers.gradleProperty("larkVersion").get()
 
 dependencies {
     testImplementation(project(":app"))
+    // The shop keeps its outbox in Postgres, so the load test starts one.
+    testImplementation(testFixtures(project(":app")))
     testImplementation("io.github.matthewjones372:lark-app:$larkVersion")
     // The chip registry the shop calls out to, played by a real HTTP server.
     testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC3")
