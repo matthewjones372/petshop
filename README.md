@@ -223,7 +223,7 @@ bargain — but a service taking it on should know it is taking on a moving part
 in exchange for an earlier error, and that `larkWiring` is what it would fall
 back to.
 
-### lark-stream: yes for the relay, with three rough edges
+### lark-stream: yes for the relay, once three rough edges were fixed
 
 The outbox relay and the projection are the first things here to use more of
 `lark-stream` than `tick` and `map`. `EventsSpec` covers the claims below: an
@@ -244,25 +244,28 @@ no `CompletionStage` to build by hand.
 `seq`s and `scan` carries the tally, both as plain Kotlin values. Duplicates are
 counted, not hidden.
 
-The rough edges, each found while writing this:
+Writing the relay against `0.4.0` found three rough edges, and each became a lark
+spec and a change in `0.5.0`:
 
-- **`mapPar` on a stream with no failure type cannot infer one from a body that
-  never raises.** On `Stream<Nothing, A>` the overload that reads the failure
-  from the body wins, finds nothing to read, and asks for `F` explicitly. The
-  relay writes `mapPar<Nothing, _, _>(1)`. The obvious call is the one that does
-  not compile.
-- **Nothing stops a running stream from outside.** `run` hands back the `Exit`
-  and nothing to cancel with, because the materialised value is dropped. The
-  relay stops through `takeWhile { open.get() }`, which takes effect at the next
-  tick and not at once. Its node's release flips that flag and waits for the
-  `Exit`, which is how the bus is closed only after the relay stops publishing.
-- **One `Died` ends the relay for good.** There is no resume by design, and no
-  restart either. A timed-out ask stops the outbox from draining until the
-  process restarts. Pekko's `RestartSource` would do it, but only on the far
-  side of `toSource()`, where the typed failure is already gone.
-
-A smaller one: in `0.4.0`, `groupedWithin` takes a `java.time.Duration` while
-`tick` takes a `kotlin.time.Duration`.
+- **`mapPar` on a stream with no failure type could not infer one from a body
+  that never raises** ([spec 0043](https://github.com/matthewjones372/lark/blob/main/specs/0043-two-signatures-a-relay-tripped-on.md)).
+  The relay had to write `mapPar<Nothing, _, _>(1)`. Now `mapPar` keeps the
+  stream's failure type, and the form that reads one out of a `raise` is
+  `mapParOrFail`, matching `mapOrFail`. The same spec moved `groupedWithin` onto
+  `kotlin.time.Duration`, which is what `tick` takes.
+- **Nothing could stop a running stream from outside**
+  ([spec 0044](https://github.com/matthewjones372/lark/blob/main/specs/0044-a-run-you-can-stop.md)).
+  The relay used to stop through a flag and `takeWhile`, at the next tick.
+  `Run.start` now answers a `Running`, and its `close` is the node's release:
+  the relay stops at once, before the bus it publishes to closes. The arrivals
+  feed, which used to end only when the actor system went, stops the same way.
+- **One `Died` ended the relay for good**
+  ([spec 0045](https://github.com/matthewjones372/lark/blob/main/specs/0045-a-stream-that-starts-again.md)).
+  A timed-out ask would have stopped the outbox draining until the process
+  restarted. `restartOnDefect(schedule)` runs the same description again after
+  the delay the schedule decides, with a warn line each time, and keeps the
+  declared failure in the type. Starting again loses nothing here: whatever was
+  not marked sent is still in the outbox.
 
 ### The wiring check: cheap, and it found nothing here
 
@@ -394,7 +397,7 @@ the edge does with it, and the edge is the part a service writes itself.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.4.0`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
+Pelican `1.0.0-RC1`, Lark `0.5.0`, Proofload `0.1.0-rc4`, Kotlin 2.4.10, JDK 21.
 
 `singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler
 plugin that reports it as you type were all written while this repository was
