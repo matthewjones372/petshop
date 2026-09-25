@@ -1,10 +1,10 @@
 plugins {
     // Writes the client from `registrySpec()`, and checks on every build that the committed one is
     // still what the descriptions produce.
-    id("io.github.matthewjones372.pelican") version "1.0.0-RC1"
+    id("io.github.matthewjones372.pelican") version "1.0.0-RC3"
 }
 
-val pelicanVersion = "1.0.0-RC1"
+val pelicanVersion = "1.0.0-RC3"
 
 // The generator runs off this module's classpath rather than shipping its own, and nothing the
 // service runs needs it: so it is on the generating task's classpath and nowhere else.

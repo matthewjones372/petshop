@@ -13,7 +13,6 @@ rootProject.name = "petshop"
 
 include("domain")
 include("registry")
-include("pelican-wiremock")
 include("api")
 include("app")
 include("loadtest")
