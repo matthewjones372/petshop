@@ -17,6 +17,7 @@ import io.github.matthewjones372.proofload.perSecond
 import io.github.matthewjones372.proofload.report.writeHtmlReport
 import io.github.matthewjones372.proofload.scenario
 import io.github.matthewjones372.proofload.step
+import io.github.matthewjones372.proofload.warmingUp
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.withClue
 import io.kotest.matchers.comparables.shouldBeLessThan
@@ -74,7 +75,11 @@ class PetshopLoadTest {
                     }
                 }
 
-                proofload.run(shopping.at(200.perSecond, over = 10.seconds))
+                // Two seconds of the same load first, recorded nowhere. A cold JVM, connection pool and
+                // JIT put every one of a cold run's twenty slowest requests in its first second — p99
+                // 453 ms there, 5 to 18 ms in each second after — so without it the p99 below was
+                // measuring start-up rather than the shop.
+                proofload.run(shopping.at(200.perSecond, over = 10.seconds).warmingUp(2.seconds))
             }
         }
 
