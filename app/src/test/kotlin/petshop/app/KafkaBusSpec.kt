@@ -10,6 +10,7 @@ import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
+import io.github.matthewjones372.lark.kafka.DEAD_LETTER_HEADER
 import io.github.matthewjones372.lark.kafka.DecodeError
 import io.github.matthewjones372.lark.kafka.Topic
 import io.github.matthewjones372.lark.stream.Forks
@@ -63,7 +64,7 @@ class KafkaBusSpec {
 
     private fun registry(scope: String): Map<String, Any> = mapOf("schema.registry.url" to "mock://$scope")
 
-    private fun bus(name: String, deadLetters: (DecodeError) -> Unit = {}) =
+    private fun bus(name: String, deadLetters: ((DecodeError) -> Unit)? = null) =
         KafkaBus(Topic(name), kafka.bootstrap, group = "projection-$name", registry(name), deadLetters)
 
     /** The whole service with its bus on Kafka, and its streams on [backend]'s. No port, no arrivals. */
@@ -144,6 +145,45 @@ class KafkaBusSpec {
         }
         dead.single().offset shouldBe 0L
         dead.single().cause.shouldBeInstanceOf<Exception>()
+    }
+
+    @Test
+    fun `by default an unreadable record is written to the dead-letter topic as it was read`() {
+        KafkaProducer(mapOf<String, Any>("bootstrap.servers" to kafka.bootstrap), StringSerializer(), ByteArraySerializer())
+            .use { it.send(ProducerRecord("lettered", "junk", "not avro".toByteArray())).get(30, TimeUnit.SECONDS) }
+        val waffle = PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog))
+
+        val seen = ConcurrentLinkedQueue<Any>()
+        bus("lettered").use { bus ->
+            bus.publish(waffle)
+            val running = bus.consume { event -> seen.add(event) }.start(Forks())
+            val deadline = System.nanoTime() + 30_000_000_000L
+            while (seen.isEmpty()) {
+                check(System.nanoTime() < deadline) { "nothing reached the projection" }
+                Thread.sleep(20)
+            }
+            running.close()
+        }
+
+        val letter = KafkaConsumer(
+            mapOf<String, Any>(
+                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to kafka.bootstrap,
+                ConsumerConfig.GROUP_ID_CONFIG to "letters",
+                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG to "earliest",
+            ),
+            StringDeserializer(),
+            ByteArrayDeserializer(),
+        ).use { raw ->
+            raw.subscribe(listOf("lettered.dead-letters"))
+            generateSequence { raw.poll(Duration.ofMillis(200)) }.take(100).flatMap { it }.first()
+        }
+        letter.key() shouldBe "junk"
+        String(letter.value()) shouldBe "not avro"
+        withClue("where it came from rides along in its headers") {
+            String(letter.headers().lastHeader("$DEAD_LETTER_HEADER.offset").value()) shouldBe "0"
+            String(letter.headers().lastHeader("$DEAD_LETTER_HEADER.topic").value()) shouldBe "lettered"
+        }
+        kafka.committed("projection-lettered", "lettered") shouldBe 2L
     }
 }
 
