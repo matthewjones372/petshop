@@ -1,7 +1,7 @@
 <!--
   Tests log at WARN and above. Without this file logback's default is DEBUG for everything, and one run of
-  the app tests printed about eleven thousand lines, most of them the embedded Kafka broker, ZooKeeper,
-  Hikari and Testcontainers' Docker client.
+  the app tests printed about eleven thousand lines, most of them Kafka, Hikari and Testcontainers'
+  Docker client.
 
   In test fixtures, so the load test gets it too.
 -->
@@ -14,11 +14,8 @@
         </encoder>
     </appender>
 
-    <!-- The embedded broker and its clients warn about every topic they create on first use. -->
+    <!-- Kafka's clients warn about every topic they create on first use. -->
     <logger name="org.apache.kafka" level="ERROR"/>
-    <logger name="kafka" level="ERROR"/>
-    <logger name="state.change.logger" level="ERROR"/>
-    <logger name="org.apache.zookeeper" level="ERROR"/>
 
     <!--
       The service's own lines stay at INFO, because LoggingSpec reads them through an appender of its own,

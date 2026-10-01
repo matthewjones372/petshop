@@ -1,9 +1,5 @@
 package petshop.app
 
-import io.github.embeddedkafka.EmbeddedK
-import io.github.embeddedkafka.EmbeddedKafka
-import io.github.embeddedkafka.EmbeddedKafkaConfig
-import java.net.ServerSocket
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import org.apache.kafka.clients.admin.Admin
@@ -16,30 +12,35 @@ import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.Deserializer
 import org.apache.kafka.common.serialization.StringSerializer
-import org.junit.jupiter.api.extension.AfterAllCallback
 import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.ExtensionContext
+import org.testcontainers.kafka.KafkaContainer
+import org.testcontainers.utility.DockerImageName
 
-/** A broker in the test JVM for one test class, started and stopped by JUnit 5 as the actor system is. */
-class KafkaBroker : BeforeAllCallback, AfterAllCallback {
+/**
+ * One Kafka broker for the whole test run, in a container started the first time a test class asks for it,
+ * as [TestPostgres] is. Testcontainers' reaper stops it once the JVM has gone. Each test uses topics and
+ * groups of its own, so the classes can share it.
+ */
+private object TestKafka {
 
-    private lateinit var kafka: EmbeddedK
+    // The native image starts in about a second, and runs KRaft, so there is no ZooKeeper beside it.
+    val container: KafkaContainer by lazy {
+        KafkaContainer(DockerImageName.parse("apache/kafka-native:3.8.0"))
+            // A group's first member is not kept waiting for others to join, which is 3s a test by default.
+            .withEnv("KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS", "0")
+            .apply { start() }
+    }
+}
 
-    val bootstrap: String get() = "localhost:${kafka.config().kafkaPort()}"
+/** The test run's Kafka broker, for a test class that registers it; [bootstrap] is where it answers. */
+class KafkaBroker : BeforeAllCallback {
+
+    val bootstrap: String get() = TestKafka.container.bootstrapServers
 
     override fun beforeAll(context: ExtensionContext) {
-        val config = EmbeddedKafkaConfig.apply(
-            freePort(),
-            freePort(),
-            // A group's first member is not kept waiting for others to join, which is 3s a test by default.
-            brokerProperties(),
-            EmbeddedKafkaConfig.`apply$default$4`(),
-            EmbeddedKafkaConfig.`apply$default$5`(),
-        )
-        kafka = EmbeddedKafka.start(config)
+        TestKafka.container
     }
-
-    override fun afterAll(context: ExtensionContext) = kafka.stop(true)
 
     fun send(topic: String, vararg values: String) {
         KafkaProducer(mapOf<String, Any>("bootstrap.servers" to bootstrap), StringSerializer(), StringSerializer())
@@ -75,14 +76,6 @@ class KafkaBroker : BeforeAllCallback, AfterAllCallback {
                 }
             }
         }
-
-    // Scala's `updated` widens its value type, which Kotlin reads as a Map of Any; the entry added is a String.
-    @Suppress("UNCHECKED_CAST")
-    private fun brokerProperties(): scala.collection.immutable.Map<String, String> =
-        EmbeddedKafkaConfig.`apply$default$3`()
-            .updated("group.initial.rebalance.delay.ms", "0") as scala.collection.immutable.Map<String, String>
-
-    private fun freePort(): Int = ServerSocket(0).use { it.localPort }
 
     private companion object {
         const val TIMEOUT_SECONDS = 30L

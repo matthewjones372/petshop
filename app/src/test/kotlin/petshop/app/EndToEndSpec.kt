@@ -48,8 +48,8 @@ import petshop.registry.recordKeeper
  *   there is no teardown to write.
  * - **Pelican** stubs the registry in its own endpoints and calls the shop through its own, so there is
  *   no URL, no status code and no JSON in this file. A failure is the value the endpoint declared.
- * - **Testcontainers** gives the outbox a real Postgres schema of its own, and an embedded broker gives
- *   the bus a real Kafka, with Confluent's in-process `mock://` schema registry. The test holds on to
+ * - **Testcontainers** gives the outbox a real Postgres schema of its own, and the bus a real Kafka
+ *   broker, with Confluent's in-process `mock://` schema registry. The test holds on to
  *   both, so it can look in the table and on the topic as well as at the API.
  *
  * It reads as a story (`Story.kt`, a prototype of Lark specs 0115 and 0116): each step's text is what a

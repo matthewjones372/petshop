@@ -36,13 +36,13 @@ What they run on, and what the tests use:
 |---|---|
 | Apache Pekko | the shop's actor, the HTTP server and client, the stream backend the arrivals and the projection run on, and the in-process bus |
 | PostgreSQL, HikariCP | the outbox table |
-| Testcontainers | a real Postgres for every test that builds the shop, a fresh schema per graph |
+| Testcontainers | a real Postgres and a real Kafka broker for the tests, one container each per run: a fresh schema per graph, and topics and groups of each test's own |
 | WireMock | the chip registry in tests and the demo, stubbed through Pelican's `pelican-test-wiremock` |
 | Kotest assertions on JUnit 6 | every test; the end-to-end and app tests read as stories (below) |
 | Arrow | `Either` and `Raise` for declared failures, from the domain up |
 | OpenTelemetry, Micrometer, Prometheus, Grafana | traces through the graph, metrics at `/metrics`, and the demo's dashboard |
 | Logback | where Lark's log lines and Pekko's end up, through `lark-slf4j` |
-| Apache Kafka, avro4k, Confluent's Avro serializer | the bus on a broker: events as Avro in the schema registry's wire format; tests run an embedded broker and Confluent's in-process `mock://` registry |
+| Apache Kafka, avro4k, Confluent's Avro serializer | the bus on a broker: events as Avro in the schema registry's wire format; tests run the broker in a container and Confluent's in-process `mock://` registry |
 
 ## What it is
 
@@ -524,7 +524,7 @@ Pelican `1.0.0-RC3`, Lark `0.7.0` (its Gradle wiring plugin `0.2.0`), Proofload
 `2.1.2`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`, HikariCP `7.1.0`,
 OpenTelemetry SDK `1.51.0`, Micrometer's Prometheus registry `1.12.0`, Logback
 `1.5.20`, Kotest `6.2.4`, JUnit `6.1.3`. kimney `0.3.0`, avro4k `2.12.0`,
-Confluent's Avro serializer `7.8.0`, Kafka client `3.8.0`, embedded-kafka
-`3.8.0`. Kotlin 2.4.10 (2.3.0 for `outbox-table/`), JDK 21.
+Confluent's Avro serializer `7.8.0`, Kafka client `3.8.0`, the
+`apache/kafka-native:3.8.0` image for tests. Kotlin 2.4.10 (2.3.0 for `outbox-table/`), JDK 21.
 
 All five libraries under evaluation are early, and say so.
