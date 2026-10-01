@@ -61,7 +61,7 @@ class KafkaBroker : BeforeAllCallback, AfterAllCallback {
      * Every record on [topic] as the broker holds it now, oldest first per partition. Reads up to each
      * partition's end offset and stops, so it answers at once rather than polling until a timeout, and an
      * empty topic is an empty list. `assign` with no group: reading changes no offset the service sees.
-     * Spec 0103 proposes this for lark-kafka-test; it can move there when that lands.
+     * Lark spec 0117 proposes this for lark-kafka-test; it can move there when that lands.
      */
     fun <K, V> records(topic: String, key: Deserializer<K>, value: Deserializer<V>): List<ConsumerRecord<K, V>> =
         KafkaConsumer(mapOf<String, Any>(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrap), key, value).use { reader ->
