@@ -1,13 +1,12 @@
 package petshop.app
 
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.use
-import io.github.matthewjones372.lark.kafka.Topic
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.PelicanServer
@@ -43,8 +42,8 @@ import petshop.registry.recordKeeper
  * Three things make it short, one from each library:
  *
  * - **Lark** starts the graph `main` starts — server, actor, arrivals, outbox, relay, bus, projection —
- *   and swaps three nodes: where the registry is, which database the outbox is in, and the bus, which is
- *   Kafka here rather than the in-process hub. `use` gives everything back when the block returns, so
+ *   and swaps two nodes: where the registry is, and which database the outbox is in. The bus is Kafka
+ *   because the configuration it is assembled from says so, as `BUS=kafka` does for `main`. `use` gives everything back when the block returns, so
  *   there is no teardown to write.
  * - **Pelican** stubs the registry in its own endpoints and calls the shop through its own, so there is
  *   no URL, no status code and no JSON in this file. A failure is the value the endpoint declared.
@@ -67,7 +66,8 @@ class EndToEndSpec {
 
         private const val TOPIC = "shop-events-e2e"
         private const val GROUP = "projection-e2e"
-        private val schemas = mapOf<String, Any>("schema.registry.url" to "mock://e2e")
+        private const val SCHEMAS = "mock://e2e"
+        private val schemas = mapOf<String, Any>("schema.registry.url" to SCHEMAS)
     }
 
     @JvmField
@@ -79,13 +79,19 @@ class EndToEndSpec {
 
     private val database: DatabaseSettings = TestPostgres.fresh()
 
+    // The bus is chosen as main chooses it, from petshop.bus, with Kafka named in the configuration.
+    private val onKafka: Config = ConfigFactory.parseString(
+        """
+        petshop.bus {
+          kind = kafka
+          kafka { bootstrap = "${kafka.bootstrap}", topic = $TOPIC, group = $GROUP, registry = "$SCHEMAS" }
+        }
+        """,
+    ).withFallback(ConfigFactory.load())
+
     private val theService: Module =
-        petshop.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
+        petshopFrom(onKafka).overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
             .onDatabase(database)
-            .overriding(
-                singleOf<KafkaBus>({ KafkaBus(Topic(TOPIC), kafka.bootstrap, GROUP, schemas) }, { it.close() })
-                    .boundTo<EventBus>(),
-            )
             .overridingConfig("petshop.port = 0\npetshop.arrivalsEvery = 1h\npetshop.outboxEvery = 20ms")
 
     @Test
