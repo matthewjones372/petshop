@@ -23,6 +23,7 @@ import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.logSpan
 import io.github.matthewjones372.lark.logWarn
 import io.github.matthewjones372.lark.otel.tracedSpan
+import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.PekkoStreams
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.opentelemetry.api.trace.Tracer
@@ -60,7 +61,8 @@ import kotlin.time.Duration
 import org.apache.pekko.actor.typed.ActorSystem as TypedSystem
 import kotlin.time.Duration.Companion.seconds
 
-data class Settings(val port: Int, val arrivalsEvery: Duration, val outboxEvery: Duration)
+/** [host] is the interface the port is bound on: loopback unless something outside this machine has to reach it. */
+data class Settings(val host: String, val port: Int, val arrivalsEvery: Duration, val outboxEvery: Duration)
 
 /** The catalogue the shop opens with, before any arrival. */
 val opening: List<Pet> = listOf(
@@ -165,7 +167,7 @@ private fun PetShopError.outcome(): String = when (this) {
 
 private val settings: Module =
     loadedConfig() + config<Settings>("petshop") {
-        Settings(int("port"), duration("arrivalsEvery"), duration("outboxEvery"))
+        Settings(string("host"), int("port"), duration("arrivalsEvery"), duration("outboxEvery"))
     }
 
 private val telemetry: Module =
@@ -192,10 +194,13 @@ private val theShop: Module =
 
 private val events: Module =
     // What the relay runs on. The relay describes its stream and names no backend; this is the one
-    // place that decides, and a test that wants the relay on its own clock overrides it.
-    single { system: ActorSystem -> PekkoStreams(system) }.boundTo<StreamBackend>() +
+    // place that decides, and a test that wants the relay on its own clock overrides it. Forks runs it
+    // as one loop on a virtual thread, so the claim blocks on Postgres where it is and a stop interrupts it.
+    single { -> Forks() }.boundTo<StreamBackend>() +
         // Closed after the relay stops publishing to it, because the relay depends on it.
         singleOf({ system: ActorSystem -> HubBus(system) }, { bus -> bus.close() }).boundTo<EventBus>() +
+        // The in-process bus is a Pekko hub, so its reader runs on Pekko. A bus on Kafka can run on either.
+        single { system: ActorSystem -> ProjectionStreams(PekkoStreams(system)) } +
         outbox +
         projection
 
@@ -206,7 +211,7 @@ private val web: Module =
         { shop: PetShop, config: Settings, system: TypedSystem<Void>, health: HealthRegistry,
             registry: PrometheusMeterRegistry, projection: Projection, _: Arrivals, _: OutboxRelay ->
             petshopApi(shop, { asked(health) }, registry::scrape, projection::tally)
-                .startWithDocs(system, port = config.port, docs = docs { docsPath = "/api-docs" })
+                .startWithDocs(system, port = config.port, host = config.host, docs = docs { docsPath = "/api-docs" })
         },
         { server -> server.stop() },
     )

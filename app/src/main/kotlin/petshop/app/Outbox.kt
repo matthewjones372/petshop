@@ -57,7 +57,7 @@ private const val batch = 100
  *
  * Every [every], the [outbox] is asked for a claim on what the shop has not sent, and each claimed
  * event is offered to [bus] while the claim is held. The description names no backend: the service
- * runs it on Pekko, and `RelaySpec` on a clock the test moves.
+ * runs it on Forks, and `RelaySpec` on a clock the test moves.
  */
 internal fun relay(
     every: Duration,
@@ -65,7 +65,7 @@ internal fun relay(
     bus: EventBus,
 ): Run<Nothing, Long> =
     Stream.tick(every = every, element = Unit)
-        // The claim blocks on Postgres, and mapPar gives it a virtual thread rather than a Pekko one.
+        // The claim blocks on Postgres, and mapPar gives it a virtual thread of its own.
         // Publishing happens inside it, because the rows are only held while the claim is open.
         .mapPar(1) { _ -> outbox.claim(batch) { claimed -> published(claimed, bus) } }
         .mapConcat { published -> published }

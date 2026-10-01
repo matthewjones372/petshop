@@ -14,7 +14,11 @@
       "name": "pet 3 was never chipped",
       "priority": 1,
       "request": { "method": "GET", "urlPath": "/chips/3" },
-      "response": { "status": 404 }
+      "response": {
+        "status": 404,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "message": "The registry has no chip under that id" }
+      }
     },
     {
       "name": "a new keeper is recorded as asked",

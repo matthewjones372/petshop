@@ -8,5 +8,6 @@ scrape_configs:
   - job_name: petshop
     metrics_path: /metrics
     static_configs:
-      # The app runs on the host, not in this compose file.
+      # The app runs on the host, not in this compose file. On Linux this name is the Docker
+      # bridge, so the app has to be listening there: HOST=0.0.0.0 ./gradlew :app:run.
       - targets: ["host.docker.internal:8080"]

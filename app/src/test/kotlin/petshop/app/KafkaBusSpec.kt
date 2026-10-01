@@ -14,7 +14,6 @@ import io.github.matthewjones372.lark.kafka.DEAD_LETTER_HEADER
 import io.github.matthewjones372.lark.kafka.DecodeError
 import io.github.matthewjones372.lark.kafka.Topic
 import io.github.matthewjones372.lark.stream.Forks
-import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.lark.stream.start
 import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
@@ -67,12 +66,12 @@ class KafkaBusSpec {
     private fun bus(name: String, deadLetters: ((DecodeError) -> Unit)? = null) =
         KafkaBus(Topic(name), kafka.bootstrap, group = "projection-$name", registry(name), deadLetters)
 
-    /** The whole service with its bus on Kafka, and its streams on [backend]'s. No port, no arrivals. */
+    /** The whole service with its bus on Kafka, and its projection on [backend]. No port, no arrivals. */
     private fun shopOnKafka(name: String, backend: String): Module {
         val kafkaBus = singleOf<KafkaBus>({ bus(name) }, { bus -> bus.close() }).boundTo<EventBus>()
         val graph = petshop.overriding(single<petshop.domain.ChipRegistry> { FakeRegistry() }).overriding(kafkaBus)
             .onAFreshDatabase()
-        val streams = if (backend == "Forks") graph.overriding(single<StreamBackend> { Forks() }) else graph
+        val streams = if (backend == "Forks") graph.overriding(single { -> ProjectionStreams(Forks()) }) else graph
         return (streams + onKafka).subgraph<OnKafka>().overridingConfig("petshop.outboxEvery = 50ms")
     }
 

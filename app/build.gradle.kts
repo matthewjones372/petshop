@@ -20,9 +20,12 @@ dependencies {
     implementation("io.github.matthewjones372:lark-app:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-pekko:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
-    // The Pekko backend, which brings lark-stream with it. The relay's description names no backend:
-    // the graph decides, and RelaySpec runs the same description on a clock the test moves.
+    // The Pekko backend, which brings lark-stream with it: the arrivals feed and the projection run on
+    // the actor system, because the bus they read is a Pekko hub.
     implementation("io.github.matthewjones372:lark-stream-pekko:$larkVersion")
+    // Forks, which the relay runs on. Its description names no backend: the graph decides, and
+    // RelaySpec runs the same description on a clock the test moves.
+    implementation("io.github.matthewjones372:lark-stream-forks:$larkVersion")
     implementation("io.github.matthewjones372:lark-pekko:$larkVersion")
     // The bus on Kafka: a consumer loop on whichever backend the graph names, committing what it handled.
     implementation("io.github.matthewjones372:lark-kafka:$larkVersion")
@@ -69,11 +72,13 @@ dependencies {
     // The relay on time the test owns: an interval of ticks is one clock.adjust, and nothing sleeps.
     testImplementation("io.github.matthewjones372:lark-stream-test:$larkVersion")
 
-    // The same Kafka bus on the other backend, and a broker in the test JVM so the suite needs no Docker.
-    testImplementation("io.github.matthewjones372:lark-stream-forks:$larkVersion")
+    // A Kafka broker in the test JVM, so the suite needs no Docker for it.
     testImplementation("io.github.embeddedkafka:embedded-kafka_2.13:3.8.0")
 
     // A real HTTP server playing the registry, stubbed in the registry's own endpoints.
     testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC3")
     testImplementation(project(":registry"))
+
+    // The shop's own typed client, for the end-to-end test: it calls the service by endpoint, not URL.
+    testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC3")
 }

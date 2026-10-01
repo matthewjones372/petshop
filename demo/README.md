@@ -9,8 +9,16 @@ cd demo && docker compose up -d
 ```
 
 ```bash
-./gradlew :app:run
+HOST=0.0.0.0 ./gradlew :app:run
 ```
+
+`HOST=0.0.0.0` is for Linux. There, `host.docker.internal` is the Docker bridge
+(`host-gateway`, usually 172.17.0.1) rather than the host's loopback. The app
+binds 127.0.0.1 unless told otherwise, so Prometheus's scrape is refused and
+every panel stays empty. Binding all interfaces lets the scrape in. It also
+serves the shop to your network, which is why it is not the default. Docker
+Desktop on a Mac or Windows forwards `host.docker.internal` to loopback, so
+there it is harmless either way.
 
 Then open <http://localhost:3000>. The dashboard is provisioned, so there is
 nothing to import and nothing to log into.
@@ -35,12 +43,13 @@ Arrivals happen on their own, every `petshop.arrivalsEvery`.
 |---|---|
 | `docker-compose.yml` | Prometheus, Grafana, the outbox's Postgres and a WireMock stand-in for the chip registry — the app is the thing being demonstrated |
 | `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
-| `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds |
+| `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds, which on Linux needs the app started with `HOST=0.0.0.0` |
 | `grafana/provisioning/` | the datasource and the dashboard provider |
 | `grafana/dashboards/petshop.json` | the dashboard itself |
 
 `extra_hosts: host.docker.internal:host-gateway` is there for Linux, where that
-name does not otherwise exist. Docker Desktop ignores it.
+name does not otherwise exist. Docker Desktop ignores it. It names the bridge,
+not loopback, which is why the app needs `HOST=0.0.0.0` on Linux.
 
 ## The outbox panels
 
