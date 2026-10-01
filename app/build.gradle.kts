@@ -61,4 +61,7 @@ dependencies {
     // A real HTTP server playing the registry, stubbed in the registry's own endpoints.
     testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC3")
     testImplementation(project(":registry"))
+
+    // The shop's own typed client, for the end-to-end test: it calls the service by endpoint, not URL.
+    testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC3")
 }

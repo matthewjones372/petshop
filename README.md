@@ -192,6 +192,34 @@ and what the shop has promised its callers is a set of golden files:
 `golden.operations(api.spec())` fails on a change that would break somebody
 already calling, and rewrites the file on one that would not.
 
+End to end is the whole graph `main` starts, with two nodes swapped: where the
+registry is, and which database the outbox is in. The shop is called through
+its own endpoints, so there is no URL, status code or JSON in the test, and
+the database is a real Postgres the test can read as well as the API
+(`EndToEndSpec`, about three seconds):
+
+```kotlin
+val database = TestPostgres.fresh()   // a schema of its own, in a Testcontainers Postgres
+
+petshop.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
+    .onDatabase(database)
+    .overridingConfig("petshop.port = 0")
+    .use { server: PelicanServer ->
+        apiClient(server.baseUrl, JacksonCodecs).use { shop ->
+            shop.outcome(adoptPet, 1L).shouldBeOk().adopted shouldBe true
+            shop.outcome(adoptPet, 1L).shouldBeError() shouldBe AlreadyAdopted(1)
+            shop.outcome(adoptPet, 3L).shouldBeError() shouldBe NotChipped(3)
+
+            // the adoption went into the table, out through the relay, and /stats counted it once
+            within(5.seconds) { database.unsent().takeIf { it == 0L } } shouldBe 0L
+            shop.call(stats, Unit).events.toLong() shouldBe database.recorded()
+        }
+    }
+```
+
+`use` gives the port, the actor system and the pool back when the block
+returns, so there is no teardown to write.
+
 and what the load test asks:
 
 ```kotlin
