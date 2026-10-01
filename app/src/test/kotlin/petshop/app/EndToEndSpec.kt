@@ -93,8 +93,10 @@ class EndToEndSpec {
                 }
                 withClue("every event the shop wrote to the table left it, and /stats counted each one once") {
                     patiently.retry { database.unsent() shouldBe 0L }
-                    val tally = shop.call(stats, Unit)
-                    tally.events.toLong() shouldBe database.recorded()
+                    // The table empties when the relay publishes; the projection folds a tick or so later.
+                    val tally = patiently.retry {
+                        shop.call(stats, Unit).also { it.events.toLong() shouldBe database.recorded() }
+                    }
                     tally.duplicates shouldBe 0
                 }
             }
