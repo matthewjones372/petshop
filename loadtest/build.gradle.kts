@@ -24,7 +24,7 @@ dependencies {
 // machine busy for ten seconds and measures it, so they belong to a quiet machine rather than to every build.
 tasks.test { enabled = false }
 
-val loadTest by tasks.registering(Test::class) {
+tasks.register<Test>("loadTest") {
     description = "Runs the load tests against the whole service, started in-process."
     group = "verification"
     testClassesDirs = sourceSets.test.get().output.classesDirs
