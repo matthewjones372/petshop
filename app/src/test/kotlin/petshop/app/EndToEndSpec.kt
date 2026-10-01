@@ -5,6 +5,8 @@ import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.use
+import io.github.matthewjones372.lark.Schedule
+import io.github.matthewjones372.lark.retry
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.PelicanServer
@@ -30,9 +32,8 @@ import petshop.registry.Problem
 import petshop.registry.lookupChip
 import petshop.registry.noSuchChip
 import petshop.registry.recordKeeper
-import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 
 /**
  * The whole service, end to end, in about as many lines as it takes to say what it should do.
@@ -86,13 +87,12 @@ class EndToEndSpec {
                     registry.calls(recordKeeper) shouldBe 1
                 }
                 withClue("the adoption went into the outbox, out through the relay and onto the bus, and /stats read it") {
-                    val tortoises = within(5.seconds) {
-                        shop.call(stats, Unit).bySpecies.single { it.species == Species.Tortoise }.takeIf { it.adopted > 0 }
+                    patiently.retry {
+                        shop.call(stats, Unit).bySpecies.single { it.species == Species.Tortoise }.adopted shouldBe 1
                     }
-                    tortoises?.adopted shouldBe 1
                 }
                 withClue("every event the shop wrote to the table left it, and /stats counted each one once") {
-                    within(5.seconds) { database.unsent().takeIf { it == 0L } } shouldBe 0L
+                    patiently.retry { database.unsent() shouldBe 0L }
                     val tally = shop.call(stats, Unit)
                     tally.events.toLong() shouldBe database.recorded()
                     tally.duplicates shouldBe 0
@@ -103,14 +103,9 @@ class EndToEndSpec {
 }
 
 /**
- * [read] again until it answers something, or [timeout] passes. The relay and the projection are a
- * tick or two behind the response, so the last check waits for them rather than for a fixed sleep.
+ * Up to 250 more tries, 20 ms apart, rethrowing the last failed assertion when it gives up. The relay and
+ * the projection are a tick or two behind the response, so a check of what they did waits for them.
+ * Counted rather than timed: Lark's schedules have no bound on elapsed time, so how long giving up takes
+ * depends on how long each try does.
  */
-private fun <T : Any> within(timeout: Duration, read: () -> T?): T? {
-    val deadline = TimeSource.Monotonic.markNow() + timeout
-    while (deadline.hasNotPassedNow()) {
-        read()?.let { return it }
-        Thread.sleep(20)
-    }
-    return read()
-}
+private val patiently: Schedule<Throwable, Long> = Schedule.spaced<Throwable>(20.milliseconds) zipLeft Schedule.recurs(250)

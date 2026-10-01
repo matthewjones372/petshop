@@ -200,6 +200,7 @@ the database is a real Postgres the test can read as well as the API
 
 ```kotlin
 val database = TestPostgres.fresh()   // a schema of its own, in a Testcontainers Postgres
+val patiently = Schedule.spaced<Throwable>(20.milliseconds) zipLeft Schedule.recurs(250)
 
 petshop.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
     .onDatabase(database)
@@ -210,8 +211,9 @@ petshop.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl,
             shop.outcome(adoptPet, 1L).shouldBeError() shouldBe AlreadyAdopted(1)
             shop.outcome(adoptPet, 3L).shouldBeError() shouldBe NotChipped(3)
 
-            // the adoption went into the table, out through the relay, and /stats counted it once
-            within(5.seconds) { database.unsent().takeIf { it == 0L } } shouldBe 0L
+            // the adoption went into the table, out through the relay, and /stats counted it once.
+            // Lark's own retry, so no runBlocking: `use` is not suspend, and neither is this.
+            patiently.retry { database.unsent() shouldBe 0L }
             shop.call(stats, Unit).events.toLong() shouldBe database.recorded()
         }
     }
