@@ -17,10 +17,15 @@ import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.start
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.kafka.common.serialization.ByteArraySerializer
+import org.apache.kafka.common.serialization.LongDeserializer
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.junit.jupiter.api.Test
@@ -34,10 +39,6 @@ import petshop.domain.PetArrived
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.Species
-import java.nio.ByteBuffer
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.TimeUnit
-import kotlin.time.Duration.Companion.seconds
 
 /** What a test watches from: the shop to act on, the bus to publish to, the consumer to read. */
 private class OnKafka(val shop: PetShop, val bus: EventBus, val projection: Projection)
@@ -97,9 +98,9 @@ class KafkaBusSpec {
         }
         When("the bus publishes it") { bus("wire").use { it.publish(nibbles) } }
         val record = Then("one record is on the topic").eventually(30.seconds) {
-            kafka.records("wire", StringDeserializer(), ByteArrayDeserializer()).single()
+            kafka.records("wire", LongDeserializer(), ByteArrayDeserializer()).single()
         }
-        And("its key is the event's seq, so a partition keeps one event's copies in order") { record.key() shouldBe "3" }
+        And("its key is the event's seq, as a number, so a partition keeps one event's copies in order") { record.key() shouldBe 3L }
         val body = ByteBuffer.wrap(record.value())
         And("it is Confluent's wire format: a zero magic byte, then the id the registry gave the schema") {
             body.get() shouldBe 0.toByte()
