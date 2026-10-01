@@ -326,7 +326,22 @@ exec(adoptTaken) { step ->
 
 ## How each one holds up
 
+| | Verdict |
+|---|---|
+| Pelican | **Worth it.** The largest payoff here for the least cost |
+| Lark, the application graph | **Worth it** for a service with several resources and tests that start parts of it. It saves no code; it makes a set of mistakes impossible |
+| Lark, streams | **Worth it** where the background work has time in it: the relay is tested on a clock the test owns, and restarts itself |
+| Lark, schedules and waiting | **Worth it.** Small, and blocking, which is what lets the tests wait without coroutines |
+| Lark, Kafka | **Worth it.** A topic is a stream like the others, and an offset is committed only once its event is handled |
+| Proofload | **Worth it.** The cheapest win: correctness under load in a few lines |
+| kimney | **Worth it** once events have a wire format of their own; a missing field is a compile error |
+| ExoQuery | **Not here, yet.** Real type checking, but for three statements it costs a separate build on an older Kotlin |
+
+
 ### Pelican
+
+**Verdict: worth it.** One contract value gives the routes, the document, the
+registry's client, its stubs and a typed test client, and its limits rarely bite.
 
 **What it gives.** Every failure an endpoint declares is in its handler's type,
 so the `when` over the shop's errors is exhaustive and a new error is a build
@@ -342,13 +357,18 @@ arrives as the value the endpoint declared.
 failure, and the import for `orFail`.
 
 **Its limits.** A status names one response, so `NotRecorded` and an
-unreachable registry share one 503, told apart by its message. A declared
+unreachable registry share one 503, told apart by its message; Pelican spec 0063
+lets two failures share a status, told apart by a tag in the body. A declared
 status whose body is not the declared shape is not that failure: the generated
 client cannot decode it and throws `ApiCallFailed`, which the shop treats as
 the registry being unreachable. A stand-in that answers a bare 404 where the
 contract says a 404 carries a `Problem` gets `registry_down`, not `not_chipped`.
 
 ### Lark: the application graph
+
+**Verdict: worth it** for a service that holds several resources and whose tests
+start parts of it. It saves no code. What it buys is the list below, each a
+mistake that cannot happen here.
 
 **What it gives.** Each of these is a test in this repository:
 
@@ -403,6 +423,11 @@ runs.
 
 ### Lark: streams
 
+**Verdict: worth it** for background work with time in it. The relay is the clear
+case: tested an hour at a time on a clock the test owns, restarted after a
+defect, and run on whichever backend the graph names. For the in-process bus it
+adds less, and ties the bus's readers to Pekko.
+
 **What it gives.**
 
 - **A blocking call has an obvious home.** `mapPar` runs the relay's JDBC claim
@@ -429,6 +454,8 @@ yet.
 
 ### Lark: schedules and waiting
 
+**Verdict: worth it.** A few lines, no `suspend`, and a clock a test can drive.
+
 `Schedule.spaced(…) zipLeft Schedule.upTo(…)`, retried, waits for something
 eventually consistent without `suspend`, rethrowing the last failure, on a
 clock a test can drive. `upTo` and `lark-test`'s `eventually` and stories are
@@ -436,6 +463,8 @@ on Lark's `main` and not yet in a release, which is why the story code here is
 a prototype in `app`'s tests.
 
 ### Proofload
+
+**Verdict: worth it**, and the least work of anything here.
 
 Three load tests, each a scenario and an assertion and an HTML report, against
 the whole service started in-process:
@@ -452,6 +481,9 @@ anything here: each test is a few lines on top of the graph and the typed
 client.
 
 ### Lark: Kafka
+
+**Verdict: worth it.** The consumer that commits only what it handled, and
+dead letters, are the parts a service otherwise writes itself and gets wrong.
 
 **What it gives.** Kafka is a `Stream` like any other, run on either backend,
 and `runCommitting()` commits an offset only once its record reached the end of
@@ -474,6 +506,9 @@ committing sees it again, which is why the projection dedupes by `seq`.
 
 ### kimney
 
+**Verdict: worth it** once the events have a wire format of their own, which
+Kafka gives them.
+
 **What it gives.** The domain events and their wire records are separate types,
 and the mapping between them is derived at compile time, so a field one side
 cannot fill is a compile error rather than a null on the wire.
@@ -481,6 +516,11 @@ cannot fill is a compile error rather than a null on the wire.
 **What it costs.** A compiler plugin, applied in `app`'s build.
 
 ### ExoQuery
+
+**Verdict: not here, yet.** The outbox has three statements. Typing them is real,
+but a separate build on Kotlin 2.3.0, a conversion layer and a `free` block for
+the locking clause cost more than the SQL they replace. Worth another look
+when it loads on the project's Kotlin, or with many more queries.
 
 **What it gives.** Every statement against the outbox but its `CREATE TABLE`
 is Kotlin, checked when it compiles. The locking clause it has no syntax for is
@@ -498,24 +538,27 @@ the actor protocol all accepted an actor answering "no such pet" with `null`,
 and Pekko refuses a null message at run time. Running it is what finds that.
 `ask` makes a nullable reply a compile error, and the general point
 stands: a declared failure is only as good as everything beneath it.
+*Handled:* by `ask`, and by the shop's actor moving to `lark-actor`.
 
 **An annotation that crosses a fork can still be lost at the backend.**
 Flattening the pairs onto the message reads correctly to a person, while
 `%X{pet_id}`, a JSON encoder and every field search see nothing. `lark-slf4j`
 puts them in the MDC for the call and restores the map after it, because the
-thread is one a pool hands on.
+thread is one a pool hands on. *Handled:* by `lark-slf4j`.
 
 **A test worker does not see the shell's environment.** `FORCE_COLOR=1
 ./gradlew test` sets nothing in the JVM the tests run in. `app/build.gradle.kts`
-hands `FORCE_COLOR`, `NO_COLOR` and `lark.test.colour` on.
+hands `FORCE_COLOR`, `NO_COLOR` and `lark.test.colour` on. *Spec:* Lark 0118
+has the wiring plugin do it for every test task.
 
 **A record keyed by text sorts as text.** The topic's keys are each event's
 `seq` as a string, so a test comparing them sorts them as numbers, or `"10"`
-comes before `"2"`.
+comes before `"2"`. *Handled:* in the test; a numeric key would make it moot.
 
 **A demo stub must keep the contract too.** The demo's registry stand-in has to
 answer a 404 with the `Problem` body the contract declares, or the shop reports
-the registry as down.
+the registry as down. *Spec:* Pelican 0062 writes the demo's mapping files from
+the same typed stubs the tests use.
 
 ## Versions
 
