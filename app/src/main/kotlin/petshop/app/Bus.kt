@@ -7,8 +7,11 @@ import io.github.matthewjones372.lark.stream.map
 import io.github.matthewjones372.lark.stream.runFold
 import petshop.domain.ShopEvent
 
-/** Where the shop's events go once they have left it, and where anyone else reads them from. */
-interface EventBus {
+/**
+ * Where the shop's events go once they have left it, and where anyone else reads them from. Closed when the graph
+ * is given back, after the relay has stopped publishing to it.
+ */
+interface EventBus : AutoCloseable {
 
     fun publish(event: ShopEvent): Either<BusRefused, ShopEvent>
 
@@ -30,7 +33,7 @@ data class BusRefused(val seq: Long, val why: String)
  * What is published before anyone reads is held for the first reader, and a reader runs on whichever
  * backend runs its stream.
  */
-class HubBus(capacity: Int = 256) : EventBus, AutoCloseable {
+class HubBus(capacity: Int = 256) : EventBus {
 
     private val hub = Hub<ShopEvent>(capacity)
 

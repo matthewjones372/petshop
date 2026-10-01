@@ -194,6 +194,13 @@ ShopEvent ◀──kimney── wire record ◀──avro4k── GenericRecord 
 The service starts on the in-process bus. Kafka is one node swapped, as
 `KafkaBusSpec` and the end-to-end test do; it is not chosen by configuration.
 
+**What a bus promises is a test of its own.** `EventBusContract` holds what any
+`EventBus` must do: an event published before anyone reads reaches the first
+reader, a reader reads events in the order they were published, and the whole
+service runs on it, an adoption reaching the projection. `HubBusSpec` and
+`KafkaBusSpec` each extend it and say only how to make their bus, and add what
+is true of that bus alone. Another bus is one class that passes it.
+
 ### The application is a value
 
 ```kotlin
