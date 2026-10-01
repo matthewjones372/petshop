@@ -3,17 +3,22 @@ package petshop.app
 import io.github.embeddedkafka.EmbeddedK
 import io.github.embeddedkafka.EmbeddedKafka
 import io.github.embeddedkafka.EmbeddedKafkaConfig
+import java.net.ServerSocket
+import java.time.Duration
+import java.util.concurrent.TimeUnit
 import org.apache.kafka.clients.admin.Admin
 import org.apache.kafka.clients.admin.AdminClientConfig
+import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.serialization.Deserializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.junit.jupiter.api.extension.AfterAllCallback
 import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.ExtensionContext
-import java.net.ServerSocket
-import java.util.concurrent.TimeUnit
 
 /** A broker in the test JVM for one test class, started and stopped by JUnit 5 as the actor system is. */
 class KafkaBroker : BeforeAllCallback, AfterAllCallback {
@@ -50,6 +55,25 @@ class KafkaBroker : BeforeAllCallback, AfterAllCallback {
         Admin.create(mapOf<String, Any>(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrap)).use { admin ->
             admin.listConsumerGroupOffsets(group).partitionsToOffsetAndMetadata()
                 .get(TIMEOUT_SECONDS, TimeUnit.SECONDS)[TopicPartition(topic, 0)]?.offset()
+        }
+
+    /**
+     * Every record on [topic] as the broker holds it now, oldest first per partition. Reads up to each
+     * partition's end offset and stops, so it answers at once rather than polling until a timeout, and an
+     * empty topic is an empty list. `assign` with no group: reading changes no offset the service sees.
+     * Spec 0103 proposes this for lark-kafka-test; it can move there when that lands.
+     */
+    fun <K, V> records(topic: String, key: Deserializer<K>, value: Deserializer<V>): List<ConsumerRecord<K, V>> =
+        KafkaConsumer(mapOf<String, Any>(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrap), key, value).use { reader ->
+            val partitions = reader.partitionsFor(topic).map { TopicPartition(topic, it.partition()) }
+            reader.assign(partitions)
+            reader.seekToBeginning(partitions)
+            val end = reader.endOffsets(partitions)
+            buildList {
+                while (partitions.any { reader.position(it) < end.getValue(it) }) {
+                    addAll(reader.poll(Duration.ofMillis(100)))
+                }
+            }
         }
 
     // Scala's `updated` widens its value type, which Kotlin reads as a Map of Any; the entry added is a String.
