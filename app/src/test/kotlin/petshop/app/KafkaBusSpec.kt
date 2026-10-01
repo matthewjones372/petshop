@@ -15,11 +15,8 @@ import io.github.matthewjones372.lark.kafka.DecodeError
 import io.github.matthewjones372.lark.kafka.Topic
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.start
-import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
-import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
@@ -38,9 +35,9 @@ import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.Species
 import java.nio.ByteBuffer
-import java.time.Duration
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 /** What a test watches from: the shop to act on, the bus to publish to, the consumer to read. */
 private class OnKafka(val shop: PetShop, val bus: EventBus, val projection: Projection)
@@ -77,123 +74,100 @@ class KafkaBusSpec {
 
     @ParameterizedTest
     @ValueSource(strings = ["Forks", "Pekko"])
-    fun `an adoption reaches the projection through Kafka, on either backend`(backend: String) {
-        val tally = testApp(shopOnKafka("adoptions-$backend", backend)) { app: OnKafka ->
-            app.shop.adopt(PetId(1), by = "Ada")
-            app.projection.settlesOn { tally -> tally.adopted(Species.Tortoise) == 1 }
+    fun `an adoption reaches the projection through Kafka, on either backend`(backend: String) = story {
+        val shop = Given("the whole service with its bus on Kafka, and its projection on $backend") {
+            shopOnKafka("adoptions-$backend", backend)
         }
-
-        tally.events shouldBe 1
-        withClue("the projection's consumer committed what it folded in") {
-            kafka.committed("projection-adoptions-$backend", "adoptions-$backend") shouldBe 1L
-        }
-    }
-
-    @Test
-    fun `an event on the wire is the registry's Avro, and reads back as the domain event it was`() {
-        val nibbles = PetAdopted(seq = 3, pet = Pet(PetId(1), "Nibbles", Species.Tortoise, adopted = true), by = "Ada")
-        bus("wire").use { it.publish(nibbles) }
-
-        val bytes = KafkaConsumer(
-            mapOf<String, Any>(
-                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to kafka.bootstrap,
-                ConsumerConfig.GROUP_ID_CONFIG to "raw",
-                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG to "earliest",
-            ),
-            StringDeserializer(),
-            ByteArrayDeserializer(),
-        ).use { raw ->
-            raw.subscribe(listOf("wire"))
-            generateSequence { raw.poll(Duration.ofMillis(200)) }.take(100).flatMap { it }.first()
-        }
-
-        withClue("the key is the event's seq, so a partition keeps one event's copies in order") {
-            bytes.key() shouldBe "3"
-        }
-        val body = ByteBuffer.wrap(bytes.value())
-        withClue("Confluent's wire format: a zero magic byte, then the id the registry gave the schema") {
-            body.get() shouldBe 0.toByte()
-        }
-        val registered = MockSchemaRegistry.getClientForScope("wire").getSchemaById(body.int)
-        registered shouldBe AvroSchema(shopEventSchema)
-        ShopEventDeserializer(registry("wire")).deserialize("wire", bytes.value()) shouldBe nibbles
-    }
-
-    @Test
-    fun `a record that is not the shop's Avro goes to dead letters, and the projection reads on past it`() {
-        KafkaProducer(mapOf<String, Any>("bootstrap.servers" to kafka.bootstrap), StringSerializer(), ByteArraySerializer())
-            .use { it.send(ProducerRecord("mixed", "junk", "not avro".toByteArray())).get(30, TimeUnit.SECONDS) }
-        val dead = ConcurrentLinkedQueue<DecodeError>()
-        val waffle = PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog))
-
-        val seen = ConcurrentLinkedQueue<Any>()
-        bus("mixed", deadLetters = dead::add).use { bus ->
-            bus.publish(waffle)
-            val running = bus.consume { event -> seen.add(event) }.start(Forks())
-            val deadline = System.nanoTime() + 30_000_000_000L
-            while (seen.isEmpty()) {
-                check(System.nanoTime() < deadline) { "nothing reached the projection" }
-                Thread.sleep(20)
+        testApp(shop) { app: OnKafka ->
+            When("Ada adopts Nibbles") { app.shop.adopt(PetId(1), by = "Ada") }
+            val tally = Then("the projection counts a tortoise adopted").eventually(30.seconds) {
+                app.projection.tally().also { it.adopted(Species.Tortoise) shouldBe 1 }
             }
-            running.close()
+            And("it counted one event") { tally.events shouldBe 1 }
+            And("its consumer committed what it folded in").eventually(30.seconds) {
+                kafka.committed("projection-adoptions-$backend", "adoptions-$backend") shouldBe 1L
+            }
         }
+    }
 
-        seen.toList() shouldBe listOf(waffle)
-        withClue("the unreadable record and the event after it are both committed past") {
+    @Test
+    fun `an event on the wire is the registry's Avro, and reads back as the domain event it was`() = story {
+        val nibbles = Given("Ada's adoption of Nibbles, as event 3") {
+            PetAdopted(seq = 3, pet = Pet(PetId(1), "Nibbles", Species.Tortoise, adopted = true), by = "Ada")
+        }
+        When("the bus publishes it") { bus("wire").use { it.publish(nibbles) } }
+        val record = Then("one record is on the topic").eventually(30.seconds) {
+            kafka.records("wire", StringDeserializer(), ByteArrayDeserializer()).single()
+        }
+        And("its key is the event's seq, so a partition keeps one event's copies in order") { record.key() shouldBe "3" }
+        val body = ByteBuffer.wrap(record.value())
+        And("it is Confluent's wire format: a zero magic byte, then the id the registry gave the schema") {
+            body.get() shouldBe 0.toByte()
+            MockSchemaRegistry.getClientForScope("wire").getSchemaById(body.int) shouldBe AvroSchema(shopEventSchema)
+        }
+        And("it reads back as the event it was") {
+            ShopEventDeserializer(registry("wire")).deserialize("wire", record.value()) shouldBe nibbles
+        }
+    }
+
+    @Test
+    fun `a record that is not the shop's Avro goes to dead letters, and the projection reads on past it`() = story {
+        Given("a record on the topic that is not the shop's Avro") { junkOn("mixed") }
+        val waffle = And("Waffle's arrival behind it") { PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog)) }
+        val dead = ConcurrentLinkedQueue<DecodeError>()
+        val seen = ConcurrentLinkedQueue<Any>()
+
+        bus("mixed", deadLetters = dead::add).use { bus ->
+            When("the bus publishes Waffle, and a consumer reads the topic") {
+                bus.publish(waffle)
+                bus.consume { event -> seen.add(event) }.start(Forks())
+            }.use { _ ->
+                Then("Waffle reaches the consumer").eventually(30.seconds) { seen.toList() shouldBe listOf(waffle) }
+            }
+        }
+        And("the unreadable record went to dead letters, from offset 0") {
+            dead.single().offset shouldBe 0L
+            dead.single().cause.shouldBeInstanceOf<Exception>()
+        }
+        And("the unreadable record and the event after it are both committed past").eventually(30.seconds) {
             kafka.committed("projection-mixed", "mixed") shouldBe 2L
         }
-        dead.single().offset shouldBe 0L
-        dead.single().cause.shouldBeInstanceOf<Exception>()
     }
 
     @Test
-    fun `by default an unreadable record is written to the dead-letter topic as it was read`() {
-        KafkaProducer(mapOf<String, Any>("bootstrap.servers" to kafka.bootstrap), StringSerializer(), ByteArraySerializer())
-            .use { it.send(ProducerRecord("lettered", "junk", "not avro".toByteArray())).get(30, TimeUnit.SECONDS) }
+    fun `by default an unreadable record is written to the dead-letter topic as it was read`() = story {
+        Given("a record on the topic that is not the shop's Avro") { junkOn("lettered") }
         val waffle = PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog))
-
         val seen = ConcurrentLinkedQueue<Any>()
-        bus("lettered").use { bus ->
-            bus.publish(waffle)
-            val running = bus.consume { event -> seen.add(event) }.start(Forks())
-            val deadline = System.nanoTime() + 30_000_000_000L
-            while (seen.isEmpty()) {
-                check(System.nanoTime() < deadline) { "nothing reached the projection" }
-                Thread.sleep(20)
-            }
-            running.close()
-        }
 
-        val letter = KafkaConsumer(
-            mapOf<String, Any>(
-                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to kafka.bootstrap,
-                ConsumerConfig.GROUP_ID_CONFIG to "letters",
-                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG to "earliest",
-            ),
-            StringDeserializer(),
-            ByteArrayDeserializer(),
-        ).use { raw ->
-            raw.subscribe(listOf("lettered.dead-letters"))
-            generateSequence { raw.poll(Duration.ofMillis(200)) }.take(100).flatMap { it }.first()
+        bus("lettered").use { bus ->
+            When("the bus publishes Waffle behind it, and a consumer reads the topic") {
+                bus.publish(waffle)
+                bus.consume { event -> seen.add(event) }.start(Forks())
+            }.use { _ ->
+                Then("Waffle reaches the consumer").eventually(30.seconds) { seen.toList() shouldBe listOf(waffle) }
+            }
         }
-        letter.key() shouldBe "junk"
-        String(letter.value()) shouldBe "not avro"
-        withClue("where it came from rides along in its headers") {
+        val letter = And("one letter is on the dead-letter topic").eventually(30.seconds) {
+            kafka.records("lettered.dead-letters", StringDeserializer(), ByteArrayDeserializer()).single()
+        }
+        And("it is the record as it was read") {
+            letter.key() shouldBe "junk"
+            String(letter.value()) shouldBe "not avro"
+        }
+        And("where it came from rides along in its headers") {
             String(letter.headers().lastHeader("$DEAD_LETTER_HEADER.offset").value()) shouldBe "0"
             String(letter.headers().lastHeader("$DEAD_LETTER_HEADER.topic").value()) shouldBe "lettered"
         }
-        kafka.committed("projection-lettered", "lettered") shouldBe 2L
+        And("both records are committed past").eventually(30.seconds) {
+            kafka.committed("projection-lettered", "lettered") shouldBe 2L
+        }
+    }
+
+    private fun junkOn(topic: String) {
+        KafkaProducer(mapOf<String, Any>("bootstrap.servers" to kafka.bootstrap), StringSerializer(), ByteArraySerializer())
+            .use { it.send(ProducerRecord(topic, "junk", "not avro".toByteArray())).get(30, TimeUnit.SECONDS) }
     }
 }
 
 private fun Tally.adopted(species: Species): Int = bySpecies.single { it.species == species }.adopted
-
-/** The consumer is behind the shop by a tick and two hops, so a test waits for it rather than sleeping. */
-private fun Projection.settlesOn(done: (Tally) -> Boolean): Tally {
-    val deadline = System.nanoTime() + 30_000_000_000L
-    while (!done(tally())) {
-        check(System.nanoTime() < deadline) { "the projection never got there: ${tally()}" }
-        Thread.sleep(20)
-    }
-    return tally()
-}

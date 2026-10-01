@@ -10,7 +10,6 @@ import io.github.matthewjones372.lark.stream.Run
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.TestStreams
 import io.github.matthewjones372.lark.stream.start
-import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -93,99 +92,111 @@ class RelaySpec {
         }
 
     @Test
-    fun `nothing leaves before the first tick, and each tick carries what was recorded, in order`() {
-        val outbox = Recorded(arrived, adopted)
+    fun `nothing leaves before the first tick, and each tick carries what was recorded, in order`() = story {
+        val outbox = Given("Nibbles' arrival and adoption in the outbox") { Recorded(arrived, adopted) }
         val bus = Taking()
-        val relay = relaying(outbox, bus)
+        val relay = And("a relay publishing to a bus") { relaying(outbox, bus) }
 
-        clock.adjust(every - 1.milliseconds)
-        withClue("the first tick is one interval in") { bus.took.shouldBeEmpty() }
+        When("the clock moves to just before the first tick") { clock.adjust(every - 1.milliseconds) }
+        Then("nothing has left: the first tick is one interval in") { bus.took.shouldBeEmpty() }
 
-        clock.adjust(1.milliseconds)
-        bus.took shouldBe listOf(1L, 2L)
-        outbox.left.shouldBeEmpty()
+        When("it reaches the first tick") { clock.adjust(1.milliseconds) }
+        Then("both events went, in order, and left the outbox") {
+            bus.took shouldBe listOf(1L, 2L)
+            outbox.left.shouldBeEmpty()
+        }
 
-        outbox.record(returned)
-        clock.adjust(every)
-        bus.took shouldBe listOf(1L, 2L, 3L)
-
-        withClue("stopped, the relay answers with how many it published") { relay.stopped shouldBe Exit.Done(3L) }
+        When("Nibbles is returned, and the clock moves one tick") {
+            outbox.record(returned)
+            clock.adjust(every)
+        }
+        Then("the return went on that tick") { bus.took shouldBe listOf(1L, 2L, 3L) }
+        And("stopped, the relay answers with how many it published") { relay.stopped shouldBe Exit.Done(3L) }
     }
 
     @Test
-    fun `an event the bus refused stays in the outbox, and each refusal costs it exactly one tick`() {
+    fun `an event the bus refused stays in the outbox, and each refusal costs it exactly one tick`() = story {
         val refusals = java.util.concurrent.atomic.AtomicInteger(3)
-        val outbox = Recorded(arrived)
-        val bus = Taking(refuses = { refusals.getAndDecrement() > 0 })
+        val outbox = Given("Nibbles' arrival in the outbox") { Recorded(arrived) }
+        val bus = And("a bus that refuses the first three offers") { Taking(refuses = { refusals.getAndDecrement() > 0 }) }
         val relay = relaying(outbox, bus)
 
-        clock.adjust(every * 3)
-        withClue("three ticks, three refusals, and the event is where it was") {
+        When("three ticks pass") { clock.adjust(every * 3) }
+        Then("there were three refusals, and the event is where it was") {
             bus.refused shouldBe listOf(1L, 1L, 1L)
             bus.took.shouldBeEmpty()
             outbox.left shouldBe listOf(arrived)
         }
 
-        clock.adjust(every)
-        bus.took shouldBe listOf(1L)
-        outbox.left.shouldBeEmpty()
-        relay.stopped shouldBe Exit.Done(1L)
+        When("a fourth tick passes") { clock.adjust(every) }
+        Then("the bus took it, and the outbox is empty") {
+            bus.took shouldBe listOf(1L)
+            outbox.left.shouldBeEmpty()
+        }
+        And("the relay published one") { relay.stopped shouldBe Exit.Done(1L) }
     }
 
     @Test
-    fun `an event behind a refused one goes on the same tick, and the refused one on the next`() {
+    fun `an event behind a refused one goes on the same tick, and the refused one on the next`() = story {
         val refusedOnce = java.util.concurrent.atomic.AtomicBoolean(false)
-        val outbox = Recorded(arrived, adopted)
-        val bus = Taking(refuses = { event -> event.seq == 1L && refusedOnce.compareAndSet(false, true) })
+        val outbox = Given("Nibbles' arrival and adoption in the outbox") { Recorded(arrived, adopted) }
+        val bus = And("a bus that refuses the arrival once") {
+            Taking(refuses = { event -> event.seq == 1L && refusedOnce.compareAndSet(false, true) })
+        }
         val relay = relaying(outbox, bus)
 
-        clock.adjust(every)
-        withClue("at least once, in order unless the bus turns one away") {
+        When("one tick passes") { clock.adjust(every) }
+        Then("the adoption went, and the refused arrival stayed: at least once, in order unless the bus turns one away") {
             bus.took shouldBe listOf(2L)
             outbox.left shouldBe listOf(arrived)
         }
 
-        clock.adjust(every)
-        bus.took shouldBe listOf(2L, 1L)
-        relay.stopped shouldBe Exit.Done(2L)
+        When("another tick passes") { clock.adjust(every) }
+        Then("the arrival went on it") { bus.took shouldBe listOf(2L, 1L) }
+        And("the relay published two") { relay.stopped shouldBe Exit.Done(2L) }
     }
 
     @Test
-    fun `a claim that throws restarts the relay one interval later, and nothing recorded is lost`() {
+    fun `a claim that throws restarts the relay one interval later, and nothing recorded is lost`() = story {
         val asks = java.util.concurrent.atomic.AtomicInteger()
-        val outbox = Recorded(arrived) {
-            if (asks.incrementAndGet() == 1) throw SQLTransientConnectionException("the pool had nothing to lend")
+        val outbox = Given("Nibbles' arrival, in an outbox whose first claim throws") {
+            Recorded(arrived) {
+                if (asks.incrementAndGet() == 1) throw SQLTransientConnectionException("the pool had nothing to lend")
+            }
         }
         val bus = Taking()
         val relay = relaying(outbox, bus)
 
-        clock.adjust(every)
-        withClue("the first claim threw, and the restart waits one interval") {
+        When("one tick passes") { clock.adjust(every) }
+        Then("the first claim threw, and nothing went") {
             asks.get() shouldBe 1
             bus.took.shouldBeEmpty()
         }
 
-        clock.adjust(every)
-        withClue("restarted at two intervals in, its first tick is one interval after that") {
+        When("another interval passes") { clock.adjust(every) }
+        Then("still nothing: restarted at two intervals in, its first tick is one interval after that") {
             bus.took.shouldBeEmpty()
         }
 
-        clock.adjust(every)
-        bus.took shouldBe listOf(1L)
-        outbox.left.shouldBeEmpty()
-        relay.stopped shouldBe Exit.Done(1L)
+        When("a third interval passes") { clock.adjust(every) }
+        Then("the arrival went, and nothing recorded was lost") {
+            bus.took shouldBe listOf(1L)
+            outbox.left.shouldBeEmpty()
+        }
+        And("the relay published one") { relay.stopped shouldBe Exit.Done(1L) }
     }
 
     @Test
-    fun `an hour of an empty outbox is one claim a tick and nothing published, without waiting the hour`() {
+    fun `an hour of an empty outbox is one claim a tick and nothing published, without waiting the hour`() = story {
         val asks = java.util.concurrent.atomic.AtomicInteger()
         val bus = Taking()
-        val relay = relaying(Recorded { asks.incrementAndGet() }, bus)
+        val relay = Given("a relay over an empty outbox that counts its claims") { relaying(Recorded { asks.incrementAndGet() }, bus) }
 
-        clock.adjust(every * 72_000)
-
-        asks.get() shouldBe 72_000
-        bus.took.shouldBeEmpty()
-        relay.stopped shouldBe Exit.Done(0L)
+        When("an hour passes on the test's clock") { clock.adjust(every * 72_000) }
+        Then("it claimed once a tick") { asks.get() shouldBe 72_000 }
+        And("published nothing") {
+            bus.took.shouldBeEmpty()
+            relay.stopped shouldBe Exit.Done(0L)
+        }
     }
 }

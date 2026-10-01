@@ -6,7 +6,6 @@ import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
-import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import petshop.api.Tally
@@ -17,6 +16,7 @@ import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.Species
 import petshop.domain.Unreachable
+import kotlin.time.Duration.Companion.seconds
 
 /** What a test watches from: the shop to act on, the bus to publish to, the consumer to read. */
 private class Observed(val shop: PetShop, val bus: EventBus, val projection: Projection)
@@ -48,53 +48,52 @@ private val settled: Module = settledWith(FakeRegistry())
 class EventsSpec {
 
     @Test
-    fun `an adoption reaches a consumer through the outbox and the bus`() {
-        val tally = testApp(settled) { app: Observed ->
-            app.shop.adopt(PetId(1), by = "Ada")
-            app.projection.settlesOn { tally -> tally.adopted(Species.Tortoise) == 1 }
-        }
-
-        tally.events shouldBe 1
-        tally.duplicates shouldBe 0
-    }
-
-    @Test
-    fun `an event delivered twice is counted once`() {
-        val barnaby = PetAdopted(seq = 7, pet = Pet(PetId(2), "Barnaby", Species.Dog, adopted = true), by = "Bea")
-
-        val tally = testApp(settled) { app: Observed ->
-            app.bus.publish(barnaby)
-            app.bus.publish(barnaby)
-            app.projection.settlesOn { tally -> tally.duplicates == 1 }
-        }
-
-        withClue("the bus is at-least-once, so the consumer knows an event by its seq") {
-            tally.adopted(Species.Dog) shouldBe 1
-            tally.events shouldBe 1
+    fun `an adoption reaches a consumer through the outbox and the bus`() = story {
+        testApp(settled) { app: Observed ->
+            When("Ada adopts Nibbles") { app.shop.adopt(PetId(1), by = "Ada") }
+            val tally = Then("the consumer counts a tortoise adopted, once it has caught up").eventually(5.seconds) {
+                app.projection.tally().also { it.adopted(Species.Tortoise) shouldBe 1 }
+            }
+            And("it counted one event, and none twice") {
+                tally.events shouldBe 1
+                tally.duplicates shouldBe 0
+            }
         }
     }
 
     @Test
-    fun `an adoption the registry refused reaches the consumer as a return`() {
-        val tally = testApp(settledWith(FakeRegistry(refusing = Unreachable("down")))) { app: Observed ->
-            app.shop.adopt(PetId(1), by = "Ada")
-            app.projection.settlesOn { tally -> tally.events == 2 }
+    fun `an event delivered twice is counted once`() = story {
+        val barnaby = Given("Bea's adoption of Barnaby, as an event") {
+            PetAdopted(seq = 7, pet = Pet(PetId(2), "Barnaby", Species.Dog, adopted = true), by = "Bea")
         }
+        testApp(settled) { app: Observed ->
+            When("the bus delivers it twice") {
+                app.bus.publish(barnaby)
+                app.bus.publish(barnaby)
+            }
+            val tally = Then("the consumer sees the second as a duplicate").eventually(5.seconds) {
+                app.projection.tally().also { it.duplicates shouldBe 1 }
+            }
+            And("counts the adoption once, because the bus is at-least-once and it knows an event by its seq") {
+                tally.adopted(Species.Dog) shouldBe 1
+                tally.events shouldBe 1
+            }
+        }
+    }
 
-        withClue("the adoption was already recorded, so the undo is an event and the count goes back") {
-            tally.adopted(Species.Tortoise) shouldBe 0
+    @Test
+    fun `an adoption the registry refused reaches the consumer as a return`() = story {
+        val down = Given("a registry that is down") { settledWith(FakeRegistry(refusing = Unreachable("down"))) }
+        testApp(down) { app: Observed ->
+            When("Ada adopts Nibbles") { app.shop.adopt(PetId(1), by = "Ada") }
+            val tally = Then("the consumer hears of the adoption and of its undoing").eventually(5.seconds) {
+                app.projection.tally().also { it.events shouldBe 2 }
+            }
+            And("the adoption was already recorded, so the undo is an event and the count goes back") {
+                tally.adopted(Species.Tortoise) shouldBe 0
+            }
         }
     }
 }
 
 private fun Tally.adopted(species: Species): Int = bySpecies.single { it.species == species }.adopted
-
-/** The consumer is behind the shop by a tick and a hop, so a test waits for it rather than sleeping. */
-private fun Projection.settlesOn(done: (Tally) -> Boolean): Tally {
-    val deadline = System.nanoTime() + 5_000_000_000L
-    while (!done(tally())) {
-        check(System.nanoTime() < deadline) { "the projection never got there: ${tally()}" }
-        Thread.sleep(20)
-    }
-    return tally()
-}

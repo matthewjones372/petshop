@@ -1,30 +1,57 @@
 # Petshop
 
-A small service built with [Pelican](https://github.com/matthewjones372/pelican),
-[Lark](https://github.com/matthewjones372/lark) and
-[Proofload](https://github.com/matthewjones372/proofload) — three Kotlin
-libraries that have not been used together before. It exists to find out whether
-they help, and the answer at the bottom is what was actually observed rather
-than what was hoped for.
+A small pet shop, built to find out how well a set of Kotlin libraries work
+together on a real service: an HTTP API with an OpenAPI document, an actor that
+owns the state, background work as streams, a transactional outbox in Postgres,
+a dependency graph that starts and stops it all, and tests that run the whole
+thing in-process, under load and as Given/When/Then stories. The bus between the
+outbox and its consumer can be in-process or Kafka carrying Avro.
 
-It is a real service: an HTTP API with an OpenAPI document, an actor that owns
-the state, a stream of background work, a dependency graph that starts and stops
-it, and a load test that runs the whole thing in its own process.
+The evaluation below is of the libraries and this repository as they are now.
 
 ```bash
 docker compose -f demo/docker-compose.yml up -d postgres registry
-./gradlew :app:run          # http://127.0.0.1:8080 — docs at /api-docs
+./gradlew :app:run          # http://127.0.0.1:8080, docs at /api-docs
+./gradlew :app:test         # every test that builds the shop starts its own Postgres
 ./gradlew :loadtest:test    # 200 requests a second at the real graph
 ```
 
+`demo/` adds Prometheus and Grafana watching the running shop; see `demo/README.md`.
+
+## What it is built with
+
+The libraries under evaluation:
+
+| Library | What it does here |
+|---|---|
+| [Pelican](https://github.com/matthewjones372/pelican) | the shop's HTTP contract as values: routes, the OpenAPI document and Swagger page, handlers that must answer a declared failure; the chip registry's client generated from its contract; typed WireMock stubs, golden files and a typed test client |
+| [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`, its Pekko, Typesafe Config and Gradle wiring-check modules); the background work as `Stream`s on Pekko or Lark's own Forks (`lark-stream`); Kafka as a `Stream` that commits what it handled (`lark-kafka`); retries on schedules; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
+| [Proofload](https://github.com/matthewjones372/proofload) | load tests that start the whole service in-process, assert correctness under load, and write an HTML report |
+| [ExoQuery](https://github.com/ExoQuery/ExoQuery) | every statement against the outbox table, written as Kotlin and checked at compile time |
+| [kimney](https://github.com/matthewjones372/kimney) | the mappings between the shop's events and their wire records, derived at compile time |
+
+What they run on, and what the tests use:
+
+| | |
+|---|---|
+| Apache Pekko | the shop's actor, the HTTP server and client, the stream backend the arrivals and the projection run on, and the in-process bus |
+| PostgreSQL, HikariCP | the outbox table |
+| Testcontainers | a real Postgres for every test that builds the shop, a fresh schema per graph |
+| WireMock | the chip registry in tests and the demo, stubbed through Pelican's `pelican-test-wiremock` |
+| Kotest assertions on JUnit 6 | every test; the end-to-end and app tests read as stories (below) |
+| Arrow | `Either` and `Raise` for declared failures, from the domain up |
+| OpenTelemetry, Micrometer, Prometheus, Grafana | traces through the graph, metrics at `/metrics`, and the demo's dashboard |
+| Logback | where Lark's log lines and Pekko's end up, through `lark-slf4j` |
+| Apache Kafka, avro4k, Confluent's Avro serializer | the bus on a broker: events as Avro in the schema registry's wire format; tests run an embedded broker and Confluent's in-process `mock://` registry |
+
 ## What it is
 
-| Module | What it holds | Library |
+| Module | What it holds | Built with |
 |---|---|---|
-| `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | none |
+| `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | Arrow |
 | `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
-| `api` | the endpoints, their failures, the handlers | Pelican |
-| `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus (in process, or Kafka carrying Avro) and its consumer, the wiring, `main` | Lark, kimney |
+| `api` | the endpoints, their failures, the handlers | Pelican, Pekko HTTP |
+| `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus (in process, or Kafka carrying Avro) and its consumer, the wiring, `main` | Lark, Pekko, kimney |
 | `outbox-table` | the outbox's row and its SQL, in an included build on the Kotlin ExoQuery is built for | ExoQuery |
 | `loadtest` | the shop under load, started in-process | Proofload |
 
@@ -33,14 +60,15 @@ docker compose -f demo/docker-compose.yml up -d postgres registry
 ```kotlin
 val adoptPet = endpoint(petId) {
     post("pets" / petId / "adoption")
-    json<Pet>().orFail(petMissing, petTaken)
+    summary = "Take a pet home"
+    json<Pet>().orFail(petMissing, petTaken, petNotChipped, unavailable)
 }
 ```
 
 The route, the OpenAPI document at `/openapi.json` and the Swagger page at
-`/api-docs` all come from that. The handler must answer with `ok`, `petMissing`
-or `petTaken` — a `when` over the sealed error type is exhaustive, and returning
-a failure the endpoint never declared does not compile.
+`/api-docs` all come from that. The handler must answer with `ok` or one of the
+four declared failures. A `when` over the sealed error type is exhaustive, and
+returning a failure the endpoint never declared does not compile.
 
 ### One writer, no locks
 
@@ -52,7 +80,7 @@ this repository.
 ### The background work is a stream
 
 New pets keep arriving. `Stream.tick(...)` into the actor, with the failure the
-feed can end with in its type — `Stream<Nothing, Pet>` says this one cannot fail.
+feed can end with in its type: `Stream<Nothing, Pet>` says this one cannot fail.
 
 ### What happened leaves through an outbox
 
@@ -92,7 +120,7 @@ Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only 
   plugin is built for Kotlin 2.3.0 and does not load in 2.4.10: it fails with a
   `ClassCastException` while registering, and Terpal fails the same way. So the
   table, the row and the queries are in an included build on Kotlin 2.3.0,
-  which has its own Kotlin Gradle plugin. `app`, still on 2.4.10, depends on it
+  which has its own Kotlin Gradle plugin. `app`, on 2.4.10, depends on it
   as `petshop:outbox-table` and converts events to rows and back
   (`PostgresOutbox`). When ExoQuery ships a plugin for Kotlin 2.4,
   `outbox-table/` can move back into `app`.
@@ -108,8 +136,9 @@ Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only 
   projection sees only its own relay's bus, so the two tallies must add up to
   exactly the number of events recorded. With the locking clause removed, they
   add up to more.
-- **The relay is a stream.** `Stream.tick` makes the claim on a virtual thread
-  (`mapPar`, because JDBC blocks). A refusal is logged and counted, and the
+- **The relay is a stream, run on Lark's Forks.** `Stream.tick` makes the claim on a
+  virtual thread (`mapPar`, because JDBC blocks), and publishes inside it, while the rows
+  are held. A refusal is logged and counted, and the
   event stays in the table for the next tick. `restartOnDefect` starts the
   relay again after a claim that throws, and the rolled-back claim loses nothing.
 - **The bus** is a bounded queue into a Pekko `BroadcastHub` in the same process,
@@ -119,7 +148,7 @@ Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only 
   has seen, because at-least-once means some arrive twice, and `scan` folds the
   rest into a `Tally`. `/stats` reports how many duplicates it dropped.
 
-The pets are still the actor's and still in memory. The table is what makes
+The pets are the actor's, in memory. The table is what makes
 the events durable: a restart forgets the catalogue, but not an event it
 recorded and had yet to publish. The order within one relay is the order the
 events were recorded. With more than one relay, each one's batch is in order
@@ -141,7 +170,7 @@ ShopEvent ──kimney──▶ wire record ──avro4k──▶ GenericRecord 
                                                                               │
 ShopEvent ◀──kimney── wire record ◀──avro4k── GenericRecord ◀──Confluent──────┘
     │                                        (a record that will not read: dead letters, committed past)
-    └─▶ projection, on whichever backend the graph names ─▶ runCommitting()
+    └─▶ projection, on whichever backend ProjectionStreams names ─▶ runCommitting()
 ```
 
 - **The wire records are their own types.** `petshop.app.wire` holds
@@ -151,24 +180,27 @@ ShopEvent ◀──kimney── wire record ◀──avro4k── GenericRecord 
   `WireEvent.toDomain()` are one `transformInto()` each, and a field either side
   cannot fill does not compile.
 - **One schema per topic.** The three events are a union inside one
-  `ShopEventRecord`, so the registry holds one subject's worth of versions
-  rather than a record type per case.
+  `ShopEventRecord`, so the registry holds one subject's versions rather than a
+  record type per case.
+- **Publishing is `lark-kafka`'s `Producer`.** A record it gives up on is a
+  `BusRefused`, and the event stays in the outbox. How long a send may take is
+  the producer's own timeouts, not a `get()` around the send.
 - **Two failures, told apart.** A record that is not the shop's Avro is a
-  `DecodeError`, diverted to dead letters and committed past. A registry that
-  cannot be asked is a defect, and the run ends for its owner to start again.
-  Confluent throws the same exception for both; `registryDown` reads what it
-  wraps.
-- **Either backend.** `KafkaBusSpec` runs the whole service over Kafka on Forks
-  and on Pekko, against a broker in the test JVM and Confluent's `mock://`
-  registry: the real serializers and wire format, no registry server.
+  `DecodeError`, written to `<topic>.dead-letters` as it was read and committed
+  past. A registry that cannot be asked is a defect, and the run ends for its
+  owner to start again. Confluent throws the same exception for both, so
+  `registryDown` reads what it wraps.
+- **The projection runs on its own backend.** `ProjectionStreams` is a key of
+  its own: Pekko beside the in-process hub, which only Pekko can read, and either
+  backend over Kafka, while the relay runs on Forks.
 
-The service still starts on the in-process bus. Choosing Kafka from
-configuration is the next step, and `KafkaBusSpec` shows the one node it swaps.
+The service starts on the in-process bus. Kafka is one node swapped, as
+`KafkaBusSpec` and the end-to-end test do; it is not chosen by configuration.
 
 ### The application is a value
 
 ```kotlin
-val petshop: Module = settings + telemetry + registry + theShop + arrivals + events + web
+val petshop: Module = settings + telemetry + database + registry + theShop + arrivals + events + web
 
 object Petshop : LarkApp<PelicanServer>() {
     override val module: Module = petshop
@@ -197,17 +229,70 @@ shop's decision about which answers mean "no chip" and which mean "could not ask
 
 ## What a test looks like
 
-```kotlin
-// twenty adopters, one tortoise, no port bound and no arrivals turning up mid-assertion
-testApp(petshop.subgraph<PetShop>()) { shop: PetShop ->
-    parMap((1..20).toList()) { who -> shop.adopt(PetId(1), by = "adopter $who") }
-}.count { it.isRight() } shouldBe 1
+Every test in `app` reads as a story: `Given`, `When`, `Then`, `And` and `But`
+each run a block, time it and answer its value, so the next step checks what the
+last one did. A failing step ends the story with an `AssertionError` whose
+message is the story up to that step, so CI and the JUnit XML show where it
+broke. The console copy is coloured under `FORCE_COLOR` or IntelliJ. The code
+is a prototype in `app/src/test/kotlin/petshop/app/Story.kt`; Lark specs 0115
+and 0116 move it into a `lark-test` module.
 
-// one setting changed; application.conf keeps the rest
-testApp(petshop.subgraph<Settings>().overridingConfig("petshop.arrivalsEvery = 1s")) { it }
+The end-to-end test is the whole graph `main` starts, with three nodes swapped:
+where the registry is, which database the outbox is in, and the bus, which is
+Kafka. The shop is called through its own endpoints, so there is no URL, status
+code or JSON in the test, and the test reads the Postgres table and the Kafka
+topic as well as the API:
+
+```kotlin
+@Test
+fun `somebody adopts a tortoise, and every part of the service hears about it`() = story {
+    Given("a chip registry that knows every pet but Mrs Peel") {
+        registry.stub(lookupChip, 3L) answers noSuchChip(Problem("never chipped"))
+    }
+    theService.use { server: PelicanServer ->
+        apiClient(server.baseUrl, JacksonCodecs).use { shop ->
+            val nibbles = When("Ada adopts Nibbles") { shop.outcome(adoptPet, 1L) }
+            Then("Nibbles is hers") { nibbles.shouldBeOk().adopted shouldBe true }
+
+            val peel = When("somebody asks for Mrs Peel") { shop.outcome(adoptPet, 3L) }
+            Then("she has no chip on record") { peel.shouldBeError() shouldBe NotChipped(3) }
+
+            And("the outbox drains").eventually(5.seconds) { database.unsent() shouldBe 0L }
+            And("/stats counts every event the table recorded").eventually(5.seconds) {
+                shop.call(stats, Unit).events.toLong() shouldBe database.recorded()
+            }
+
+            val onTheTopic = When("the topic is read as the broker holds it") {
+                kafka.records(TOPIC, StringDeserializer(), ShopEventDeserializer(schemas))
+            }
+            Then("every event the outbox recorded is on it once, keyed by its seq") {
+                onTheTopic.map { it.key().toLong() }.sorted() shouldBe (1..database.recorded()).toList()
+            }
+            And("the projection committed every event").eventually(5.seconds) {
+                kafka.committed(GROUP, TOPIC) shouldBe database.recorded()
+            }
+        }
+    }.shouldBeRight()
+}
 ```
 
-Somebody else's service is replaced in one of two places, depending on what the test is about:
+```
+Story: somebody adopts a tortoise, and every part of the service hears about it
+  ✓ Given a chip registry that knows every pet but Mrs Peel      1 ms
+  ✓ When Ada adopts Nibbles                                      153 ms
+  ✓ Then Nibbles is hers                                         0 ms
+  ...
+  ✓ And the outbox drains                                        48 ms, 2 tries
+```
+
+`use` gives the port, the actor system and the pool back when the block
+returns, so there is no teardown to write. `eventually` blocks rather than
+suspends, because `use`'s block is not `suspend`, and gives up on time by Lark's
+clock.
+
+A test of one part starts only that part. `subgraph` cuts the graph to what a
+node is reached through, and a collaborator is replaced in one of two places,
+depending on what the test is about:
 
 ```kotlin
 // about the shop: swap the node. `overriding` refuses a key the graph does not hold,
@@ -216,349 +301,230 @@ petshop.overriding(single<ChipRegistry> { FakeRegistry() }).subgraph<PetShop>()
 
 // about the client: keep the node, swap the server. The stubs are the registry's own
 // endpoints, so they move with its contract; the answers are values it declares.
-@RegisterExtension val registry = PelicanWireMockExtension(JacksonCodecs)
-
 registry.stub(lookupChip, 1L) answers ok(ChipRecord("981000000000001", keeper = "Petshop"))
 registry.stub(recordKeeper, In2("981000000000001", NewKeeper("Ada"))) fails Fault.CONNECTION_RESET_BY_PEER
-
-testApp(shopCalling(registry)) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") } shouldBeLeft RegistryDown(1)
 ```
 
-and what the shop has promised its callers is a set of golden files:
-`golden.operations(api.spec())` fails on a change that would break somebody
-already calling, and rewrites the file on one that would not.
+The relay's tests run it on a clock the test owns (`lark-stream-test`), so an
+hour of ticks is one `adjust` and nothing sleeps. What the shop has promised
+its callers is a set of golden files: `golden.operations(api.spec())` fails on a
+change that would break somebody already calling.
 
-End to end is the whole graph `main` starts, with two nodes swapped: where the
-registry is, and which database the outbox is in. The shop is called through
-its own endpoints, so there is no URL, status code or JSON in the test, and
-the database is a real Postgres the test can read as well as the API
-(`EndToEndSpec`, about three seconds):
-
-```kotlin
-val database = TestPostgres.fresh()   // a schema of its own, in a Testcontainers Postgres
-val patiently = Schedule.spaced<Throwable>(20.milliseconds) zipLeft Schedule.recurs(250)
-
-petshop.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
-    .onDatabase(database)
-    .overridingConfig("petshop.port = 0")
-    .use { server: PelicanServer ->
-        apiClient(server.baseUrl, JacksonCodecs).use { shop ->
-            shop.outcome(adoptPet, 1L).shouldBeOk().adopted shouldBe true
-            shop.outcome(adoptPet, 1L).shouldBeError() shouldBe AlreadyAdopted(1)
-            shop.outcome(adoptPet, 3L).shouldBeError() shouldBe NotChipped(3)
-
-            // the adoption went into the table, out through the relay, and /stats counted it once.
-            // Lark's own retry, so no runBlocking: `use` is not suspend, and neither is this.
-            patiently.retry { database.unsent() shouldBe 0L }
-            shop.call(stats, Unit).events.toLong() shouldBe database.recorded()
-        }
-    }
-```
-
-`use` gives the port, the actor system and the pool back when the block
-returns, so there is no teardown to write.
-
-and what the load test asks:
+The load test asks a correctness question under load, through the same typed
+client:
 
 ```kotlin
 // adopt the tortoise, then have two hundred a second try to adopt it again.
-// every one must be told it is gone: a 200 in there is two people sold one pet.
-exec(adoptTaken, api.post("/pets/1/adoption").expecting(409))
+// every one must be told it is gone: an Ok in there is two people sold one pet.
+exec(adoptTaken) { step ->
+    when (val answer = client.outcome(adoptPet, 1L)) {
+        is Outcome.Ok -> step.fail("the tortoise was sold twice")
+        is Outcome.Err -> if (answer.error !is AlreadyAdopted) step.fail("not the declared failure")
+    }
+}
 ```
 
-That last one is a **correctness** claim checked under load rather than a
-latency one, and it is the thing this stack can say that none of the three
-libraries could say alone.
+## How each one holds up
 
-## Does it help?
+### Pelican
 
-### Pelican: yes, clearly
+**What it gives.** Every failure an endpoint declares is in its handler's type,
+so the `when` over the shop's errors is exhaustive and a new error is a build
+failure rather than a 500. The OpenAPI document cannot drift, because there is
+no second description to drift from; nothing here writes YAML. The chip
+registry's client is generated from its contract and checked on every build.
+Its tests stub it through the same endpoint values, so a contract change moves
+the stubs too, or stops them compiling. The end-to-end test and the load test
+call the shop through a typed client: no URL, no status code, and a failure
+arrives as the value the endpoint declared.
 
-The handlers compiled first time, which for HTTP code is not the usual
-experience. Every failure the endpoints declare is in the handler's type, so the
-`when` over `NoSuchPet` and `AlreadyAdopted` is exhaustive and a new error
-member would break the build rather than escape as a 500.
+**What it costs.** Two things to look up once: `errorJson` for a declared
+failure, and the import for `orFail`.
 
-The document is free and cannot drift, because there is no second description to
-drift from. Nothing here writes YAML.
+**Its limits.** A status names one response, so `NotRecorded` and an
+unreachable registry share one 503, told apart by its message. A declared
+status whose body is not the declared shape is not that failure: the generated
+client cannot decode it and throws `ApiCallFailed`, which the shop treats as
+the registry being unreachable. A stand-in that answers a bare 404 where the
+contract says a 404 carries a `Problem` gets `registry_down`, not `not_chipped`.
 
-The cost was two lookups: `errorJson` for a declared failure and an import for
-`orFail`. Both once.
+### Lark: the application graph
 
-Re-read after everything below: unchanged. Pelican's claim was always a
-compile-time one and it was always kept, which is the least interesting verdict
-here and the one that has needed the least revision.
+**What it gives.** Each of these is a test in this repository:
 
-### Lark: yes, and not for the reason first measured
+- **A pet is sold once.** Twenty adopters race for one tortoise on a subgraph
+  that binds no port, and exactly one wins. Under load, two hundred a second try
+  to adopt one already gone, and every one is told so.
+- **An actor cannot answer with null.** Pekko refuses a null message, so a
+  nullable reply would fail at run time. `ask` binds its reply to `Any`, so a
+  nullable reply type does not compile, and the shop's `Find` answers an
+  `Option<Pet>`.
+- **The wiring is checked as the code compiles.** A missing key is a compiler
+  error on the recipe that asked for it, and `larkWiring` runs every graph on
+  `check`.
+- **A dependency nothing reads cannot hide.** A test asserts every node that
+  takes the settings uses them, and `overriding` refuses a fake under a key the
+  graph does not hold.
+- **Nothing is left open.** The port, the actor system, the pool and the SDK
+  are released in reverse dependency order, which is what lets the load test
+  start the whole application twice in one process and get everything back.
+- **A bad configuration file says everything wrong with it at once**, in
+  Typesafe Config's words, naming the file and the line.
+- **A number is a call, not a node.** Counting an adoption is
+  `counter("petshop.adoptions").increment()`, with the outcome as a label, so
+  one query answers how many adoptions and how many were refused.
+- **A line about one pet can be found by that pet.** `adopt` annotates `pet_id`
+  and `adopted_by` rather than spelling them into the message, the refusal
+  carries the same pair, and the pair survives the fork the ask runs on and
+  reaches logback's MDC.
 
-What changed is what cannot happen any more, and each of these is a test in this
-repository rather than a claim about one.
+**What it costs.** `app/Wiring.kt` is about 240 lines, much of it comments, for
+a graph a hand-written `main` might do in fewer. It does not delete code; it
+makes a set of mistakes impossible. `singleOf(::Thing)` shortens a node that is
+a plain constructor call, and few are: most are a resource with a release, a
+factory, an adapter between Pekko systems, a stream being run or a config
+section.
 
-**A pet is sold once.** Twenty adopters race for one tortoise on a subgraph that
-binds no port; exactly one wins. Two hundred a second try to adopt one already
-gone; every single one is told so, and a `200` in there would fail the run. That
-is a correctness claim checked under load, which is not a thing a load tool or a
-test framework does alone.
+**Its limits.** The compiler plugin behind the in-editor error is written
+against Kotlin's compiler internals, which have no stability promise, so it is
+the part of this stack that can break on a Kotlin upgrade. It reads a graph
+only from source it can see:
 
-**An actor cannot answer "no such pet" with null.** It did once, and the
-endpoint that had carefully declared a 404 returned a 500 — everything compiled,
-and only running it found the bug. `ask` binds its reply to `Any`, so the code
-that did it no longer compiles, and a does-not-compile fixture in Lark holds
-that.
+- IntelliJ runs it in the editor only once
+  `kotlin.k2.only.bundled.compiler.plugins.enabled` is unchecked in the
+  registry.
+- A module arriving from another Gradle module has no source to read.
+- An incremental compile re-reads only what changed, so a graph spread over
+  several files is usually one it declines.
 
-**The wiring is checked as the code compiles.** A missing key is a compiler
-error on the recipe that asked for it, and a red underline in the editor before
-any build is run. A dependency nothing provides cannot reach staging, or a
-commit.
+It says when it has not read a graph rather than staying quiet. `larkWiring`
+runs the graph, is unaffected by any of this, and is the check that always
+runs.
 
-**A dependency nothing reads cannot hide.** The actor took a `Settings` it never
-looked at, and `render()` drew that edge as though it were real. A test asserts
-every node taking the settings uses them, and `overriding` refuses a fake it is
-handed.
+### Lark: streams
 
-**Nothing is left open.** The port, the actor system and the SDK are released in
-reverse dependency order, which is what lets the load test start the whole
-application in its own process and get the port back afterwards.
+**What it gives.**
 
-**A bad configuration file says everything that is wrong with it, at once**, in
-Typesafe Config's own words, which name the file and the line.
+- **A blocking call has an obvious home.** `mapPar` runs the relay's JDBC claim
+  on a virtual thread, with no dispatcher held and no `CompletionStage` built
+  by hand.
+- **A refusal is not a failure.** An event the bus turns away is logged,
+  counted and left in the outbox for the next tick, and the stream's type
+  stays `Nothing`.
+- **A defect is not the end.** `restartOnDefect` runs the relay again after a
+  claim that throws, and the rolled-back claim loses nothing.
+- **An idempotent consumer is two operators.** `statefulMap` carries the `seq`s
+  seen and `scan` the tally, as plain Kotlin values.
+- **A run stops from outside.** `Run.start` answers a `Running`, whose `close`
+  is the node's release.
+- **One description, more than one backend.** The relay runs on Lark's Forks,
+  and the arrivals and the projection on Pekko, because the bus is a Pekko hub.
+  The binding that picks the backend is one line, and the relay's tests run the
+  same description on a test clock.
 
-**A number is a call, not a node.** `0.4.0` ships `lark-micrometer`, so counting
-an adoption is `counter("petshop.adoptions").increment()` and nothing takes a
-`MeterRegistry` as a dependency. The outcome is a label rather than three metric
-names, so one query answers how many adoptions and how many were refused — and
-`demo/` is Prometheus and Grafana watching exactly that.
+**Its limits.** A Pekko-native source runs only on Pekko, so whatever reads the
+in-process bus is pinned to it. Forks' `stop` interrupts the loop, which should
+cut a claim blocked on Postgres short and roll it back; no test here holds that
+yet.
 
-**A line about one pet can be found by that pet.** `adopt` annotates `pet_id`
-and `adopted_by` rather than spelling them into the message, and the refusal
-carries the same pair as the success — so a search for one pet returns the whole
-story and not the half of it that went well. The pairs survive the fork the ask
-runs on, which an MDC cannot do by itself, and a test asserts that rather than
-the wording.
+### Lark: schedules and waiting
 
-#### What it costs
+`Schedule.spaced(…) zipLeft Schedule.upTo(…)`, retried, waits for something
+eventually consistent without `suspend`, rethrowing the last failure, on a
+clock a test can drive. `upTo` and `lark-test`'s `eventually` and stories are
+on Lark's `main` and not yet in a release, which is why the story code here is
+a prototype in `app`'s tests.
 
-`app/Wiring.kt` is 84 lines for eight nodes, against maybe sixty written by hand
-in `main`. Line count is roughly a wash and is not the point: none of the six
-things above is available at sixty lines, and most of them are not available at
-any number of lines without something that owns the graph.
+### Proofload
 
-`singleOf(::Thing)` shortens a node that is a plain constructor call, and one of
-the eight here is one. The rest are a resource with a release, a factory, an
-adapter between two Pekko systems, a stream being run and a config section —
-which is worth knowing before expecting a dependency graph to delete code. It
-does not delete code. It makes a set of mistakes impossible.
+Three load tests, each a scenario and an assertion and an HTML report, against
+the whole service started in-process:
 
-Logging was the one place the graph gave nothing back. No node takes a logger,
-which is right, but `0.2.0` shipped no adapter either — so every service wrote
-the same twenty lines to reach a backend, and this one had not: `logInfo` went
-to stderr while Pekko's lines went through the logback already on the classpath,
-in a different format, and `main` printed its start-up line with `println`.
-`0.3.0` ships `lark-slf4j`, and the twenty lines became a dependency: it
-registers itself, so `main` is back to one line and a test here says the
-classpath still answers.
+- browsing at two hundred a second, after two seconds of warm-up that are not
+  recorded;
+- the rush on a pet already gone, a correctness claim;
+- two instances on one outbox table, whose two relays must publish every event
+  exactly once between them.
 
-The cost that arrived with `0.2.0` is a different kind. The compiler plugin is
-written against Kotlin's compiler internals, which have no stability promise, so
-it is a thing that will break on Kotlin upgrades in a way the rest of this stack
-will not. Lark keeps it in a module nothing else depends on and refuses to read
-a graph in a compiler it was not built for, which is the right shape for that
-bargain — but a service taking it on should know it is taking on a moving part
-in exchange for an earlier error, and that `larkWiring` is what it would fall
-back to.
+The report says whether the generator kept its own schedule, which decides
+whether a p99 belongs to the shop or the tool. It was the least work of
+anything here: each test is a few lines on top of the graph and the typed
+client.
 
-### lark-stream: yes for the relay, once three rough edges were fixed
+### Lark: Kafka
 
-The outbox relay and the projection are the first things here to use more of
-`lark-stream` than `tick` and `map`. `EventsSpec` covers the claims below: an
-adoption reaches the consumer, a refused event goes again, and an event
-delivered twice is counted once.
+**What it gives.** Kafka is a `Stream` like any other, run on either backend,
+and `runCommitting()` commits an offset only once its record reached the end of
+the stream, so the projection never commits an event it has not folded in. A
+record that will not decode is a `Left` that keeps its offset, so it is routed
+to dead letters rather than ending the consumer, and `deadLetters` writes it as
+it was read, with where it came from in its headers. The producer's failure is
+a value, `PublishFailed`, which the shop turns into the `BusRefused` the relay
+already handles.
 
-**A refusal is not a failure, and the type says so.** `publish` answers
-`Either<BusRefused, ShopEvent>`, and `divertLefts` sends each `Left` to a named
-sink and keeps the stream `Stream<Nothing, ShopEvent>`. In plain Pekko you would
-write `divertTo` with a predicate and a cast. Here nothing is carried in the
-element past the point where it stopped mattering.
+**What it costs.** Confluent's serializer is not on Maven Central, so the build
+adds Confluent's repository, limited to `io.confluent`. Confluent 7.8 asks for
+its own `7.8.0-ccs` build of the Kafka 3.8 client, so the build pins Apache's
+`3.8.0`, the one `lark-kafka` is built against, to keep one client on the
+classpath.
 
-**A blocking call has an obvious home.** The ask to the actor blocks. `mapPar`
-runs it on a virtual thread, so no Pekko dispatcher thread is held and there is
-no `CompletionStage` to build by hand.
+**Its limits.** At least once, not exactly once: `lark-kafka` has no
+transactions, so a consumer that dies after folding an event and before
+committing sees it again, which is why the projection dedupes by `seq`.
 
-**An idempotent consumer is two operators.** `statefulMap` carries the seen
-`seq`s and `scan` carries the tally, both as plain Kotlin values. Duplicates are
-counted, not hidden.
+### kimney
 
-Writing the relay against `0.4.0` found three rough edges, and each became a lark
-spec and a change in `0.5.0`:
+**What it gives.** The domain events and their wire records are separate types,
+and the mapping between them is derived at compile time, so a field one side
+cannot fill is a compile error rather than a null on the wire.
 
-- **`mapPar` on a stream with no failure type could not infer one from a body
-  that never raises** ([spec 0043](https://github.com/matthewjones372/lark/blob/main/specs/0043-two-signatures-a-relay-tripped-on.md)).
-  The relay had to write `mapPar<Nothing, _, _>(1)`. Now `mapPar` keeps the
-  stream's failure type, and the form that reads one out of a `raise` is
-  `mapParOrFail`, matching `mapOrFail`. The same spec moved `groupedWithin` onto
-  `kotlin.time.Duration`, which is what `tick` takes.
-- **Nothing could stop a running stream from outside**
-  ([spec 0044](https://github.com/matthewjones372/lark/blob/main/specs/0044-a-run-you-can-stop.md)).
-  The relay used to stop through a flag and `takeWhile`, at the next tick.
-  `Run.start` now answers a `Running`, and its `close` is the node's release:
-  the relay stops at once, before the bus it publishes to closes. The arrivals
-  feed, which used to end only when the actor system went, stops the same way.
-- **One `Died` ended the relay for good**
-  ([spec 0045](https://github.com/matthewjones372/lark/blob/main/specs/0045-a-stream-that-starts-again.md)).
-  A timed-out ask would have stopped the outbox draining until the process
-  restarted. `restartOnDefect(schedule)` runs the same description again after
-  the delay the schedule decides, with a warn line each time, and keeps the
-  declared failure in the type. Starting again loses nothing here: whatever was
-  not marked sent is still in the outbox.
+**What it costs.** A compiler plugin, applied in `app`'s build.
 
-**The relay runs on Forks since `0.6.0`.** Until then Forks refused `tick`,
-`mapPar` and `restartOnDefect`, which is everything the relay is made of, so it
-ran on Pekko and the claim was handed to a virtual thread to keep it off a
-dispatcher. `0.6.0` runs all three on lark's own threads, and the change here is
-the one binding in `Wiring.kt` that decides the backend: the description did not
-move, and `RelaySpec` and `EventsSpec` pass unchanged. Forks' `stop` interrupts
-the loop, so stopping the relay should cut a claim blocked on Postgres short and
-roll it back rather than wait for it; no spec here holds that yet. The arrivals
-feed and the projection stay on Pekko, because the bus they read is a Pekko hub.
+### ExoQuery
 
-### The wiring check: cheap, and it found nothing here
+**What it gives.** Every statement against the outbox but its `CREATE TABLE`
+is Kotlin, checked when it compiles. The locking clause it has no syntax for is
+a `@SqlFragment` around a `free` block, so it is written once and used like any
+other query.
 
-`lark-app-gradle` checks every graph in the project as it compiles and draws
-each one. Applying it is one line in `app/build.gradle.kts`; declaring the
-application as a value so the check knows the root it starts from is ten more
-in `Wiring.kt`, and it takes seven out of `Main.kt`, which is now six lines
-including imports. Call it **net ten lines** for a gate that runs on every
-build.
+**What it costs.** Its compiler plugin is built for Kotlin 2.3.0 and does not
+load in 2.4.10, so the table, the row and the queries live in an included build
+on 2.3.0, and `app` converts events to rows and back.
 
-**It found nothing in this graph**, which is the result worth reporting. No
-missing key — that was already true. No key provided twice. And nothing
-unreachable from `PelicanServer`, which was the check most likely to produce
-noise: `Arrivals` is a background stream nothing reads, and it is *still*
-reached, because the web node takes it as a dependency rather than trusting
-start-up order. Eight nodes, no findings, no opt-outs needed.
+## Sharp edges
 
-**What it caught was a bug in lark**, not in this service. The report's own
-bullet arrived as `?`: from JDK 19 `System.err` follows `stderr.encoding`,
-which is the native encoding when a build redirects the stream, and
-`-Dfile.encoding` does not reach it. That is the sort of thing only running a
-tool against a real service finds.
+**Three type systems can agree on something that fails.** Kotlin, Pelican and
+the actor protocol all accepted an actor answering "no such pet" with `null`,
+and Pekko refuses a null message at run time. Running it is what finds that.
+`ask` makes a nullable reply a compile error, and the general point
+stands: a declared failure is only as good as everything beneath it.
 
-**The report names the line**, which is the part that matters day to day.
-Commenting out the actor to see what it says:
+**An annotation that crosses a fork can still be lost at the backend.**
+Flattening the pairs onto the message reads correctly to a person, while
+`%X{pet_id}`, a JSON encoder and every field search see nothing. `lark-slf4j`
+puts them in the MDC for the call and restores the map after it, because the
+thread is one a pool hands on.
 
-```
-e: .../petshop/app/src/main/kotlin/petshop/app/Wiring.kt:92:9 lark-app: PetShop needs ActorRef<Shop>, and nothing builds it
-e: .../petshop/app/src/main/kotlin/petshop/app/Arrivals.kt:29:1 lark-app: Arrivals needs ActorRef<Shop>, and nothing builds it
-```
+**A test worker does not see the shell's environment.** `FORCE_COLOR=1
+./gradlew test` sets nothing in the JVM the tests run in. `app/build.gradle.kts`
+hands `FORCE_COLOR`, `NO_COLOR` and `lark.test.colour` on.
 
-`Wiring.kt:92` is the `singleOf(::ActorPetShop)` that asked. Since Lark `0.2.0`
-that is also a compiler error and a red underline on that call, which is what
-the last version of this paragraph said could not be had: a module is an
-expression, and nothing reads an expression until something runs it.
+**A record keyed by text sorts as text.** The topic's keys are each event's
+`seq` as a string, so a test comparing them sorts them as numbers, or `"10"`
+comes before `"2"`.
 
-What changed is that a second thing now reads it — `lark-app-compiler`, a K2
-checker that reconstructs the graph from the compiler's own syntax tree. It
-follows `single`, `singleOf`, `actor`, `config`, `+`, `boundTo`, names in the
-same file and the branches of a `when`, and abandons an application entirely on
-anything else, on the grounds that a red line under working code is worse than a
-fault found a moment later.
-
-This graph is one it can read: all ten keys, the same ten `render()` draws.
-Two limits are worth knowing before expecting it everywhere. IntelliJ runs no
-third-party compiler plugin in the editor until
-`kotlin.k2.only.bundled.compiler.plugins.enabled` is unchecked in the registry,
-so the underline is opt-in per developer. And a module arriving from another
-Gradle module has no source to read, so a graph assembled across modules is one
-the editor stays quiet about — this one is not, but a larger service would be.
-
-The third limit is the one that decides how much of this is real, and it is
-easiest to see by breaking the graph twice. On a full compile the error above is
-what arrives. On an **incremental** one, this does:
-
-```
-w: .../Wiring.kt:119:1 lark-app: this graph was not read here, and is checked by larkWiring alone: petshop/app/arrivals, which has no source here
-```
-
-An incremental compilation re-parses only what changed; everything else arrives
-as symbols from the last compilation's class files, and a class file has no
-initialiser to read. So a graph spread over more than one file is usually one
-the compiler plugin declines, and it declines out loud rather than reporting a
-sound graph. In the editor this does not arise — analysis there is always from
-current sources, which is why the underline is reliable exactly where it was
-wanted.
-
-`larkWiring` is the gate, then, and not a formality. It runs the graph, so it
-sees what no reader of source can, it is unaffected by any of the above, and in
-the incremental case it is the only thing that catches the fault at all —
-naming, in this one, both `Wiring.kt:92` and `Arrivals.kt:29`, which is better
-than the compiler plugin manages even when it does read the graph. The plugin
-buys earliness where it can get it. It buys no correctness, and is not asked to.
-
-### Proofload: yes, and it was the least work
-
-Nothing about this changed with `0.2.0`, which is worth saying rather than
-leaving to be inferred: the load test is the one part of this repository that
-has not been touched since it was first written.
-
-One scenario, one assertion, one HTML report. It ran two thousand requests at
-two hundred a second against the real service, and the report says whether the
-generator kept its own schedule — which is the number that decides whether the
-p99 belongs to the shop or to the tool.
-
-The whole load test is thirty lines including imports.
-
-## What building it found
-
-**A 500 where a 404 was declared.** `Find(id, replyTo: ActorRef<Pet?>)` compiles.
-Pekko refuses a null message, so an actor answering "no such pet" with `null`
-throws where it meant to answer, and the endpoint that had carefully declared a
-404 returned a 500. Kotlin's nullable type did not stop it and neither did
-Pelican's declared failure — the mistake was below both of them. The reply is an
-`Option<Pet>` now.
-
-It is worth saying plainly: **everything compiled before that bug, and the bug
-was in the one place three type systems all thought was fine.** Running it is
-what found it.
-
-**Three ways a compiler plugin fails without telling anyone.** This graph is
-what `lark-app-compiler` was developed against, and getting it to work here took
-four attempts that all looked identical from outside — the build green, the
-editor silent. A relocated `PsiElement` that the compiler has and the editor does
-not; a positioning strategy that casts its source to a declaration, which the
-compiler tolerates on a call and the editor answers by dropping the diagnostic
-entirely; a republished snapshot served from a cached classloader; and an
-incremental compilation with nothing to read. A green `compileKotlin` turned out
-to be no evidence at all about the half the plugin exists for.
-
-The consequence is in the design rather than only in the story: the plugin now
-says when it has not read a graph, which is the difference between a tool that
-is working and a tool that has stopped. Without that line, every incremental
-build in this repository would have looked exactly like a clean bill of health.
-
-**An annotation that survives a fork can still die at the backend.** Lark's
-strongest logging claim is that `logAnnotated` carries a pair across a `parMap`
-where an MDC cannot. Writing the adapter is where that claim is kept or lost,
-and the obvious version loses it: flatten the pairs onto the end of the message
-— which is what the library's own cookbook showed — and every line still reads
-correctly to a human while `%X{pet_id}`, a JSON encoder and every field search
-see nothing. The adapter puts them in the MDC for the duration of the call and
-puts the previous map back, because the thread is one a pool hands to something
-else next. That adapter was written here first and is now `lark-slf4j`, which is
-the shorter version of what this repository is for.
-
-The general shape of it: a propagation guarantee is only worth what the thing at
-the edge does with it, and the edge is the part a service writes itself.
+**A demo stub must keep the contract too.** The demo's registry stand-in has to
+answer a 404 with the `Problem` body the contract declares, or the shop reports
+the registry as down.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.7.0`, kimney `0.3.0`, Proofload `0.1.0-rc4`, ExoQuery `2.0.4.PL`,
-avro4k `2.12.0`, Confluent's Avro serializer `7.8.0`, Kotlin 2.4.10 (2.3.0 for `outbox-table/`), JDK 21.
+Pelican `1.0.0-RC3`, Lark `0.7.0` (its Gradle wiring plugin `0.2.0`), Proofload
+`0.1.0-rc4`, ExoQuery `2.0.4.PL`. Pekko `1.2.1`, Pekko HTTP `1.3.0`, Arrow
+`2.1.2`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`, HikariCP `7.1.0`,
+OpenTelemetry SDK `1.51.0`, Micrometer's Prometheus registry `1.12.0`, Logback
+`1.5.20`, Kotest `6.2.4`, JUnit `6.1.3`. kimney `0.3.0`, avro4k `2.12.0`,
+Confluent's Avro serializer `7.8.0`, Kafka client `3.8.0`, embedded-kafka
+`3.8.0`. Kotlin 2.4.10 (2.3.0 for `outbox-table/`), JDK 21.
 
-`singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler
-plugin that reports it as you type were all written while this repository was
-being built, which is what it is for. This graph is what the compiler plugin was
-developed against, and finding that it read all ten keys and named the same
-missing one the running check names is what said it worked.
-
-All three are early. Lark says so on its own front page, and this repository is
-the first thing to use it for anything.
+All five libraries under evaluation are early, and say so.
