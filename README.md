@@ -515,7 +515,7 @@ the edge does with it, and the edge is the part a service writes itself.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.6.0`, Proofload `0.1.0-rc4`, ExoQuery `2.0.4.PL`, Kotlin 2.4.10
+Pelican `1.0.0-RC1`, Lark `0.7.0`, Proofload `0.1.0-rc4`, ExoQuery `2.0.4.PL`, Kotlin 2.4.10
 (2.3.0 for `outbox-table/`), JDK 21.
 
 `singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler
