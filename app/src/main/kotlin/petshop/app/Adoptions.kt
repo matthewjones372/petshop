@@ -52,9 +52,12 @@ data class Returned(val id: PetId) : Shop
  */
 private class State(val pets: Map<PetId, Pet>, private val outbox: Outbox) {
 
-    /** The next state, or why the write failed: Postgres down, the pool exhausted. */
+    /**
+     * The next state, or why the write failed: Postgres down, the pool exhausted. The pet's new state and its event
+     * are one transaction, so the state changes here only once both are durable.
+     */
     fun record(pet: Pet, event: (seq: Long) -> ShopEvent): Either<Throwable, State> =
-        Either.catch { outbox.record(event) }.map { State(pets + (pet.id to pet), outbox) }
+        Either.catch { outbox.record(pet, event) }.map { State(pets + (pet.id to pet), outbox) }
 }
 
 /**

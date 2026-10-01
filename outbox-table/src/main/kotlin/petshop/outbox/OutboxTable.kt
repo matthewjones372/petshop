@@ -25,6 +25,11 @@ data class OutboxRow(
     @SerialName("adopted_by") val adoptedBy: String?,
 )
 
+/** A row of `pets`: one pet as the shop last left it. */
+@Serializable
+@SerialName("pets")
+data class PetRow(val id: Long, val name: String, val species: String, val adopted: Boolean)
+
 /**
  * Locks the rows [rows] selects, and passes over any another transaction has already locked rather
  * than waiting for it. ExoQuery has no locking clause of its own, so a free block adds one.
@@ -35,7 +40,7 @@ fun <T> forUpdateSkipLocked(rows: SqlQuery<T>): SqlQuery<T> = sql {
 }
 
 /**
- * `outbox`, every statement against it written in ExoQuery. It knows rows and nothing of what the
+ * `outbox` and `pets`, every statement against them written in ExoQuery. It knows rows and nothing of what the
  * shop puts in them.
  *
  * A claim is one transaction: the oldest rows are selected `FOR UPDATE SKIP LOCKED`, handed over, and
@@ -47,11 +52,41 @@ class OutboxTable(dataSource: DataSource) {
 
     private val db: JdbcController = JdbcControllers.Postgres(dataSource)
 
-    /** Inserts [row] as it is but for its `seq`, which is Postgres's to give. Answers that `seq`. */
-    fun insert(row: OutboxRow): Long = runBlocking {
-        sql { insert<OutboxRow> { setParams(row).excluding(seq) }.returning { it.seq } }
-            .buildFor.Postgres()
-            .runOn(db)
+    /**
+     * Writes [pet] as it now is and inserts [event], but for its `seq`, in one transaction: both rows are written or
+     * neither is, so no event is recorded for a change the pets table does not hold. Answers the event's `seq`.
+     */
+    fun record(pet: PetRow, event: OutboxRow): Long = runBlocking {
+        db.transaction {
+            sql {
+                insert<PetRow> {
+                    setParams(pet).onConflictUpdate(id) { excluded ->
+                        set(name to excluded.name, species to excluded.species, adopted to excluded.adopted)
+                    }
+                }
+            }
+                .buildFor.Postgres()
+                .runOnTransaction()
+            sql { insert<OutboxRow> { setParams(event).excluding(seq) }.returning { it.seq } }
+                .buildFor.Postgres()
+                .runOnTransaction()
+        }
+    }
+
+    /** Adds each of [pets] not there yet; a pet already there keeps what it has. */
+    fun stock(pets: List<PetRow>): Unit = runBlocking {
+        db.transaction {
+            pets.forEach { pet ->
+                sql { insert<PetRow> { setParams(pet).onConflictIgnore(id) } }
+                    .buildFor.Postgres()
+                    .runOnTransaction()
+            }
+        }
+    }
+
+    /** Every pet as the shop last left it, by id. */
+    fun pets(): List<PetRow> = runBlocking {
+        sql { Table<PetRow>().sortedBy { it.id } }.buildFor.Postgres().runOn(db)
     }
 
     /**

@@ -18,6 +18,7 @@ import io.github.matthewjones372.lark.stream.tick
 import java.util.concurrent.atomic.AtomicLong
 import petshop.domain.Pet
 import petshop.domain.PetId
+import petshop.domain.PetShop
 import petshop.domain.Species
 
 /** The background work every service has one of: new pets keep turning up. */
@@ -32,8 +33,9 @@ private val names = listOf("Pickle", "Waffle", "Sprocket", "Marmalade", "Biscuit
  */
 val arrivals: Module =
     singleOf(
-        { ref: ActorRef<Shop>, config: Settings, streams: StreamBackend ->
-            val next = AtomicLong(opening.size.toLong())
+        { ref: ActorRef<Shop>, shop: PetShop, config: Settings, streams: StreamBackend ->
+            // On from the highest id the shop holds, so a pet that arrives after a restart gets a new one.
+            val next = AtomicLong(shop.all().maxOfOrNull { it.id.value } ?: opening.size.toLong())
             Stream.tick(every = config.arrivalsEvery, element = Unit)
                 .map { _ ->
                     val id = next.incrementAndGet()

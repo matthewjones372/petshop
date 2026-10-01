@@ -70,12 +70,13 @@ The route, the OpenAPI document at `/openapi.json` and the Swagger page at
 four declared failures. A `when` over the sealed error type is exhaustive, and
 returning a failure the endpoint never declared does not compile.
 
-### One writer, no locks
+### One writer
 
 Two people adopting the same tortoise is the race the shop has to lose on
 purpose. An actor handles one message at a time, so the second adopter is told
-the pet is taken rather than both being told yes. There is no lock anywhere in
-this repository.
+the pet is taken rather than both being told yes. The app's own code takes no
+lock: the actor serialises the shop's changes, and the relay's claim locks rows
+in Postgres with `FOR UPDATE SKIP LOCKED`.
 
 ### The background work is a stream
 
@@ -89,7 +90,7 @@ service reads them: a projection that tallies arrivals and adoptions by species
 and serves the result at `/stats`.
 
 ```
-Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only if the row went in
+Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT ─▶ actor changes      both rows, or neither
                               │
    relay: tick ─▶ BEGIN; SELECT … FOR UPDATE SKIP LOCKED
                    ─▶ publish ─▶ DELETE what the bus took; COMMIT     at least once
@@ -98,9 +99,11 @@ Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only 
           (stays, next tick)          dedupe by seq, fold
 ```
 
-- **The outbox is a Postgres table.** The actor writes the event's row first
-  and changes the pet only once the row is in, so the shop never sells a pet it
-  has not recorded selling. If the write throws, the actor carries on as it was
+- **The outbox is a Postgres table, written in one transaction with the
+  catalogue.** The actor writes the pet's new state to `pets` and the event's row
+  to `outbox` together, and changes its own state only once both have committed:
+  the table never records a sale the catalogue does not hold, and the shop never
+  sells a pet it has not recorded selling. If the write throws, the actor carries on as it was
   and answers `NotRecorded`, a 503: the pet is still on the shelf, and the
   registry is never asked. That 503 is the same response as a registry that
   cannot be reached (`Unavailable`, with a message saying which), because
@@ -148,9 +151,12 @@ Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only 
   holding every `seq` seen, because at-least-once means some arrive twice, and
   the `Tally` the rest add up to. `/stats` reports how many duplicates it dropped.
 
-The pets are the actor's, in memory. The table is what makes
-the events durable: a restart forgets the catalogue, but not an event it
-recorded and had yet to publish. The order within one relay is the order the
+The catalogue is the `pets` table. The actor holds it in memory as the one
+writer, reads it back when it starts, and stocks it with the opening catalogue
+only where a pet is not there yet, so a restart opens the shop as it was left,
+and new arrivals are numbered on from the highest id it holds. `RestartSpec`
+adopts a pet, stops the shop, starts it again on the same database, and finds
+her adopted. The order within one relay is the order the
 events were recorded. With more than one relay, each one's batch is in order
 and the batches interleave.
 
@@ -343,7 +349,7 @@ exec(adoptTaken) { step ->
 | Lark, Kafka | **Worth it.** A topic is a stream like the others, and an offset is committed only once its event is handled |
 | Proofload | **Worth it.** The cheapest win: correctness under load in a few lines |
 | kimney | **Worth it** once events have a wire format of their own; a missing field is a compile error |
-| ExoQuery | **Not here, yet.** Real type checking, but for three statements it costs a separate build on an older Kotlin |
+| ExoQuery | **Not here, yet.** Real type checking, but for six statements it costs a separate build on an older Kotlin |
 
 
 ### Pelican
@@ -527,7 +533,7 @@ cannot fill is a compile error rather than a null on the wire.
 
 ### ExoQuery
 
-**Verdict: not here, yet.** The outbox has three statements. Typing them is real,
+**Verdict: not here, yet.** The outbox and the catalogue have six statements between them. Typing them is real,
 but a separate build on Kotlin 2.3.0, a conversion layer and a `free` block for
 the locking clause cost more than the SQL they replace. Worth another look
 when it loads on the project's Kotlin, or with many more queries.
