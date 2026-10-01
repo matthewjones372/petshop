@@ -24,6 +24,7 @@ import io.github.matthewjones372.lark.logSpan
 import io.github.matthewjones372.lark.logWarn
 import io.github.matthewjones372.lark.otel.tracedSpan
 import io.github.matthewjones372.lark.stream.Forks
+import io.github.matthewjones372.lark.stream.PekkoStreams
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.opentelemetry.api.trace.Tracer
 import io.micrometer.core.instrument.Metrics as MicrometerRegistries
@@ -198,6 +199,8 @@ private val events: Module =
     single { -> Forks() }.boundTo<StreamBackend>() +
         // Closed after the relay stops publishing to it, because the relay depends on it.
         singleOf({ system: ActorSystem -> HubBus(system) }, { bus -> bus.close() }).boundTo<EventBus>() +
+        // The in-process bus is a Pekko hub, so its reader runs on Pekko. A bus on Kafka can run on either.
+        single { system: ActorSystem -> ProjectionStreams(PekkoStreams(system)) } +
         outbox +
         projection
 

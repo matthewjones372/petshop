@@ -1,10 +1,13 @@
 package petshop.app
 
 import io.github.matthewjones372.lark.app.Module
+import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
+import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.use
+import io.github.matthewjones372.lark.kafka.Topic
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.PelicanServer
@@ -14,6 +17,8 @@ import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
+import kotlin.time.Duration.Companion.seconds
+import org.apache.kafka.common.serialization.StringDeserializer
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import petshop.api.adoptPet
@@ -23,13 +28,14 @@ import petshop.api.stats
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.NotChipped
+import petshop.domain.PetAdopted
+import petshop.domain.PetReturned
 import petshop.domain.Species
 import petshop.registry.ChipRecord
 import petshop.registry.Problem
 import petshop.registry.lookupChip
 import petshop.registry.noSuchChip
 import petshop.registry.recordKeeper
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * The whole service, end to end, in about as many lines as it takes to say what it should do.
@@ -37,12 +43,14 @@ import kotlin.time.Duration.Companion.seconds
  * Three things make it short, one from each library:
  *
  * - **Lark** starts the graph `main` starts — server, actor, arrivals, outbox, relay, bus, projection —
- *   and swaps exactly two nodes: where the registry is, and which database the outbox is in. `use`
- *   gives everything back when the block returns, so there is no teardown to write.
+ *   and swaps three nodes: where the registry is, which database the outbox is in, and the bus, which is
+ *   Kafka here rather than the in-process hub. `use` gives everything back when the block returns, so
+ *   there is no teardown to write.
  * - **Pelican** stubs the registry in its own endpoints and calls the shop through its own, so there is
  *   no URL, no status code and no JSON in this file. A failure is the value the endpoint declared.
- * - **Testcontainers** gives the outbox a real Postgres schema of its own. The test holds on to it, so
- *   it can look in the table as well as at the API.
+ * - **Testcontainers** gives the outbox a real Postgres schema of its own, and an embedded broker gives
+ *   the bus a real Kafka, with Confluent's in-process `mock://` schema registry. The test holds on to
+ *   both, so it can look in the table and on the topic as well as at the API.
  *
  * It reads as a story (`Story.kt`, a prototype of Lark specs 0115 and 0116): each step's text is what a
  * failure says, and a step's value is what the next one checks.
@@ -51,6 +59,16 @@ import kotlin.time.Duration.Companion.seconds
  * apart, so no new pet lands between reading the table and reading /stats.
  */
 class EndToEndSpec {
+
+    companion object {
+        @JvmField
+        @RegisterExtension
+        val kafka = KafkaBroker()
+
+        private const val TOPIC = "shop-events-e2e"
+        private const val GROUP = "projection-e2e"
+        private val schemas = mapOf<String, Any>("schema.registry.url" to "mock://e2e")
+    }
 
     @JvmField
     @RegisterExtension
@@ -64,6 +82,10 @@ class EndToEndSpec {
     private val theService: Module =
         petshop.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
             .onDatabase(database)
+            .overriding(
+                singleOf<KafkaBus>({ KafkaBus(Topic(TOPIC), kafka.bootstrap, GROUP, schemas) }, { it.close() })
+                    .boundTo<EventBus>(),
+            )
             .overridingConfig("petshop.port = 0\npetshop.arrivalsEvery = 1h\npetshop.outboxEvery = 20ms")
 
     @Test
@@ -100,6 +122,27 @@ class EndToEndSpec {
                     val tally = shop.call(stats, Unit)
                     tally.bySpecies.single { it.species == Species.Tortoise }.adopted shouldBe 1
                     tally.duplicates shouldBe 0
+                }
+
+                val onTheTopic = When("the topic is read as the broker holds it") {
+                    kafka.records(TOPIC, StringDeserializer(), ShopEventDeserializer(schemas))
+                }
+                Then("every event the outbox recorded is on it once, keyed by its seq") {
+                    onTheTopic.map { it.key().toLong() }.sorted() shouldBe (1..database.recorded()).toList()
+                }
+                And("the adoptions read back from the Avro as Nibbles adopted, then Mrs Peel adopted and returned") {
+                    // The actor says yes before the registry says Mrs Peel has no chip, so the undo is an event of its own.
+                    val adoptions = onTheTopic.map { it.value() }.sortedBy { it.seq }.mapNotNull { event ->
+                        when (event) {
+                            is PetAdopted -> "adopted ${event.pet.name}"
+                            is PetReturned -> "returned ${event.pet.name}"
+                            else -> null
+                        }
+                    }
+                    adoptions shouldBe listOf("adopted Nibbles", "adopted Mrs Peel", "returned Mrs Peel")
+                }
+                And("the projection committed every event").eventually(5.seconds) {
+                    kafka.committed(GROUP, TOPIC) shouldBe database.recorded()
                 }
             }
         }.shouldBeRight()

@@ -4,7 +4,8 @@ A small pet shop, built to find out how well a set of Kotlin libraries work
 together on a real service: an HTTP API with an OpenAPI document, an actor that
 owns the state, background work as streams, a transactional outbox in Postgres,
 a dependency graph that starts and stops it all, and tests that run the whole
-thing in-process, under load and as Given/When/Then stories.
+thing in-process, under load and as Given/When/Then stories. The bus between the
+outbox and its consumer can be in-process or Kafka carrying Avro.
 
 The evaluation below is of the libraries and this repository as they are now.
 
@@ -24,9 +25,10 @@ The libraries under evaluation:
 | Library | What it does here |
 |---|---|
 | [Pelican](https://github.com/matthewjones372/pelican) | the shop's HTTP contract as values: routes, the OpenAPI document and Swagger page, handlers that must answer a declared failure; the chip registry's client generated from its contract; typed WireMock stubs, golden files and a typed test client |
-| [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`, its Pekko, Typesafe Config and Gradle wiring-check modules); the background work as `Stream`s on Pekko or Lark's own Forks (`lark-stream`); retries on schedules; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
+| [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`, its Pekko, Typesafe Config and Gradle wiring-check modules); the background work as `Stream`s on Pekko or Lark's own Forks (`lark-stream`); Kafka as a `Stream` that commits what it handled (`lark-kafka`); retries on schedules; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
 | [Proofload](https://github.com/matthewjones372/proofload) | load tests that start the whole service in-process, assert correctness under load, and write an HTML report |
 | [ExoQuery](https://github.com/ExoQuery/ExoQuery) | every statement against the outbox table, written as Kotlin and checked at compile time |
+| [kimney](https://github.com/matthewjones372/kimney) | the mappings between the shop's events and their wire records, derived at compile time |
 
 What they run on, and what the tests use:
 
@@ -40,6 +42,7 @@ What they run on, and what the tests use:
 | Arrow | `Either` and `Raise` for declared failures, from the domain up |
 | OpenTelemetry, Micrometer, Prometheus, Grafana | traces through the graph, metrics at `/metrics`, and the demo's dashboard |
 | Logback | where Lark's log lines and Pekko's end up, through `lark-slf4j` |
+| Apache Kafka, avro4k, Confluent's Avro serializer | the bus on a broker: events as Avro in the schema registry's wire format; tests run an embedded broker and Confluent's in-process `mock://` registry |
 
 ## What it is
 
@@ -48,7 +51,7 @@ What they run on, and what the tests use:
 | `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | Arrow |
 | `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
 | `api` | the endpoints, their failures, the handlers | Pelican, Pekko HTTP |
-| `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus and its consumer, the wiring, `main` | Lark, Pekko |
+| `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus (in process, or Kafka carrying Avro) and its consumer, the wiring, `main` | Lark, Pekko, kimney |
 | `outbox-table` | the outbox's row and its SQL, in an included build on the Kotlin ExoQuery is built for | ExoQuery |
 | `loadtest` | the shop under load, started in-process | Proofload |
 
@@ -155,6 +158,45 @@ Running it needs a Postgres. `demo/docker-compose.yml` starts one with the
 credentials `application.conf` expects, and every test that builds the shop
 starts its own through Testcontainers, with a fresh schema per graph.
 
+### The bus can be Kafka, carrying Avro
+
+`KafkaBus` is the same `EventBus` on a real broker, and the projection does not
+change. Each event goes out as an Avro record in the schema registry's wire
+format, keyed by its `seq`, and comes back through `lark-kafka`'s consumer loop,
+which commits an offset only once the projection has folded that event in.
+
+```
+ShopEvent ──kimney──▶ wire record ──avro4k──▶ GenericRecord ──Confluent──▶ [0][schema id][Avro]
+                                                                              │
+ShopEvent ◀──kimney── wire record ◀──avro4k── GenericRecord ◀──Confluent──────┘
+    │                                        (a record that will not read: dead letters, committed past)
+    └─▶ projection, on whichever backend ProjectionStreams names ─▶ runCommitting()
+```
+
+- **The wire records are their own types.** `petshop.app.wire` holds
+  `@Serializable` classes whose schema avro4k derives, committed as
+  `golden/shop-event.avsc`. The domain's `ShopEvent` knows nothing of Avro, and
+  kimney derives both mappings at compile time: `ShopEvent.toWire()` and
+  `WireEvent.toDomain()` are one `transformInto()` each, and a field either side
+  cannot fill does not compile.
+- **One schema per topic.** The three events are a union inside one
+  `ShopEventRecord`, so the registry holds one subject's versions rather than a
+  record type per case.
+- **Publishing is `lark-kafka`'s `Producer`.** A record it gives up on is a
+  `BusRefused`, and the event stays in the outbox. How long a send may take is
+  the producer's own timeouts, not a `get()` around the send.
+- **Two failures, told apart.** A record that is not the shop's Avro is a
+  `DecodeError`, written to `<topic>.dead-letters` as it was read and committed
+  past. A registry that cannot be asked is a defect, and the run ends for its
+  owner to start again. Confluent throws the same exception for both, so
+  `registryDown` reads what it wraps.
+- **The projection runs on its own backend.** `ProjectionStreams` is a key of
+  its own: Pekko beside the in-process hub, which only Pekko can read, and either
+  backend over Kafka, while the relay runs on Forks.
+
+The service starts on the in-process bus. Kafka is one node swapped, as
+`KafkaBusSpec` and the end-to-end test do; it is not chosen by configuration.
+
 ### The application is a value
 
 ```kotlin
@@ -195,10 +237,11 @@ broke. The console copy is coloured under `FORCE_COLOR` or IntelliJ. The code
 is a prototype in `app/src/test/kotlin/petshop/app/Story.kt`; Lark specs 0115
 and 0116 move it into a `lark-test` module.
 
-The end-to-end test is the whole graph `main` starts, with two nodes swapped:
-where the registry is, and which database the outbox is in. The shop is called
-through its own endpoints, so there is no URL, status code or JSON in the test,
-and the database is a real Postgres the test reads as well as the API:
+The end-to-end test is the whole graph `main` starts, with three nodes swapped:
+where the registry is, which database the outbox is in, and the bus, which is
+Kafka. The shop is called through its own endpoints, so there is no URL, status
+code or JSON in the test, and the test reads the Postgres table and the Kafka
+topic as well as the API:
 
 ```kotlin
 @Test
@@ -217,6 +260,16 @@ fun `somebody adopts a tortoise, and every part of the service hears about it`()
             And("the outbox drains").eventually(5.seconds) { database.unsent() shouldBe 0L }
             And("/stats counts every event the table recorded").eventually(5.seconds) {
                 shop.call(stats, Unit).events.toLong() shouldBe database.recorded()
+            }
+
+            val onTheTopic = When("the topic is read as the broker holds it") {
+                kafka.records(TOPIC, StringDeserializer(), ShopEventDeserializer(schemas))
+            }
+            Then("every event the outbox recorded is on it once, keyed by its seq") {
+                onTheTopic.map { it.key().toLong() }.sorted() shouldBe (1..database.recorded()).toList()
+            }
+            And("the projection committed every event").eventually(5.seconds) {
+                kafka.committed(GROUP, TOPIC) shouldBe database.recorded()
             }
         }
     }.shouldBeRight()
@@ -398,6 +451,35 @@ whether a p99 belongs to the shop or the tool. It was the least work of
 anything here: each test is a few lines on top of the graph and the typed
 client.
 
+### Lark: Kafka
+
+**What it gives.** Kafka is a `Stream` like any other, run on either backend,
+and `runCommitting()` commits an offset only once its record reached the end of
+the stream, so the projection never commits an event it has not folded in. A
+record that will not decode is a `Left` that keeps its offset, so it is routed
+to dead letters rather than ending the consumer, and `deadLetters` writes it as
+it was read, with where it came from in its headers. The producer's failure is
+a value, `PublishFailed`, which the shop turns into the `BusRefused` the relay
+already handles.
+
+**What it costs.** Confluent's serializer is not on Maven Central, so the build
+adds Confluent's repository, limited to `io.confluent`. Confluent 7.8 asks for
+its own `7.8.0-ccs` build of the Kafka 3.8 client, so the build pins Apache's
+`3.8.0`, the one `lark-kafka` is built against, to keep one client on the
+classpath.
+
+**Its limits.** At least once, not exactly once: `lark-kafka` has no
+transactions, so a consumer that dies after folding an event and before
+committing sees it again, which is why the projection dedupes by `seq`.
+
+### kimney
+
+**What it gives.** The domain events and their wire records are separate types,
+and the mapping between them is derived at compile time, so a field one side
+cannot fill is a compile error rather than a null on the wire.
+
+**What it costs.** A compiler plugin, applied in `app`'s build.
+
 ### ExoQuery
 
 **What it gives.** Every statement against the outbox but its `CREATE TABLE`
@@ -427,6 +509,10 @@ thread is one a pool hands on.
 ./gradlew test` sets nothing in the JVM the tests run in. `app/build.gradle.kts`
 hands `FORCE_COLOR`, `NO_COLOR` and `lark.test.colour` on.
 
+**A record keyed by text sorts as text.** The topic's keys are each event's
+`seq` as a string, so a test comparing them sorts them as numbers, or `"10"`
+comes before `"2"`.
+
 **A demo stub must keep the contract too.** The demo's registry stand-in has to
 answer a 404 with the `Problem` body the contract declares, or the shop reports
 the registry as down.
@@ -437,7 +523,8 @@ Pelican `1.0.0-RC3`, Lark `0.7.0` (its Gradle wiring plugin `0.2.0`), Proofload
 `0.1.0-rc4`, ExoQuery `2.0.4.PL`. Pekko `1.2.1`, Pekko HTTP `1.3.0`, Arrow
 `2.1.2`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`, HikariCP `7.1.0`,
 OpenTelemetry SDK `1.51.0`, Micrometer's Prometheus registry `1.12.0`, Logback
-`1.5.20`, Kotest `6.2.4`, JUnit `6.1.3`. Kotlin 2.4.10 (2.3.0 for
-`outbox-table/`), JDK 21.
+`1.5.20`, Kotest `6.2.4`, JUnit `6.1.3`. kimney `0.3.0`, avro4k `2.12.0`,
+Confluent's Avro serializer `7.8.0`, Kafka client `3.8.0`, embedded-kafka
+`3.8.0`. Kotlin 2.4.10 (2.3.0 for `outbox-table/`), JDK 21.
 
-All four libraries under evaluation are early, and say so.
+All five libraries under evaluation are early, and say so.
