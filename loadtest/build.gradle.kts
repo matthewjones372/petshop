@@ -19,3 +19,16 @@ dependencies {
     testImplementation("io.github.matthewjones372:proofload-junit5:$proofloadVersion")
     testImplementation("io.github.matthewjones372:proofload-report-html:$proofloadVersion")
 }
+
+// The load tests run when asked, as `./gradlew loadTest`, and not with every `test` or `build`: each holds the
+// machine busy for ten seconds and measures it, so they belong to a quiet machine rather than to every build.
+tasks.test { enabled = false }
+
+val loadTest by tasks.registering(Test::class) {
+    description = "Runs the load tests against the whole service, started in-process."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    // A measurement, not a build output: a cached pass says nothing about this machine now.
+    outputs.upToDateWhen { false }
+}

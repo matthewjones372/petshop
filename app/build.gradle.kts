@@ -72,8 +72,8 @@ dependencies {
     // The relay on time the test owns: an interval of ticks is one clock.adjust, and nothing sleeps.
     testImplementation("io.github.matthewjones372:lark-stream-test:$larkVersion")
 
-    // A Kafka broker in the test JVM, so the suite needs no Docker for it.
-    testImplementation("io.github.embeddedkafka:embedded-kafka_2.13:3.8.0")
+    // A Kafka broker in a container, started once for the whole run, as the Postgres is.
+    testImplementation("org.testcontainers:testcontainers-kafka:2.0.5")
 
     // A real HTTP server playing the registry, stubbed in the registry's own endpoints.
     testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC3")
