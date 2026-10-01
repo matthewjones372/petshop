@@ -12,8 +12,8 @@ The evaluation below is of the libraries and this repository as they are now.
 ```bash
 docker compose -f demo/docker-compose.yml up -d postgres registry
 ./gradlew :app:run          # http://127.0.0.1:8080, docs at /api-docs
-./gradlew :app:test         # every test that builds the shop starts its own Postgres
-./gradlew :loadtest:test    # 200 requests a second at the real graph
+./gradlew test             # every test that builds the shop starts its own Postgres and Kafka
+./gradlew loadTest         # 200 requests a second at the real graph; not part of test or build
 ```
 
 `demo/` adds Prometheus and Grafana watching the running shop; see `demo/README.md`.
@@ -441,13 +441,17 @@ Three load tests, each a scenario and an assertion and an HTML report, against
 the whole service started in-process:
 
 - browsing at two hundred a second, after two seconds of warm-up that are not
-  recorded;
+  recorded, with the shop's own service time held under 100 ms at p99;
 - the rush on a pet already gone, a correctness claim;
 - two instances on one outbox table, whose two relays must publish every event
   exactly once between them.
 
 The report says whether the generator kept its own schedule, which decides
-whether a p99 belongs to the shop or the tool. It was the least work of
+whether a p99 belongs to the shop or the tool, and the test asserts the shop's
+service time for that reason: on a busy laptop the generator fell 126 ms
+behind at p99, and the response time it measured was twice the budget while the
+shop's own was within it. They run as `./gradlew loadTest`, apart from `test`
+and `build`, because a measurement belongs on a quiet machine. It was the least work of
 anything here: each test is a few lines on top of the graph and the typed
 client.
 
