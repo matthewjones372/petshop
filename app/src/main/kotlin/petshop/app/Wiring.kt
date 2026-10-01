@@ -1,44 +1,50 @@
 package petshop.app
 
 import arrow.core.Either
+import arrow.core.Option
 import arrow.core.flatMap
+import arrow.core.getOrElse
 import arrow.core.raise.either
+import io.github.matthewjones372.lark.actor.ActorRef
+import io.github.matthewjones372.lark.actor.Reply
+import io.github.matthewjones372.lark.actor.ask
 import io.github.matthewjones372.lark.app.AppScope
 import io.github.matthewjones372.lark.app.Health
 import io.github.matthewjones372.lark.app.HealthRegistry
 import io.github.matthewjones372.lark.app.LarkApp
 import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.probe
-import arrow.core.Option
+import io.github.matthewjones372.lark.app.actor.actor
+import io.github.matthewjones372.lark.app.actor.actors
 import io.github.matthewjones372.lark.app.boundTo
-import io.github.matthewjones372.lark.app.pekko.ask
+import io.github.matthewjones372.lark.app.probe
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.app.typesafe.config
+import io.github.matthewjones372.lark.app.typesafe.loadedConfig
 import io.github.matthewjones372.lark.counter
 import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.logAnnotated
-import io.github.matthewjones372.lark.metricTagged
-import io.github.matthewjones372.lark.timed
 import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.logSpan
 import io.github.matthewjones372.lark.logWarn
+import io.github.matthewjones372.lark.metricTagged
 import io.github.matthewjones372.lark.otel.tracedSpan
 import io.github.matthewjones372.lark.stream.Forks
-import io.github.matthewjones372.lark.stream.PekkoStreams
 import io.github.matthewjones372.lark.stream.StreamBackend
-import io.opentelemetry.api.trace.Tracer
+import io.github.matthewjones372.lark.timed
+import io.github.matthewjones372.pelican.openapi.docs
+import io.github.matthewjones372.pelican.pekko.PelicanServer
+import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.micrometer.core.instrument.Metrics as MicrometerRegistries
 import io.micrometer.prometheus.PrometheusConfig
 import io.micrometer.prometheus.PrometheusMeterRegistry
+import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.sdk.OpenTelemetrySdk
-import io.github.matthewjones372.lark.app.pekko.actor
-import io.github.matthewjones372.lark.app.typesafe.config
-import io.github.matthewjones372.lark.app.typesafe.loadedConfig
-import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
-import io.github.matthewjones372.pelican.openapi.docs
-import io.github.matthewjones372.pelican.pekko.PelicanServer
+import kotlin.reflect.typeOf
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.ActorSystem as TypedSystem
 import org.apache.pekko.actor.typed.javadsl.Adapter
 import petshop.api.Healthy
 import petshop.api.petshopApi
@@ -54,12 +60,8 @@ import petshop.domain.PetShop
 import petshop.domain.PetShopError
 import petshop.domain.RegistryDown
 import petshop.domain.RegistryError
-import petshop.domain.Unreachable
 import petshop.domain.Species
-import kotlin.reflect.typeOf
-import kotlin.time.Duration
-import org.apache.pekko.actor.typed.ActorSystem as TypedSystem
-import kotlin.time.Duration.Companion.seconds
+import petshop.domain.Unreachable
 
 /** [host] is the interface the port is bound on: loopback unless something outside this machine has to reach it. */
 data class Settings(val host: String, val port: Int, val arrivalsEvery: Duration, val outboxEvery: Duration)
@@ -74,16 +76,14 @@ val opening: List<Pet> = listOf(
 /** Reads and writes go to the actor, so there is one writer and no lock anywhere in this file. */
 class ActorPetShop(
     private val ref: ActorRef<Shop>,
-    private val system: ActorSystem,
     private val tracer: Tracer,
     private val registry: ChipRegistry,
 ) : PetShop {
 
-    override fun all(): List<Pet> = ref.ask(system, asking) { replyTo -> Everything(replyTo) }
+    override fun all(): List<Pet> = ref.asked { reply -> Everything(reply) }
 
     override fun find(id: PetId): Pet? =
-        ref.ask(system, asking) { replyTo: ActorRef<Option<Pet>> -> Find(id, replyTo) }
-            .fold({ null }, { pet -> pet })
+        ref.asked { reply: Reply<Option<Pet>> -> Find(id, reply) }.fold({ null }, { pet -> pet })
 
     /**
      * A span whose trace id is on every line written inside it, including the ones a fork writes:
@@ -136,7 +136,7 @@ class ActorPetShop(
      * hand over a pet nobody could trace, and it does not keep one it has already refused to sell.
      */
     private fun handOver(id: PetId, by: String): Either<PetShopError, Pet> = either {
-        val pet = ref.ask(system, asking) { replyTo -> Adopt(id, by, replyTo) }.bind()
+        val pet = ref.asked { reply -> Adopt(id, by, reply) }.bind()
         registry.lookup(id)
             .flatMap { chip -> registry.transfer(chip, to = by) }
             .onLeft { failure ->
@@ -154,7 +154,12 @@ private fun RegistryError.refusing(id: PetId): PetShopError = when (this) {
     is Unreachable -> RegistryDown(id.value)
 }
 
-private val asking = 3.seconds
+/**
+ * The actor's answer, or a throw when it gave none: an actor that stopped or did not answer in time is a
+ * fault in the shop, which the endpoint answers as a 500, not a refusal it declared.
+ */
+private fun <A : Any> ActorRef<Shop>.asked(message: (Reply<A>) -> Shop): A =
+    ask(within = 3.seconds, message).getOrElse { failure -> error("the shop did not answer: $failure") }
 
 /** The shape of a refusal as a tag: few values, known before the code runs, which is what a tag is. */
 private fun PetShopError.outcome(): String = when (this) {
@@ -183,24 +188,30 @@ private val telemetry: Module =
         // force naming the dependency as one too.
         single { sdk: OpenTelemetrySdk -> sdk.getTracer("petshop") }.boundTo<Tracer>()
 
-private val theShop: Module =
+/**
+ * Pekko, for HTTP and nothing else: Pelican's server binds the port on it, and the chip registry's
+ * client sends through Pekko HTTP. The shop's actor and every stream run on Lark.
+ */
+private val http: Module =
     singleOf<ActorSystem>({ ActorSystem.create("petshop") }, { system -> system.terminate() }) +
-        // The typed view of the same system. Two types, two keys, and the one that spawns actors is
-        // not the one Pelican binds a port with.
-        single { classic: ActorSystem -> Adapter.toTyped(classic) }.boundTo<TypedSystem<Void>>() +
+        // The typed view of the same system, which is the one Pelican binds a port with.
+        single { classic: ActorSystem -> Adapter.toTyped(classic) }.boundTo<TypedSystem<Void>>()
+
+private val theShop: Module =
+    // The actors' flock, held open for the graph's life; the shop is an actor in it.
+    actors() +
         actor<Shop, Outbox>("shop") { outbox -> shop(outbox, opening.associateBy { it.id }) } +
         singleOf(::ActorPetShop).boundTo<PetShop>()
             .probe("shop", timeout = 3.seconds) { shop: PetShop -> shop.all().isNotEmpty() }
 
 private val events: Module =
-    // What the relay runs on. The relay describes its stream and names no backend; this is the one
-    // place that decides, and a test that wants the relay on its own clock overrides it. Forks runs it
-    // as one loop on a virtual thread, so the claim blocks on Postgres where it is and a stop interrupts it.
+    // What the streams run on: the relay, the arrivals and the projection. Each describes its stream and
+    // names no backend; this is the one place that decides, and a test that wants the relay on its own
+    // clock overrides it. Forks runs a stream as one loop on a virtual thread, so the relay's claim blocks
+    // on Postgres where it is and a stop interrupts it.
     single { -> Forks() }.boundTo<StreamBackend>() +
         // Closed after the relay stops publishing to it, because the relay depends on it.
-        singleOf({ system: ActorSystem -> HubBus(system) }, { bus -> bus.close() }).boundTo<EventBus>() +
-        // The in-process bus is a Pekko hub, so its reader runs on Pekko. A bus on Kafka can run on either.
-        single { system: ActorSystem -> ProjectionStreams(PekkoStreams(system)) } +
+        singleOf({ -> HubBus() }, { bus -> bus.close() }).boundTo<EventBus>() +
         outbox +
         projection
 
@@ -223,7 +234,7 @@ private fun asked(health: HealthRegistry): Healthy = when (val readiness = healt
     is Health.Down -> Healthy(ready = false, failing = readiness.failing)
 }
 
-val petshop: Module = settings + telemetry + database + registry + theShop + arrivals + events + web
+val petshop: Module = settings + telemetry + database + http + registry + theShop + arrivals + events + web
 
 /**
  * The application as a value, so `main` is the leaving and the build can read the root it starts

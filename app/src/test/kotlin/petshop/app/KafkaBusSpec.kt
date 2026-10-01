@@ -25,8 +25,6 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 import petshop.api.Tally
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
@@ -63,21 +61,17 @@ class KafkaBusSpec {
     private fun bus(name: String, deadLetters: ((DecodeError) -> Unit)? = null) =
         KafkaBus(Topic(name), kafka.bootstrap, group = "projection-$name", registry(name), deadLetters)
 
-    /** The whole service with its bus on Kafka, and its projection on [backend]. No port, no arrivals. */
-    private fun shopOnKafka(name: String, backend: String): Module {
+    /** The whole service with its bus on Kafka. No port, no arrivals. */
+    private fun shopOnKafka(name: String): Module {
         val kafkaBus = singleOf<KafkaBus>({ bus(name) }, { bus -> bus.close() }).boundTo<EventBus>()
         val graph = petshop.overriding(single<petshop.domain.ChipRegistry> { FakeRegistry() }).overriding(kafkaBus)
             .onAFreshDatabase()
-        val streams = if (backend == "Forks") graph.overriding(single { -> ProjectionStreams(Forks()) }) else graph
-        return (streams + onKafka).subgraph<OnKafka>().overridingConfig("petshop.outboxEvery = 50ms")
+        return (graph + onKafka).subgraph<OnKafka>().overridingConfig("petshop.outboxEvery = 50ms")
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = ["Forks", "Pekko"])
-    fun `an adoption reaches the projection through Kafka, on either backend`(backend: String) = story {
-        val shop = Given("the whole service with its bus on Kafka, and its projection on $backend") {
-            shopOnKafka("adoptions-$backend", backend)
-        }
+    @Test
+    fun `an adoption reaches the projection through Kafka`() = story {
+        val shop = Given("the whole service with its bus on Kafka") { shopOnKafka("adoptions") }
         testApp(shop) { app: OnKafka ->
             When("Ada adopts Nibbles") { app.shop.adopt(PetId(1), by = "Ada") }
             val tally = Then("the projection counts a tortoise adopted").eventually(30.seconds) {
@@ -85,7 +79,7 @@ class KafkaBusSpec {
             }
             And("it counted one event") { tally.events shouldBe 1 }
             And("its consumer committed what it folded in").eventually(30.seconds) {
-                kafka.committed("projection-adoptions-$backend", "adoptions-$backend") shouldBe 1L
+                kafka.committed("projection-adoptions", "adoptions") shouldBe 1L
             }
         }
     }
