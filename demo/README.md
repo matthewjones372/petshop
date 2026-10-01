@@ -37,6 +37,23 @@ docker compose start registry
 
 Arrivals happen on their own, every `petshop.arrivalsEvery`.
 
+## On Kafka
+
+Compose also runs a Kafka broker on 9092 and a schema registry on 8081. The
+shop uses them when it is started with `BUS=kafka`:
+
+```bash
+BUS=kafka HOST=0.0.0.0 ./gradlew :app:run
+```
+
+Every event the relay publishes is then an Avro record on `petshop.events`, and
+the projection behind `/stats` reads it back from there. Its schema is in the
+registry under `petshop.events-value`:
+
+```bash
+curl localhost:8081/subjects/petshop.events-value/versions/latest
+```
+
 ## What is where
 
 | | |
