@@ -82,3 +82,10 @@ dependencies {
     // The shop's own typed client, for the end-to-end test: it calls the service by endpoint, not URL.
     testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC3")
 }
+
+// The story prototype's colour (Story.kt). A test worker does not see the shell's FORCE_COLOR or NO_COLOR,
+// so they are handed on, as is -Plark.test.colour=always|never.
+tasks.test {
+    listOf("FORCE_COLOR", "NO_COLOR").forEach { name -> providers.environmentVariable(name).orNull?.let { environment(name, it) } }
+    providers.gradleProperty("lark.test.colour").orNull?.let { systemProperty("lark.test.colour", it) }
+}
