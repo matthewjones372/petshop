@@ -539,19 +539,6 @@ on 2.3.0, and `app` converts events to rows and back.
 
 ## Sharp edges
 
-**Three type systems can agree on something that fails.** Kotlin, Pelican and
-the actor protocol can all accept an actor answering "no such pet" with `null`,
-when the actor runtime underneath refuses a null message, as Pekko's does, at
-run time. Running it is what finds that, and a declared failure is only as good
-as everything beneath it. *Handled:* the shop's actor is a `lark-actor`
-behaviour, whose replies cannot be null.
-
-**An annotation that crosses a fork can still be lost at the backend.**
-Flattening the pairs onto the message reads correctly to a person, while
-`%X{pet_id}`, a JSON encoder and every field search see nothing. `lark-slf4j`
-puts them in the MDC for the call and restores the map after it, because the
-thread is one a pool hands on. *Handled:* by `lark-slf4j`.
-
 **A test worker does not see the shell's environment.** `FORCE_COLOR=1
 ./gradlew test` sets nothing in the JVM the tests run in. `app/build.gradle.kts`
 hands `FORCE_COLOR`, `NO_COLOR` and `lark.test.colour` on. *Spec:* Lark 0118
