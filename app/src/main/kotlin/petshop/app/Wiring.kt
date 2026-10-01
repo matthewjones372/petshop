@@ -5,6 +5,8 @@ import arrow.core.Option
 import arrow.core.flatMap
 import arrow.core.getOrElse
 import arrow.core.raise.either
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 import io.github.matthewjones372.lark.actor.ActorRef
 import io.github.matthewjones372.lark.actor.Reply
 import io.github.matthewjones372.lark.actor.ask
@@ -210,8 +212,6 @@ private val events: Module =
     // clock overrides it. Forks runs a stream as one loop on a virtual thread, so the relay's claim blocks
     // on Postgres where it is and a stop interrupts it.
     single { -> Forks() }.boundTo<StreamBackend>() +
-        // Closed after the relay stops publishing to it, because the relay depends on it.
-        singleOf({ -> HubBus() }, { bus -> bus.close() }).boundTo<EventBus>() +
         outbox +
         projection
 
@@ -234,7 +234,11 @@ private fun asked(health: HealthRegistry): Healthy = when (val readiness = healt
     is Health.Down -> Healthy(ready = false, failing = readiness.failing)
 }
 
-val petshop: Module = settings + telemetry + database + http + registry + theShop + arrivals + events + web
+/** The whole service, its bus chosen by [conf]'s `petshop.bus`. */
+fun petshopFrom(conf: Config): Module =
+    settings + telemetry + database + http + registry + theShop + arrivals + events + bus(conf) + web
+
+val petshop: Module = petshopFrom(ConfigFactory.load())
 
 /**
  * The application as a value, so `main` is the leaving and the build can read the root it starts

@@ -191,8 +191,12 @@ ShopEvent ◀──kimney── wire record ◀──avro4k── GenericRecord 
   owner to start again. Confluent throws the same exception for both, so
   `registryDown` reads what it wraps.
 
-The service starts on the in-process bus. Kafka is one node swapped, as
-`KafkaBusSpec` and the end-to-end test do; it is not chosen by configuration.
+`petshop.bus.kind` picks the bus, `BUS` in the environment: `in-process` by
+default, or `kafka`, which reads `petshop.bus.kafka`'s broker, topic, group and
+registry. The choice is made where the graph is assembled, with lark-app's
+`Config.choosing`, so the branch not taken has no node: a shop on the
+in-process bus opens no producer, and a shop on Kafka starts no hub. A `kind`
+that is neither refuses the start, naming where it was set.
 
 **What a bus promises is a test of its own.** `EventBusContract` holds what any
 `EventBus` must do: an event published before anyone reads reaches the first
