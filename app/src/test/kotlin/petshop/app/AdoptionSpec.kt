@@ -9,7 +9,6 @@ import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.parMap
 import io.kotest.assertions.arrow.core.shouldBeLeft
-import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
@@ -37,33 +36,36 @@ class AdoptionSpec {
     private val settled: Module = shopWith(FakeRegistry())
 
     @Test
-    fun `twenty people adopt one tortoise and one of them gets it`() {
-        val outcomes = testApp(settled) { shop: PetShop ->
-            parMap((1..20).toList()) { who -> shop.adopt(PetId(1), by = "adopter $who") }
+    fun `twenty people adopt one tortoise and one of them gets it`() = story {
+        val outcomes = When("twenty people ask for Nibbles at once") {
+            testApp(settled) { shop: PetShop ->
+                parMap((1..20).toList()) { who -> shop.adopt(PetId(1), by = "adopter $who") }
+            }
         }
-
-        withClue("an actor handles one message at a time, so the race has exactly one winner") {
+        Then("exactly one gets her, because an actor handles one message at a time") {
             outcomes.count { it.isRight() } shouldBe 1
         }
-        outcomes.count { it.leftOrNull() == AlreadyAdopted(1) } shouldBe 19
+        And("the other nineteen are told she is taken") {
+            outcomes.count { it.leftOrNull() == AlreadyAdopted(1) } shouldBe 19
+        }
     }
 
     @Test
-    fun `a keeper the registry will not record puts the pet back on the shelf`() {
-        val refused = shopWith(FakeRegistry(refusing = Unreachable("down for maintenance")))
-
-        val (first, after) = testApp(refused) { shop: PetShop ->
-            shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1))
+    fun `a keeper the registry will not record puts the pet back on the shelf`() = story {
+        val refused = Given("a registry that will not record a new keeper") {
+            shopWith(FakeRegistry(refusing = Unreachable("down for maintenance")))
         }
-
-        first shouldBeLeft RegistryDown(1)
-        withClue("the actor said yes before the registry said no, and the no has to undo it") {
+        val (first, after) = When("Ada adopts Nibbles") {
+            testApp(refused) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1)) }
+        }
+        Then("she is told the registry is down") { first shouldBeLeft RegistryDown(1) }
+        And("Nibbles is back on the shelf: the actor said yes before the registry said no, and the no undid it") {
             after?.adopted shouldBe false
         }
     }
 
     @Test
-    fun `an adoption the outbox could not record is refused, and the pet stays on the shelf`() {
+    fun `an adoption the outbox could not record is refused, and the pet stays on the shelf`() = story {
         val asked = AtomicInteger()
         val counting = object : ChipRegistry by FakeRegistry() {
             override fun lookup(id: PetId) = FakeRegistry().lookup(id).also { asked.incrementAndGet() }
@@ -74,26 +76,25 @@ class AdoptionSpec {
 
             override fun claim(limit: Int, publish: (List<ShopEvent>) -> List<ShopEvent>) = emptyList<ShopEvent>()
         }
-        val unrecorded = petshop.overriding(single<ChipRegistry> { counting })
-            .overriding(single<Outbox> { down })
-            .subgraph<PetShop>()
-
-        val (answer, after) = testApp(unrecorded) { shop: PetShop ->
-            shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1))
+        val unrecorded = Given("an outbox that cannot write, and a registry that counts what it is asked") {
+            petshop.overriding(single<ChipRegistry> { counting })
+                .overriding(single<Outbox> { down })
+                .subgraph<PetShop>()
         }
-
-        answer shouldBeLeft NotRecorded(1)
-        withClue("a sale nobody could write down did not happen, so nobody else was told of it") {
+        val (answer, after) = When("Ada adopts Nibbles") {
+            testApp(unrecorded) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1)) }
+        }
+        Then("she is told it was not recorded") { answer shouldBeLeft NotRecorded(1) }
+        And("a sale nobody could write down did not happen: Nibbles is on the shelf, and the registry was not asked") {
             after?.adopted shouldBe false
             asked.get() shouldBe 0
         }
     }
 
     @Test
-    fun `the subgraph binds no port and serves no documents`() {
-        val drawn = settled.render()
-
-        withClue("what a test of the shop needs is the shop") {
+    fun `the subgraph binds no port and serves no documents`() = story {
+        val drawn = When("the shop's subgraph is drawn") { settled.render() }
+        Then("it holds no server, no arrivals and no registry settings: what a test of the shop needs is the shop") {
             drawn.contains("PelicanServer") shouldBe false
             drawn.contains("Arrivals") shouldBe false
             drawn.contains("RegistrySettings") shouldBe false
@@ -105,33 +106,33 @@ class AdoptionSpec {
 class SettingsSpec {
 
     @Test
-    fun `a test changes one setting and the file keeps the rest`() {
-        val faster = petshop.subgraph<Settings>().overridingConfig("petshop.arrivalsEvery = 1s")
+    fun `a test changes one setting and the file keeps the rest`() = story {
+        val faster = Given("the settings with arrivals every second") {
+            petshop.subgraph<Settings>().overridingConfig("petshop.arrivalsEvery = 1s")
+        }
+        val read = When("they are read") { testApp(faster) { settings: Settings -> settings } }
+        Then("arrivals are every second") { read.arrivalsEvery shouldBe 1.seconds }
+        And("the port, never restated, came from application.conf") { read.port shouldBe 8080 }
+    }
 
-        val read = testApp(faster) { settings: Settings -> settings }
-
-        read.arrivalsEvery shouldBe 1.seconds
-        withClue("the port was never restated, and came from application.conf") {
+    @Test
+    fun `the settings come from the file rather than a default`() = story {
+        val read = When("the settings are read with nothing overridden") {
+            testApp(petshop.subgraph<Settings>()) { settings: Settings -> settings }
+        }
+        Then("they are application.conf's") {
+            read.host shouldBe "127.0.0.1"
             read.port shouldBe 8080
+            read.arrivalsEvery shouldBe 5.seconds
         }
     }
 
     @Test
-    fun `the settings come from the file rather than a default`() {
-        val read = testApp(petshop.subgraph<Settings>()) { settings: Settings -> settings }
-
-        read.host shouldBe "127.0.0.1"
-        read.port shouldBe 8080
-        read.arrivalsEvery shouldBe 5.seconds
-    }
-
-    @Test
-    fun `every node that takes the settings uses them`() {
-        val drawn = petshop.render()
-
-        withClue("a dependency nothing reads is an edge that lies, and the diagram repeats it") {
+    fun `every node that takes the settings uses them`() = story {
+        val drawn = When("the whole graph is drawn") { petshop.render() }
+        Then("the shop's actor does not take the settings: a dependency nothing reads is an edge that lies") {
             drawn.contains("Settings --> ActorRef_Shop_") shouldBe false
         }
-        drawn shouldContain "Settings --> Arrivals"
+        And("the arrivals do") { drawn shouldContain "Settings --> Arrivals" }
     }
 }
