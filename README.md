@@ -192,6 +192,36 @@ and what the shop has promised its callers is a set of golden files:
 `golden.operations(api.spec())` fails on a change that would break somebody
 already calling, and rewrites the file on one that would not.
 
+End to end is the whole graph `main` starts, with two nodes swapped: where the
+registry is, and which database the outbox is in. The shop is called through
+its own endpoints, so there is no URL, status code or JSON in the test, and
+the database is a real Postgres the test can read as well as the API
+(`EndToEndSpec`, about three seconds):
+
+```kotlin
+val database = TestPostgres.fresh()   // a schema of its own, in a Testcontainers Postgres
+val patiently = Schedule.spaced<Throwable>(20.milliseconds) zipLeft Schedule.recurs(250)
+
+petshop.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
+    .onDatabase(database)
+    .overridingConfig("petshop.port = 0")
+    .use { server: PelicanServer ->
+        apiClient(server.baseUrl, JacksonCodecs).use { shop ->
+            shop.outcome(adoptPet, 1L).shouldBeOk().adopted shouldBe true
+            shop.outcome(adoptPet, 1L).shouldBeError() shouldBe AlreadyAdopted(1)
+            shop.outcome(adoptPet, 3L).shouldBeError() shouldBe NotChipped(3)
+
+            // the adoption went into the table, out through the relay, and /stats counted it once.
+            // Lark's own retry, so no runBlocking: `use` is not suspend, and neither is this.
+            patiently.retry { database.unsent() shouldBe 0L }
+            shop.call(stats, Unit).events.toLong() shouldBe database.recorded()
+        }
+    }
+```
+
+`use` gives the port, the actor system and the pool back when the block
+returns, so there is no teardown to write.
+
 and what the load test asks:
 
 ```kotlin
@@ -345,6 +375,16 @@ spec and a change in `0.5.0`:
   declared failure in the type. Starting again loses nothing here: whatever was
   not marked sent is still in the outbox.
 
+**The relay runs on Forks since `0.6.0`.** Until then Forks refused `tick`,
+`mapPar` and `restartOnDefect`, which is everything the relay is made of, so it
+ran on Pekko and the claim was handed to a virtual thread to keep it off a
+dispatcher. `0.6.0` runs all three on lark's own threads, and the change here is
+the one binding in `Wiring.kt` that decides the backend: the description did not
+move, and `RelaySpec` and `EventsSpec` pass unchanged. Forks' `stop` interrupts
+the loop, so stopping the relay should cut a claim blocked on Postgres short and
+roll it back rather than wait for it; no spec here holds that yet. The arrivals
+feed and the projection stay on Pekko, because the bus they read is a Pekko hub.
+
 ### The wiring check: cheap, and it found nothing here
 
 `lark-app-gradle` checks every graph in the project as it compiles and draws
@@ -475,7 +515,7 @@ the edge does with it, and the edge is the part a service writes itself.
 
 ## Versions
 
-Pelican `1.0.0-RC1`, Lark `0.5.0`, Proofload `0.1.0-rc4`, ExoQuery `2.0.4.PL`, Kotlin 2.4.10
+Pelican `1.0.0-RC1`, Lark `0.6.0`, Proofload `0.1.0-rc4`, ExoQuery `2.0.4.PL`, Kotlin 2.4.10
 (2.3.0 for `outbox-table/`), JDK 21.
 
 `singleOf`, `boundTo`, `ask`, `config<T>`, the wiring check and the compiler

@@ -23,7 +23,7 @@ import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.logSpan
 import io.github.matthewjones372.lark.logWarn
 import io.github.matthewjones372.lark.otel.tracedSpan
-import io.github.matthewjones372.lark.stream.PekkoStreams
+import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.opentelemetry.api.trace.Tracer
 import io.micrometer.core.instrument.Metrics as MicrometerRegistries
@@ -193,8 +193,9 @@ private val theShop: Module =
 
 private val events: Module =
     // What the relay runs on. The relay describes its stream and names no backend; this is the one
-    // place that decides, and a test that wants the relay on its own clock overrides it.
-    single { system: ActorSystem -> PekkoStreams(system) }.boundTo<StreamBackend>() +
+    // place that decides, and a test that wants the relay on its own clock overrides it. Forks runs it
+    // as one loop on a virtual thread, so the claim blocks on Postgres where it is and a stop interrupts it.
+    single { -> Forks() }.boundTo<StreamBackend>() +
         // Closed after the relay stops publishing to it, because the relay depends on it.
         singleOf({ system: ActorSystem -> HubBus(system) }, { bus -> bus.close() }).boundTo<EventBus>() +
         outbox +
