@@ -1,5 +1,6 @@
 package petshop.app
 
+import io.github.matthewjones372.lark.actor.ActorRef
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.counter
@@ -9,21 +10,18 @@ import io.github.matthewjones372.lark.logAnnotated
 import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.stream.Running
 import io.github.matthewjones372.lark.stream.Stream
+import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.lark.stream.map
-import io.github.matthewjones372.lark.stream.runWith
+import io.github.matthewjones372.lark.stream.runFold
 import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.stream.tick
-import org.apache.pekko.Done
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.typed.ActorRef
-import org.apache.pekko.stream.javadsl.Sink
+import java.util.concurrent.atomic.AtomicLong
 import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.Species
-import java.util.concurrent.atomic.AtomicLong
 
 /** The background work every service has one of: new pets keep turning up. */
-class Arrivals internal constructor(val running: Running<Nothing, Done>)
+class Arrivals internal constructor(val running: Running<Nothing, Long>)
 
 private val names = listOf("Pickle", "Waffle", "Sprocket", "Marmalade", "Biscuit", "Clementine")
 
@@ -34,28 +32,27 @@ private val names = listOf("Pickle", "Waffle", "Sprocket", "Marmalade", "Biscuit
  */
 val arrivals: Module =
     singleOf(
-        { ref: ActorRef<Shop>, config: Settings, system: ActorSystem ->
+        { ref: ActorRef<Shop>, config: Settings, streams: StreamBackend ->
             val next = AtomicLong(opening.size.toLong())
             Stream.tick(every = config.arrivalsEvery, element = Unit)
                 .map { _ ->
                     val id = next.incrementAndGet()
                     Pet(PetId(id), names[(id % names.size).toInt()], Species.entries[(id % 4).toInt()])
                 }
-                .runWith(
-                    Sink.foreach { pet ->
-                        // Written on a Pekko thread, not a request's: the pair is on the line because
-                        // it is bound here, which is the only way this one could carry it.
-                        logAnnotated("pet_id" to pet.id.value.toString()) {
-                            logInfo("${pet.name} the ${pet.species} arrived")
-                        }
-                        counter("petshop.arrivals").increment()
-                        // The shop's size as a number rather than a rate: the id is the count, since
-                        // every pet that has ever arrived got the next one.
-                        gauge("petshop.pets.in.shop").set(pet.id.value.toDouble())
-                        ref.tell(Arrived(pet))
-                    },
-                )
-                .start(system)
+                .runFold(0L) { arrived, pet ->
+                    // Written on the stream's thread, not a request's: the pair is on the line because
+                    // it is bound here, which is the only way this one could carry it.
+                    logAnnotated("pet_id" to pet.id.value.toString()) {
+                        logInfo("${pet.name} the ${pet.species} arrived")
+                    }
+                    counter("petshop.arrivals").increment()
+                    // The shop's size as a number rather than a rate: the id is the count, since every
+                    // pet that has ever arrived got the next one.
+                    gauge("petshop.pets.in.shop").set(pet.id.value.toDouble())
+                    ref.tell(Arrived(pet))
+                    arrived + 1
+                }
+                .start(streams)
                 .let(::Arrivals)
         },
         { arrivals -> arrivals.running.close() },

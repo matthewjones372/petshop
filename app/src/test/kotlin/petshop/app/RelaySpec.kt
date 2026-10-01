@@ -67,6 +67,8 @@ private class Taking(private val refuses: (ShopEvent) -> Boolean = { false }) : 
         }
 
     override fun consume(each: (ShopEvent) -> Unit): Run<Nothing, Long> = error("nothing reads the bus in these tests")
+
+    override fun close() = Unit
 }
 
 private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
