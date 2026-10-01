@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.measureTime
 
-/** What the story prototype promises: Lark specs 0101 and 0102's "done when", checked here first. */
+/** What the story prototype promises: Lark specs 0115 and 0116's "done when", checked here first. */
 class StorySpec {
 
     @Test

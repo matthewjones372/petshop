@@ -44,7 +44,7 @@ import kotlin.time.Duration.Companion.seconds
  * - **Testcontainers** gives the outbox a real Postgres schema of its own. The test holds on to it, so
  *   it can look in the table as well as at the API.
  *
- * It reads as a story (`Story.kt`, a prototype of Lark specs 0101 and 0102): each step's text is what a
+ * It reads as a story (`Story.kt`, a prototype of Lark specs 0115 and 0116): each step's text is what a
  * failure says, and a step's value is what the next one checks.
  *
  * The port is 0, so the test never fights the demo, or anything else, for 8080. Arrivals are an hour

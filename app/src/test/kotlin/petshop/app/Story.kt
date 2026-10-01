@@ -8,7 +8,7 @@ import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.toKotlinDuration
 
 /*
- * A prototype of Lark specs 0101 (a test that reads as a story) and 0102 (a story in colour), here so the
+ * A prototype of Lark specs 0115 (a test that reads as a story) and 0116 (a story in colour), here so the
  * output can be seen and argued with before the specs are settled. It moves to lark-test when they are.
  */
 
