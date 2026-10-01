@@ -26,7 +26,15 @@ import petshop.domain.PetShop
  */
 class LoggingSpec {
 
-    private val appender = ListAppender<ILoggingEvent>()
+    // Logback reads an event's MDC when something first asks for it, and the pairs are gone from the MDC
+    // once the call that logged has returned. A list read after the fact has to take it while appending,
+    // as any appender that holds events does.
+    private val appender = object : ListAppender<ILoggingEvent>() {
+        override fun append(event: ILoggingEvent) {
+            event.prepareForDeferredProcessing()
+            super.append(event)
+        }
+    }
 
     private val backend = (LoggerFactory.getILoggerFactory() as LoggerContext).getLogger("lark")
 
