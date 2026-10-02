@@ -24,6 +24,7 @@ import petshop.api.adoptPet
 import petshop.api.getPet
 import petshop.api.health
 import petshop.api.stats
+import petshop.api.toDto
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.NotChipped
@@ -108,13 +109,13 @@ class EndToEndSpec {
                 Then("Nibbles is hers") { nibbles.shouldBeOk().adopted shouldBe true }
 
                 val again = When("somebody else asks for Nibbles too") { shop.outcome(adoptPet, 1L) }
-                Then("they are told she is taken") { again.shouldBeError() shouldBe AlreadyAdopted(1) }
+                Then("they are told she is taken") { again.shouldBeError() shouldBe AlreadyAdopted(1).toDto() }
 
                 val nobody = When("somebody asks for a pet the shop never had") { shop.outcome(adoptPet, 999L) }
-                Then("there is no such pet") { nobody.shouldBeError() shouldBe NoSuchPet(999) }
+                Then("there is no such pet") { nobody.shouldBeError() shouldBe NoSuchPet(999).toDto() }
 
                 val peel = When("somebody asks for Mrs Peel") { shop.outcome(adoptPet, 3L) }
-                Then("she has no chip on record") { peel.shouldBeError() shouldBe NotChipped(3) }
+                Then("she has no chip on record") { peel.shouldBeError() shouldBe NotChipped(3).toDto() }
                 And("she is still in the shop") { shop.outcome(getPet, 3L).shouldBeOk().adopted shouldBe false }
 
                 Then("the registry recorded one new keeper, for the one adoption that happened") {
