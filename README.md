@@ -181,7 +181,7 @@ starts its own through Testcontainers, with a fresh schema per graph.
 
 `KafkaBus` is the same `EventBus` on a real broker, and the projection does not
 change. Each event goes out as an Avro record in the schema registry's wire
-format, keyed by its `seq`, and comes back through `lark-kafka`'s consumer loop,
+format, keyed by its `seq` as a number, and comes back through `lark-kafka`'s consumer loop,
 which commits an offset only once the projection has folded that event in.
 
 ```
@@ -286,10 +286,10 @@ fun `somebody adopts a tortoise, and every part of the service hears about it`()
             }
 
             val onTheTopic = When("the topic is read as the broker holds it") {
-                kafka.records(TOPIC, StringDeserializer(), ShopEventDeserializer(schemas))
+                kafka.records(TOPIC, LongDeserializer(), ShopEventDeserializer(schemas))
             }
             Then("every event the outbox recorded is on it once, keyed by its seq") {
-                onTheTopic.map { it.key().toLong() }.sorted() shouldBe (1..database.recorded()).toList()
+                onTheTopic.map { it.key() }.sorted() shouldBe (1..database.recorded()).toList()
             }
             And("the projection committed every event").eventually(5.seconds) {
                 kafka.committed(GROUP, TOPIC) shouldBe database.recorded()
@@ -586,9 +586,6 @@ thread is one a pool hands on. *Handled:* by `lark-slf4j`.
 hands `FORCE_COLOR`, `NO_COLOR` and `lark.test.colour` on. *Spec:* Lark 0118
 has the wiring plugin do it for every test task.
 
-**A record keyed by text sorts as text.** The topic's keys are each event's
-`seq` as a string, so a test comparing them sorts them as numbers, or `"10"`
-comes before `"2"`. *Handled:* in the test; a numeric key would make it moot.
 
 **A demo stub must keep the contract too.** The demo's registry stand-in has to
 answer a 404 with the `Problem` body the contract declares, or the shop reports
