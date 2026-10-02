@@ -5,13 +5,9 @@ import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOrFail
-import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
-import petshop.domain.NotChipped
-import petshop.domain.NotRecorded
 import petshop.domain.PetId
 import petshop.domain.PetShop
-import petshop.domain.RegistryDown
 
 /**
  * The endpoints answered. A handler names the declared failure it is producing, so returning one the
@@ -22,22 +18,21 @@ fun petshopApi(shop: PetShop, health: () -> Healthy, scrape: () -> String, tally
         petshop.api.health handledNow { health() },
         metrics handledNow { scrape() },
         stats handledNow { tally() },
-        listPets handledNow { shop.all() },
+        listPets handledNow { shop.all().toDto() },
         getPet handledOrFail { id ->
-            shop.find(PetId(id))?.let { pet -> ok(pet) } ?: petMissing(NoSuchPet(id))
+            shop.find(PetId(id))?.let { pet -> ok(pet.toDto()) } ?: petMissing(NoSuchPet(id).toDto())
         },
         adoptPet handledOrFail { id ->
             shop.adopt(PetId(id), by = "the internet").fold(
                 { failure ->
-                    when (failure) {
-                        is NoSuchPet -> petMissing(failure)
-                        is AlreadyAdopted -> petTaken(failure)
-                        is NotChipped -> petNotChipped(failure)
-                        is RegistryDown -> unavailable(Unavailable(failure.id, failure.message))
-                        is NotRecorded -> unavailable(Unavailable(failure.id, failure.message))
+                    when (val problem = failure.toDto()) {
+                        is ProblemDto.NoSuchPet -> petMissing(problem)
+                        is ProblemDto.AlreadyAdopted -> petTaken(problem)
+                        is ProblemDto.NotChipped -> petNotChipped(problem)
+                        is ProblemDto.Unavailable -> unavailable(problem)
                     }
                 },
-                { pet -> ok(pet) },
+                { pet -> ok(pet.toDto()) },
             )
         },
     ),
