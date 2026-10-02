@@ -8,7 +8,6 @@ import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.logger
 import io.github.matthewjones372.lark.slf4j.Slf4jLogger
-import io.kotest.assertions.withClue
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.AfterEach
@@ -27,7 +26,15 @@ import petshop.domain.PetShop
  */
 class LoggingSpec {
 
-    private val appender = ListAppender<ILoggingEvent>()
+    // Logback reads an event's MDC when something first asks for it, and the pairs are gone from the MDC
+    // once the call that logged has returned. A list read after the fact has to take it while appending,
+    // as any appender that holds events does.
+    private val appender = object : ListAppender<ILoggingEvent>() {
+        override fun append(event: ILoggingEvent) {
+            event.prepareForDeferredProcessing()
+            super.append(event)
+        }
+    }
 
     private val backend = (LoggerFactory.getILoggerFactory() as LoggerContext).getLogger("lark")
 
@@ -46,21 +53,19 @@ class LoggingSpec {
     }
 
     @Test
-    fun `nothing in main binds a logger, and the classpath still answers`() {
-        withClue("if this is StderrLogger the dependency is no longer doing anything") {
+    fun `nothing in main binds a logger, and the classpath still answers`() = story {
+        Then("the logger lark writes to is SLF4J's, found on the classpath; StderrLogger would mean the dependency does nothing") {
             logger.get().shouldBeInstanceOf<Slf4jLogger>()
         }
     }
 
     @Test
-    fun `an adoption reaches the backend with the pet on it, not in it`() {
-        testApp<PetShop, Unit>(settled) { shop -> shop.adopt(PetId(1), "Ada"); Unit }
-
-        val adopted = appender.list.single { it.message.contains("adopted") }
-
-        withClue("in the MDC, which is what a pattern and a field search read") {
+    fun `an adoption reaches the backend with the pet on it, not in it`() = story {
+        When("Ada adopts Nibbles") { testApp<PetShop, Unit>(settled) { shop -> shop.adopt(PetId(1), "Ada"); Unit } }
+        val adopted = Then("logback received the adoption") { appender.list.single { it.message.contains("adopted") } }
+        And("the pet and the adopter are in its MDC, which is what a pattern and a field search read") {
             adopted.mdcPropertyMap["pet_id"] shouldBe "1"
+            adopted.mdcPropertyMap["adopted_by"] shouldBe "Ada"
         }
-        adopted.mdcPropertyMap["adopted_by"] shouldBe "Ada"
     }
 }

@@ -1,5 +1,6 @@
 # Prometheus and Grafana, pointed at a petshop running on the host, a stand-in
-# for the chip registry the petshop calls out to, and the Postgres its outbox is in.
+# for the chip registry the petshop calls out to, the Postgres its outbox is in,
+# and the Kafka broker and schema registry its events go to when BUS=kafka.
 #
 # The application is not in here on purpose: it is the thing being demonstrated,
 # and running it with `./gradlew :app:run` is how a reader would run it anyway.
@@ -24,6 +25,37 @@ services:
       # 55432 on the host rather than 5432, which a Postgres installed on the machine is usually
       # already holding. application.conf points at this one.
       - "55432:5432"
+
+  # The bus, for BUS=kafka: one KRaft node, so there is no ZooKeeper beside it. The shop on the host
+  # reaches it on 9092; the schema registry, in here, on kafka:29092.
+  kafka:
+    image: apache/kafka-native:3.8.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: HOST://:9092,INTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: HOST://127.0.0.1:9092,INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: HOST:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    ports:
+      - "9092:9092"
+
+  # Where the events' Avro schema is registered. application.conf points at it when BUS=kafka.
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.8.0
+    depends_on: [kafka]
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
+    ports:
+      - "8081:8081"
 
   prometheus:
     image: prom/prometheus:v2.54.1

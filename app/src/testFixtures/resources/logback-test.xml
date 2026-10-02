@@ -1,0 +1,30 @@
+<!--
+  Tests log at WARN and above. Without this file logback's default is DEBUG for everything, and one run of
+  the app tests printed about eleven thousand lines, most of them Kafka, Hikari and Testcontainers'
+  Docker client.
+
+  In test fixtures, so the load test gets it too.
+-->
+<configuration>
+    <statusListener class="ch.qos.logback.core.status.NopStatusListener"/>
+
+    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{30} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Kafka's clients warn about every topic they create on first use. -->
+    <logger name="org.apache.kafka" level="ERROR"/>
+
+    <!--
+      The service's own lines stay at INFO, because LoggingSpec reads them through an appender of its own,
+      but they are not printed: the tests provoke refusals on purpose, and a story already says what each
+      test did.
+    -->
+    <logger name="lark" level="INFO" additivity="false"/>
+
+    <root level="WARN">
+        <appender-ref ref="console"/>
+    </root>
+</configuration>

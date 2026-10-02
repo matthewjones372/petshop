@@ -1,0 +1,62 @@
+{
+  "type" : "record",
+  "name" : "ShopEventRecord",
+  "namespace" : "petshop.events",
+  "fields" : [ {
+    "name" : "event",
+    "type" : [ {
+      "type" : "record",
+      "name" : "PetAdopted",
+      "fields" : [ {
+        "name" : "seq",
+        "type" : "long"
+      }, {
+        "name" : "pet",
+        "type" : {
+          "type" : "record",
+          "name" : "Pet",
+          "fields" : [ {
+            "name" : "id",
+            "type" : "long"
+          }, {
+            "name" : "name",
+            "type" : "string"
+          }, {
+            "name" : "species",
+            "type" : {
+              "type" : "enum",
+              "name" : "Species",
+              "symbols" : [ "Cat", "Dog", "Parrot", "Tortoise" ]
+            }
+          }, {
+            "name" : "adopted",
+            "type" : "boolean"
+          } ]
+        }
+      }, {
+        "name" : "by",
+        "type" : "string"
+      } ]
+    }, {
+      "type" : "record",
+      "name" : "PetArrived",
+      "fields" : [ {
+        "name" : "seq",
+        "type" : "long"
+      }, {
+        "name" : "pet",
+        "type" : "Pet"
+      } ]
+    }, {
+      "type" : "record",
+      "name" : "PetReturned",
+      "fields" : [ {
+        "name" : "seq",
+        "type" : "long"
+      }, {
+        "name" : "pet",
+        "type" : "Pet"
+      } ]
+    } ]
+  } ]
+}

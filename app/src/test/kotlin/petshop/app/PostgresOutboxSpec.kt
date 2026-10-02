@@ -3,7 +3,6 @@ package petshop.app
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -36,71 +35,86 @@ private fun Outbox.left(): List<ShopEvent> {
 class PostgresOutboxSpec {
 
     @Test
-    fun `Postgres numbers each event, and a claim reads them back oldest first`() = onItsOwn { outbox ->
-        val arrived = outbox.record { seq -> PetArrived(seq, nibbles) }
-        val adopted = outbox.record { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") }
-        val returned = outbox.record { seq -> PetReturned(seq, nibbles) }
-
-        withClue("the seq is the table's, so it counts on across restarts") {
-            listOf(arrived.seq, adopted.seq, returned.seq) shouldBe listOf(1L, 2L, 3L)
-        }
-        outbox.left() shouldBe listOf(arrived, adopted, returned)
-    }
-
-    @Test
-    fun `what the bus took leaves the table, and what it refused stays for the next claim`() = onItsOwn { outbox ->
-        val arrived = outbox.record { seq -> PetArrived(seq, nibbles) }
-        val adopted = outbox.record { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") }
-
-        val taken = outbox.claim(10) { claimed -> claimed.filter { it.seq == adopted.seq } }
-
-        taken shouldBe listOf(adopted)
-        outbox.left() shouldBe listOf(arrived)
-    }
-
-    @Test
-    fun `a claim that throws halfway takes nothing`() = onItsOwn { outbox ->
-        val arrived = outbox.record { seq -> PetArrived(seq, nibbles) }
-
-        shouldThrow<IllegalStateException> {
-            outbox.claim(10) { error("the process fell over after publishing") }
-        }
-
-        withClue("the claim rolled back, so the event goes again: at least once, not at most") {
-            outbox.left() shouldBe listOf(arrived)
+    fun `Postgres numbers each event, and a claim reads them back oldest first`() = story {
+        onItsOwn { outbox ->
+            val recorded = When("Nibbles arrives, is adopted and is returned") {
+                listOf(
+                    outbox.record { seq -> PetArrived(seq, nibbles) },
+                    outbox.record { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") },
+                    outbox.record { seq -> PetReturned(seq, nibbles) },
+                )
+            }
+            Then("Postgres numbered them 1, 2 and 3: the seq is the table's, so it counts on across restarts") {
+                recorded.map { it.seq } shouldBe listOf(1L, 2L, 3L)
+            }
+            And("a claim reads them back oldest first") { outbox.left() shouldBe recorded }
         }
     }
 
     @Test
-    fun `a second claim skips the rows the first is holding, rather than waiting for them`() = onItsOwn { outbox ->
-        val first = (1..2).map { outbox.record { seq -> PetArrived(seq, nibbles) } }
-        val second = (1..2).map { outbox.record { seq -> PetArrived(seq, barnaby) } }
+    fun `what the bus took leaves the table, and what it refused stays for the next claim`() = story {
+        onItsOwn { outbox ->
+            val (arrived, adopted) = Given("Nibbles' arrival and adoption in the outbox") {
+                outbox.record { seq -> PetArrived(seq, nibbles) } to
+                    outbox.record { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") }
+            }
+            val taken = When("a claim's bus takes the adoption and refuses the arrival") {
+                outbox.claim(10) { claimed -> claimed.filter { it.seq == adopted.seq } }
+            }
+            Then("the claim answers what was taken") { taken shouldBe listOf(adopted) }
+            And("only the refused arrival is left for the next claim") { outbox.left() shouldBe listOf(arrived) }
+        }
+    }
 
-        val holding = CountDownLatch(1)
-        val letGo = CountDownLatch(1)
-        val slow = CompletableFuture.supplyAsync {
-            outbox.claim(2) { claimed ->
-                holding.countDown()
-                letGo.await(10, TimeUnit.SECONDS)
-                claimed
+    @Test
+    fun `a claim that throws halfway takes nothing`() = story {
+        onItsOwn { outbox ->
+            val arrived = Given("Nibbles' arrival in the outbox") { outbox.record { seq -> PetArrived(seq, nibbles) } }
+            When("a claim falls over after publishing") {
+                shouldThrow<IllegalStateException> { outbox.claim(10) { error("the process fell over after publishing") } }
+            }
+            Then("the claim rolled back, so the event goes again: at least once, not at most") {
+                outbox.left() shouldBe listOf(arrived)
             }
         }
-        holding.await(10, TimeUnit.SECONDS) shouldBe true
+    }
 
-        val seenBeside = mutableListOf<ShopEvent>()
-        // Run on a thread of its own with a deadline, so a claim that waited on the first one's locks
-        // fails the test rather than hanging it.
-        val beside = CompletableFuture.supplyAsync {
-            outbox.claim(10) { claimed -> seenBeside += claimed; emptyList() }
-        }.get(5, TimeUnit.SECONDS)
+    @Test
+    fun `a second claim skips the rows the first is holding, rather than waiting for them`() = story {
+        onItsOwn { outbox ->
+            val (first, second) = Given("two of Nibbles' arrivals, then two of Barnaby's") {
+                (1..2).map { outbox.record { seq -> PetArrived(seq, nibbles) } } to
+                    (1..2).map { outbox.record { seq -> PetArrived(seq, barnaby) } }
+            }
 
-        withClue("FOR UPDATE SKIP LOCKED: the first claim's rows are not there to see, and nothing waited") {
-            seenBeside shouldBe second
-            beside.shouldBeEmpty()
+            val holding = CountDownLatch(1)
+            val letGo = CountDownLatch(1)
+            val slow = When("one claim takes the oldest two and holds them") {
+                CompletableFuture.supplyAsync {
+                    outbox.claim(2) { claimed ->
+                        holding.countDown()
+                        letGo.await(10, TimeUnit.SECONDS)
+                        claimed
+                    }
+                }.also { holding.await(10, TimeUnit.SECONDS) shouldBe true }
+            }
+            val seenBeside = mutableListOf<ShopEvent>()
+            // On a thread of its own with a deadline, so a claim that waited on the first one's locks fails
+            // the test rather than hanging it.
+            val beside = And("a second claim runs beside it") {
+                CompletableFuture.supplyAsync {
+                    outbox.claim(10) { claimed -> seenBeside += claimed; emptyList() }
+                }.get(5, TimeUnit.SECONDS)
+            }
+            Then("the second saw only Barnaby's, and nothing waited: FOR UPDATE SKIP LOCKED") {
+                seenBeside shouldBe second
+                beside.shouldBeEmpty()
+            }
+            And("once the first lets go, it took Nibbles' and left Barnaby's") {
+                letGo.countDown()
+                slow.get(5, TimeUnit.SECONDS) shouldBe first
+                outbox.left() shouldBe second
+            }
         }
-
-        letGo.countDown()
-        slow.get(5, TimeUnit.SECONDS) shouldBe first
-        outbox.left() shouldBe second
     }
 }

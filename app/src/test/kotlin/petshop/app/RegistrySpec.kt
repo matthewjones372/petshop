@@ -9,7 +9,6 @@ import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
-import io.kotest.assertions.withClue
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import kotlin.time.Duration.Companion.milliseconds
@@ -48,79 +47,75 @@ class RegistrySpec {
     private val chip = ChipRecord("981000000000001", keeper = "Petshop")
 
     @Test
-    fun `an adoption looks the chip up and records the new keeper`() {
-        registry.stub(lookupChip, 1L) answers ok(chip)
-        registry.stub(recordKeeper, In2(chip.number, NewKeeper("Ada"))) answers ok(chip.copy(keeper = "Ada"))
-
-        val adopted = testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") }
-
-        adopted.shouldBeRight().adopted shouldBe true
-        withClue("the keeper is recorded against the chip the lookup answered with") {
+    fun `an adoption looks the chip up and records the new keeper`() = story {
+        Given("a registry with Nibbles' chip, that records Ada as her keeper") {
+            registry.stub(lookupChip, 1L) answers ok(chip)
+            registry.stub(recordKeeper, In2(chip.number, NewKeeper("Ada"))) answers ok(chip.copy(keeper = "Ada"))
+        }
+        val adopted = When("Ada adopts Nibbles") { testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") } }
+        Then("Nibbles is hers") { adopted.shouldBeRight().adopted shouldBe true }
+        And("the keeper was recorded against the chip the lookup answered with") {
             registry.verify(recordKeeper, In2(chip.number, NewKeeper("Ada")))
         }
     }
 
     @Test
-    fun `a pet with no chip on record stays in the shop`() {
-        registry.stub(lookupChip, 1L) answers noSuchChip(Problem("never chipped"))
-
-        val (answer, after) = testApp(shop) { shop: PetShop ->
-            shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1))
+    fun `a pet with no chip on record stays in the shop`() = story {
+        Given("a registry with no chip for Nibbles") { registry.stub(lookupChip, 1L) answers noSuchChip(Problem("never chipped")) }
+        val (answer, after) = When("Ada adopts Nibbles") {
+            testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1)) }
         }
-
-        answer shouldBeLeft NotChipped(1)
-        after?.adopted shouldBe false
-        withClue("there is no chip to transfer, so nothing is sent") { registry.calls(recordKeeper) shouldBe 0 }
+        Then("she is told Nibbles has no chip") { answer shouldBeLeft NotChipped(1) }
+        And("Nibbles stays in the shop") { after?.adopted shouldBe false }
+        And("with no chip to transfer, nothing was sent") { registry.calls(recordKeeper) shouldBe 0 }
     }
 
     @Test
-    fun `a registry that takes too long is an outage, not a hang`() {
-        registry.stub(lookupChip, 1L).answers(ok(chip), after = 5.seconds)
-
-        val (answer, took) = testApp(shopCalling(registry, timeout = 300.milliseconds)) { shop: PetShop ->
-            measureTimedValue { shop.adopt(PetId(1), by = "Ada") }
+    fun `a registry that takes too long is an outage, not a hang`() = story {
+        Given("a registry that takes five seconds to answer, and a shop that waits 300 ms") {
+            registry.stub(lookupChip, 1L).answers(ok(chip), after = 5.seconds)
         }
-
-        answer shouldBeLeft RegistryDown(1)
-        withClue("the shop's timeout decides how long an adopter waits, not the registry") {
-            took shouldBeLessThan 2.seconds
+        val (answer, took) = When("Ada adopts Nibbles") {
+            testApp(shopCalling(registry, timeout = 300.milliseconds)) { shop: PetShop ->
+                measureTimedValue { shop.adopt(PetId(1), by = "Ada") }
+            }
         }
+        Then("she is told the registry is down") { answer shouldBeLeft RegistryDown(1) }
+        And("she was not kept waiting: the shop's timeout decides that, not the registry") { took shouldBeLessThan 2.seconds }
     }
 
     @Test
-    fun `a connection reset while recording the keeper puts the pet back on the shelf`() {
-        registry.stub(lookupChip, 1L) answers ok(chip)
-        registry.stub(recordKeeper, In2(chip.number, NewKeeper("Ada"))) fails Fault.CONNECTION_RESET_BY_PEER
-        registry.stub(recordKeeper, In2(chip.number, NewKeeper("Bea"))) answers ok(chip.copy(keeper = "Bea"))
-
-        val (refused, retried) = testApp(shop) { shop: PetShop ->
-            shop.adopt(PetId(1), by = "Ada") to shop.adopt(PetId(1), by = "Bea")
+    fun `a connection reset while recording the keeper puts the pet back on the shelf`() = story {
+        Given("a registry that resets the connection recording Ada, and records Bea") {
+            registry.stub(lookupChip, 1L) answers ok(chip)
+            registry.stub(recordKeeper, In2(chip.number, NewKeeper("Ada"))) fails Fault.CONNECTION_RESET_BY_PEER
+            registry.stub(recordKeeper, In2(chip.number, NewKeeper("Bea"))) answers ok(chip.copy(keeper = "Bea"))
         }
-
-        refused shouldBeLeft RegistryDown(1)
-        withClue("Ada's adoption was undone, so the pet was still there for Bea") {
-            retried.shouldBeRight().adopted shouldBe true
+        val (refused, retried) = When("Ada adopts Nibbles, and then Bea does") {
+            testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") to shop.adopt(PetId(1), by = "Bea") }
         }
+        Then("Ada is told the registry is down") { refused shouldBeLeft RegistryDown(1) }
+        And("her adoption was undone, so Nibbles was still there for Bea") { retried.shouldBeRight().adopted shouldBe true }
     }
 
     @Test
-    fun `a status the contract never declared is an outage too`() {
-        registry.stub(lookupChip, 1L) breaksWith 500
-
-        testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") } shouldBeLeft RegistryDown(1)
+    fun `a status the contract never declared is an outage too`() = story {
+        Given("a registry that answers 500, which its contract never declared") { registry.stub(lookupChip, 1L) breaksWith 500 }
+        val answer = When("Ada adopts Nibbles") { testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") } }
+        Then("she is told the registry is down") { answer shouldBeLeft RegistryDown(1) }
     }
 
     @Test
-    fun `twenty adopters race for one tortoise and the registry hears from one of them`() {
-        registry.stub(lookupChip, 1L) answers ok(chip)
-        registry.stub(recordKeeper) { (number, keeper) -> ok(ChipRecord(number, keeper.keeper)) }
-
-        val outcomes = testApp(shop) { shop: PetShop ->
-            parMap((1..20).toList()) { who -> shop.adopt(PetId(1), by = "adopter $who") }
+    fun `twenty adopters race for one tortoise and the registry hears from one of them`() = story {
+        Given("a registry that knows Nibbles' chip and records any keeper") {
+            registry.stub(lookupChip, 1L) answers ok(chip)
+            registry.stub(recordKeeper) { (number, keeper) -> ok(ChipRecord(number, keeper.keeper)) }
         }
-
-        outcomes.count { it.isRight() } shouldBe 1
-        withClue("the actor settles the race before anybody calls out, so the losers cost the registry nothing") {
+        val outcomes = When("twenty people ask for Nibbles at once") {
+            testApp(shop) { shop: PetShop -> parMap((1..20).toList()) { who -> shop.adopt(PetId(1), by = "adopter $who") } }
+        }
+        Then("one of them gets her") { outcomes.count { it.isRight() } shouldBe 1 }
+        And("the registry heard from that one only: the actor settles the race before anybody calls out") {
             registry.calls(lookupChip) shouldBe 1
             registry.calls(recordKeeper) shouldBe 1
         }

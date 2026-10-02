@@ -1,6 +1,8 @@
 package petshop.app
 
 import arrow.core.Either
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 import arrow.core.flatMap
 import arrow.core.raise.either
 import io.github.matthewjones372.lark.app.AppScope
@@ -23,7 +25,7 @@ import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.logSpan
 import io.github.matthewjones372.lark.logWarn
 import io.github.matthewjones372.lark.otel.tracedSpan
-import io.github.matthewjones372.lark.stream.PekkoStreams
+import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.opentelemetry.api.trace.Tracer
 import io.micrometer.core.instrument.Metrics as MicrometerRegistries
@@ -193,10 +195,9 @@ private val theShop: Module =
 
 private val events: Module =
     // What the relay runs on. The relay describes its stream and names no backend; this is the one
-    // place that decides, and a test that wants the relay on its own clock overrides it.
-    single { system: ActorSystem -> PekkoStreams(system) }.boundTo<StreamBackend>() +
-        // Closed after the relay stops publishing to it, because the relay depends on it.
-        singleOf({ system: ActorSystem -> HubBus(system) }, { bus -> bus.close() }).boundTo<EventBus>() +
+    // place that decides, and a test that wants the relay on its own clock overrides it. Forks runs it
+    // as one loop on a virtual thread, so the claim blocks on Postgres where it is and a stop interrupts it.
+    single { -> Forks() }.boundTo<StreamBackend>() +
         outbox +
         projection
 
@@ -219,7 +220,11 @@ private fun asked(health: HealthRegistry): Healthy = when (val readiness = healt
     is Health.Down -> Healthy(ready = false, failing = readiness.failing)
 }
 
-val petshop: Module = settings + telemetry + database + registry + theShop + arrivals + events + web
+/** The whole service, its bus chosen by [conf]'s `petshop.bus`. */
+fun petshopFrom(conf: Config): Module =
+    settings + telemetry + database + registry + theShop + arrivals + events + bus(conf) + web
+
+val petshop: Module = petshopFrom(ConfigFactory.load())
 
 /**
  * The application as a value, so `main` is the leaving and the build can read the root it starts
