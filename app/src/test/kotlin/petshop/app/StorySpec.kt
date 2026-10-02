@@ -112,4 +112,17 @@ class StorySpec {
 
         failed.message!!.lines()[0] shouldBe "Story: a story takes its title from the test that tells it"
     }
+
+    @Test
+    fun `a failure points at the line of the assertion that failed`() {
+        val failed = shouldThrow<StoryFailed> {
+            story("pointing") {
+                Then("it fails") { "Bea" shouldBe "Ada" }
+            }
+        }
+
+        val line = failed.stackTrace.first()
+        line.fileName shouldBe "StorySpec.kt"
+        failed.message!!.lines().last().trim() shouldBe "at $line"
+    }
 }

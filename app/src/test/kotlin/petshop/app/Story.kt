@@ -23,6 +23,8 @@ fun story(title: String = callingTest(), block: Story.() -> Unit) {
     } catch (failure: Throwable) {
         println(story.told(title, Colour.wanted))
         throw StoryFailed(story.told(title, colour = false), failure.nonFatalOrThrow())
+            // Starts where the failing step's assertion is, so the first line a test runner links to is it.
+            .apply { stackTrace = failure.fromTheTest().toTypedArray().ifEmpty { stackTrace } }
     }
     println(story.told(title, Colour.wanted))
 }
@@ -111,6 +113,8 @@ class Story internal constructor() {
                 if (failed != null && failed.told) {
                     val indent = "  ".repeat(step.depth + 3)
                     "${failed.failure.message ?: failed.failure}".lines().forEach { append('\n').append(ink.red(indent + it)) }
+                    // A frame as a stack trace prints one, which an IDE's console turns into a link.
+                    failed.failure.fromTheTest().firstOrNull()?.let { append('\n').append(ink.dim("${indent}at $it")) }
                 }
             }
         }
@@ -171,3 +175,16 @@ private fun callingTest(): String =
     StackWalker.getInstance().walk { frames ->
         frames.filter { it.className != "petshop.app.StoryKt" }.findFirst().map { it.methodName }.orElse("a story")
     }
+
+/**
+ * Where [this] was thrown in the test's own code: its frames from the first one that is not the story, Lark, an
+ * assertion library or the JDK. A failed `shouldBe` is a few frames deep in Kotest; this is the line that called it.
+ */
+internal fun Throwable.fromTheTest(): List<StackTraceElement> =
+    stackTrace.dropWhile { frame -> frame.className.substringBefore('$') in story || machinery.any { frame.className.startsWith(it) } }
+
+private val story = setOf("petshop.app.StoryKt", "petshop.app.Story")
+
+private val machinery = listOf(
+    "io.github.matthewjones372.lark.", "io.kotest.", "org.opentest4j.", "kotlin.", "java.", "jdk.", "sun.", "arrow.",
+)
