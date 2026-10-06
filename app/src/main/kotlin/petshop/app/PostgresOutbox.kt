@@ -8,6 +8,7 @@ import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
 import petshop.outbox.OutboxRow
+import petshop.outbox.PetRow
 import petshop.outbox.OutboxTable
 import javax.sql.DataSource
 
@@ -26,7 +27,13 @@ class PostgresOutbox(dataSource: DataSource) : Outbox {
     private val table = OutboxTable(dataSource)
 
     // Everything in a row but its seq is known before Postgres numbers it.
-    override fun record(numbered: (seq: Long) -> ShopEvent): ShopEvent = numbered(table.insert(numbered(0).row()))
+    override fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent =
+        numbered(table.record(pet.row(), numbered(0).row()))
+
+    override fun shelf(opening: List<Pet>): List<Pet> {
+        table.stock(opening.map { it.row() })
+        return table.pets().map { Pet(PetId(it.id), it.name, Species.valueOf(it.species), it.adopted) }
+    }
 
     override fun claim(limit: Int, publish: (List<ShopEvent>) -> List<ShopEvent>): List<ShopEvent> {
         val taken = mutableListOf<ShopEvent>()
@@ -34,6 +41,8 @@ class PostgresOutbox(dataSource: DataSource) : Outbox {
         return taken
     }
 }
+
+private fun Pet.row(): PetRow = PetRow(id.value, name, species.name, adopted)
 
 private fun ShopEvent.row(): OutboxRow = when (this) {
     is PetArrived -> OutboxRow(seq, "arrived", pet.id.value, pet.name, pet.species.name, pet.adopted, null)

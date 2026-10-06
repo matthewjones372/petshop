@@ -202,7 +202,8 @@ private val http: Module =
 private val theShop: Module =
     // The actors' flock, held open for the graph's life; the shop is an actor in it.
     actors() +
-        actor<Shop, Outbox>("shop") { outbox -> shop(outbox, opening.associateBy { it.id }) } +
+        // The catalogue comes from the pets table, so a restart opens the shop as it was left.
+        actor<Shop, Outbox>("shop") { outbox -> shop(outbox, outbox.shelf(opening).associateBy { it.id }) } +
         singleOf(::ActorPetShop).boundTo<PetShop>()
             .probe("shop", timeout = 3.seconds) { shop: PetShop -> shop.all().isNotEmpty() }
 

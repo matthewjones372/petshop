@@ -1,28 +1,29 @@
 package petshop.app
 
 import io.github.matthewjones372.lark.app.Module
+import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.render
 import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.subgraph
-import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.testApp
+import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.parMap
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import java.sql.SQLTransientConnectionException
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.ChipRegistry
 import petshop.domain.NotRecorded
+import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.RegistryDown
 import petshop.domain.ShopEvent
 import petshop.domain.Unreachable
-import java.sql.SQLTransientConnectionException
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * The shop under test, and nothing else: no port bound, no documents served, and no arrivals turning
@@ -71,8 +72,10 @@ class AdoptionSpec {
             override fun lookup(id: PetId) = FakeRegistry().lookup(id).also { asked.incrementAndGet() }
         }
         val down = object : Outbox {
-            override fun record(numbered: (seq: Long) -> ShopEvent): ShopEvent =
+            override fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent =
                 throw SQLTransientConnectionException("the pool had nothing to lend")
+
+            override fun shelf(opening: List<Pet>): List<Pet> = opening
 
             override fun claim(limit: Int, publish: (List<ShopEvent>) -> List<ShopEvent>) = emptyList<ShopEvent>()
         }
