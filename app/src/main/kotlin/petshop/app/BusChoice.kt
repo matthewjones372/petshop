@@ -4,19 +4,15 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigException
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
-import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.Reading
 import io.github.matthewjones372.lark.app.typesafe.choosing
 import io.github.matthewjones372.lark.kafka.Topic
-import io.github.matthewjones372.lark.stream.Forks
-import io.github.matthewjones372.lark.stream.PekkoStreams
-import org.apache.pekko.actor.ActorSystem
 
 /** Which bus the shop's events go out on: `petshop.bus.kind` in application.conf, `BUS` in the environment. */
 sealed interface BusSettings {
 
-    /** A Pekko hub in the same process: nothing to run beside the shop, and nothing kept if it stops. */
+    /** Lark's hub in the same process: nothing to run beside the shop, and nothing kept if it stops. */
     data object InProcess : BusSettings
 
     /** A Kafka topic, each event Avro in the schema registry's wire format. */
@@ -60,9 +56,7 @@ private fun Reading.kind(): String =
 
 private val inProcessBus: Module =
     // Closed after the relay stops publishing to it, because the relay depends on it.
-    singleOf({ system: ActorSystem, _: BusSettings -> HubBus(system) }, { bus -> bus.close() }).boundTo<EventBus>() +
-        // The hub is Pekko's, so its reader runs on Pekko.
-        single { system: ActorSystem -> ProjectionStreams(PekkoStreams(system)) }
+    singleOf({ _: BusSettings -> HubBus() }, { bus -> bus.close() }).boundTo<EventBus>()
 
 private fun kafkaBus(on: BusSettings.OnKafka): Module =
     singleOf(
@@ -70,6 +64,4 @@ private fun kafkaBus(on: BusSettings.OnKafka): Module =
             KafkaBus(Topic(on.topic), on.bootstrap, on.group, mapOf("schema.registry.url" to on.registry))
         },
         { bus -> bus.close() },
-    ).boundTo<EventBus>() +
-        // A Kafka consumer blocks on its poll, which Forks runs as one loop on a virtual thread.
-        single { -> ProjectionStreams(Forks()) }
+    ).boundTo<EventBus>()

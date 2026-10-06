@@ -25,7 +25,7 @@ The libraries under evaluation:
 | Library | What it does here |
 |---|---|
 | [Pelican](https://github.com/matthewjones372/pelican) | the shop's HTTP contract as values: routes, the OpenAPI document and Swagger page, handlers that must answer a declared failure; the chip registry's client generated from its contract; typed WireMock stubs, golden files and a typed test client |
-| [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`, its Pekko, Typesafe Config and Gradle wiring-check modules); the background work as `Stream`s on Pekko or Lark's own Forks (`lark-stream`); Kafka as a `Stream` that commits what it handled (`lark-kafka`); retries on schedules; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
+| [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`, with its Typesafe Config and Gradle wiring-check modules); the shop's actor, on virtual threads in a `flock` (`lark-actor`, `lark-app-actor`); the background work and the in-process bus as `Stream`s on Lark's Forks (`lark-stream`); Kafka as a `Stream` that commits what it handled (`lark-kafka`); retries on schedules; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
 | [Proofload](https://github.com/matthewjones372/proofload) | load tests that start the whole service in-process, assert correctness under load, and write an HTML report |
 | [ExoQuery](https://github.com/ExoQuery/ExoQuery) | every statement against the outbox table, written as Kotlin and checked at compile time |
 | [kimney](https://github.com/matthewjones372/kimney) | the mappings between the shop's events and their wire records, and between the domain and the API's DTOs, derived at compile time |
@@ -34,14 +34,14 @@ What they run on, and what the tests use:
 
 | | |
 |---|---|
-| Apache Pekko | the shop's actor, the HTTP server and client, the stream backend the arrivals and the projection run on, and the in-process bus |
+| Apache Pekko | HTTP and nothing else: Pelican's server and the chip registry's client run on Pekko HTTP |
 | PostgreSQL, HikariCP | the outbox table |
 | Testcontainers | a real Postgres and a real Kafka broker for the tests, one container each per run: a fresh schema per graph, and topics and groups of each test's own |
 | WireMock | the chip registry in tests and the demo, stubbed through Pelican's `pelican-test-wiremock` |
 | Kotest assertions on JUnit 6 | every test; the end-to-end and app tests read as stories (below) |
 | Arrow | `Either` and `Raise` for declared failures, from the domain up |
 | OpenTelemetry, Micrometer, Prometheus, Grafana | traces through the graph, metrics at `/metrics`, and the demo's dashboard |
-| Logback | where Lark's log lines and Pekko's end up, through `lark-slf4j` |
+| Logback | where Lark's log lines end up, through `lark-slf4j`, and Pekko's |
 | Apache Kafka, avro4k, Confluent's Avro serializer | the bus on a broker: events as Avro in the schema registry's wire format; tests run the broker in a container and Confluent's in-process `mock://` registry |
 
 ## What it is
@@ -51,7 +51,7 @@ What they run on, and what the tests use:
 | `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | Arrow |
 | `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
 | `api` | the endpoints, their failures, the handlers, the DTOs | Pelican, Pekko HTTP, kimney |
-| `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus (in process, or Kafka carrying Avro) and its consumer, the wiring, `main` | Lark, Pekko, kimney |
+| `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus (in process, or Kafka carrying Avro) and its consumer, the wiring, `main` | Lark, kimney |
 | `outbox-table` | the outbox's row and its SQL, in an included build on the Kotlin ExoQuery is built for | ExoQuery |
 | `loadtest` | the shop under load, started in-process | Proofload |
 
@@ -89,12 +89,13 @@ fun PetShopError.toDto(): ProblemDto = into<_, ProblemDto>()
 added to a DTO, is a compile error at the crossing rather than a new value on
 the wire.
 
-### One writer, no locks
+### One writer
 
 Two people adopting the same tortoise is the race the shop has to lose on
 purpose. An actor handles one message at a time, so the second adopter is told
-the pet is taken rather than both being told yes. There is no lock anywhere in
-this repository.
+the pet is taken rather than both being told yes. The app's own code takes no
+lock: the actor serialises the shop's changes, and the relay's claim locks rows
+in Postgres with `FOR UPDATE SKIP LOCKED`.
 
 ### The background work is a stream
 
@@ -108,7 +109,7 @@ service reads them: a projection that tallies arrivals and adoptions by species
 and serves the result at `/stats`.
 
 ```
-Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only if the row went in
+Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT ─▶ actor changes      both rows, or neither
                               │
    relay: tick ─▶ BEGIN; SELECT … FOR UPDATE SKIP LOCKED
                    ─▶ publish ─▶ DELETE what the bus took; COMMIT     at least once
@@ -117,9 +118,11 @@ Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only 
           (stays, next tick)          dedupe by seq, fold
 ```
 
-- **The outbox is a Postgres table.** The actor writes the event's row first
-  and changes the pet only once the row is in, so the shop never sells a pet it
-  has not recorded selling. If the write throws, the actor carries on as it was
+- **The outbox is a Postgres table, written in one transaction with the
+  catalogue.** The actor writes the pet's new state to `pets` and the event's row
+  to `outbox` together, and changes its own state only once both have committed:
+  the table never records a sale the catalogue does not hold, and the shop never
+  sells a pet it has not recorded selling. If the write throws, the actor carries on as it was
   and answers `NotRecorded`, a 503: the pet is still on the shelf, and the
   registry is never asked. That 503 is the same response as a registry that
   cannot be reached (`Unavailable`, with a message saying which), because
@@ -160,16 +163,19 @@ Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only 
   are held. A refusal is logged and counted, and the
   event stays in the table for the next tick. `restartOnDefect` starts the
   relay again after a claim that throws, and the rolled-back claim loses nothing.
-- **The bus** is a bounded queue into a Pekko `BroadcastHub` in the same process,
-  standing where a broker would. It refuses the way one does: when full, and
-  once closed.
-- **The consumer** is `bus.subscribe()`: `statefulMap` remembers every `seq` it
-  has seen, because at-least-once means some arrive twice, and `scan` folds the
-  rest into a `Tally`. `/stats` reports how many duplicates it dropped.
+- **The bus** is Lark's `Hub` in the same process, a bounded queue for each
+  reader, standing where a broker would. It refuses the way one does: when a
+  reader is full, and once closed.
+- **The consumer** is `bus.consume { … }`: it folds each event into one value
+  holding every `seq` seen, because at-least-once means some arrive twice, and
+  the `Tally` the rest add up to. `/stats` reports how many duplicates it dropped.
 
-The pets are the actor's, in memory. The table is what makes
-the events durable: a restart forgets the catalogue, but not an event it
-recorded and had yet to publish. The order within one relay is the order the
+The catalogue is the `pets` table. The actor holds it in memory as the one
+writer, reads it back when it starts, and stocks it with the opening catalogue
+only where a pet is not there yet, so a restart opens the shop as it was left,
+and new arrivals are numbered on from the highest id it holds. `RestartSpec`
+adopts a pet, stops the shop, starts it again on the same database, and finds
+her adopted. The order within one relay is the order the
 events were recorded. With more than one relay, each one's batch is in order
 and the batches interleave.
 
@@ -189,7 +195,7 @@ ShopEvent ──kimney──▶ wire record ──avro4k──▶ GenericRecord 
                                                                               │
 ShopEvent ◀──kimney── wire record ◀──avro4k── GenericRecord ◀──Confluent──────┘
     │                                        (a record that will not read: dead letters, committed past)
-    └─▶ projection, on whichever backend ProjectionStreams names ─▶ runCommitting()
+    └─▶ projection, on the graph's stream backend ─▶ runCommitting()
 ```
 
 - **The wire records are their own types.** `petshop.app.wire` holds
@@ -209,9 +215,6 @@ ShopEvent ◀──kimney── wire record ◀──avro4k── GenericRecord 
   past. A registry that cannot be asked is a defect, and the run ends for its
   owner to start again. Confluent throws the same exception for both, so
   `registryDown` reads what it wraps.
-- **The projection runs on its own backend.** `ProjectionStreams` is a key of
-  its own: Pekko beside the in-process hub, which only Pekko can read, and either
-  backend over Kafka, while the relay runs on Forks.
 
 `petshop.bus.kind` picks the bus, `BUS` in the environment: `in-process` by
 default, or `kafka`, which reads `petshop.bus.kafka`'s broker, topic, group and
@@ -219,6 +222,13 @@ registry. The choice is made where the graph is assembled, with lark-app's
 `Config.choosing`, so the branch not taken has no node: a shop on the
 in-process bus opens no producer, and a shop on Kafka starts no hub. A `kind`
 that is neither refuses the start, naming where it was set.
+
+**What a bus promises is a test of its own.** `EventBusContract` holds what any
+`EventBus` must do: an event published before anyone reads reaches the first
+reader, a reader reads events in the order they were published, and the whole
+service runs on it, an adoption reaching the projection. `HubBusSpec` and
+`KafkaBusSpec` each extend it and say only how to make their bus, and add what
+is true of that bus alone. Another bus is one class that passes it.
 
 ### The application is a value
 
@@ -358,7 +368,7 @@ exec(adoptTaken) { step ->
 | Lark, Kafka | **Worth it.** A topic is a stream like the others, and an offset is committed only once its event is handled |
 | Proofload | **Worth it.** The cheapest win: correctness under load in a few lines |
 | kimney | **Worth it** once events or the API have a wire format of their own; a missing field is a compile error |
-| ExoQuery | **Not here, yet.** Real type checking, but for three statements it costs a separate build on an older Kotlin |
+| ExoQuery | **Not here, yet.** Real type checking, but for six statements it costs a separate build on an older Kotlin |
 
 
 ### Pelican
@@ -398,10 +408,9 @@ mistake that cannot happen here.
 - **A pet is sold once.** Twenty adopters race for one tortoise on a subgraph
   that binds no port, and exactly one wins. Under load, two hundred a second try
   to adopt one already gone, and every one is told so.
-- **An actor cannot answer with null.** Pekko refuses a null message, so a
-  nullable reply would fail at run time. `ask` binds its reply to `Any`, so a
-  nullable reply type does not compile, and the shop's `Find` answers an
-  `Option<Pet>`.
+- **An actor cannot answer with null.** The shop is a `lark-actor` behaviour,
+  and a `Reply<A : Any>` will not take a nullable type, so "no such pet" is an
+  `Option<Pet>` and a `null` answer does not compile.
 - **The wiring is checked as the code compiles.** A missing key is a compiler
   error on the recipe that asked for it, and `larkWiring` runs every graph on
   `check`.
@@ -425,7 +434,7 @@ mistake that cannot happen here.
 a graph a hand-written `main` might do in fewer. It does not delete code; it
 makes a set of mistakes impossible. `singleOf(::Thing)` shortens a node that is
 a plain constructor call, and few are: most are a resource with a release, a
-factory, an adapter between Pekko systems, a stream being run or a config
+factory, an actor, a stream being run or a config
 section.
 
 **Its limits.** The compiler plugin behind the in-editor error is written
@@ -448,8 +457,8 @@ runs.
 
 **Verdict: worth it** for background work with time in it. The relay is the clear
 case: tested an hour at a time on a clock the test owns, restarted after a
-defect, and run on whichever backend the graph names. For the in-process bus it
-adds less, and ties the bus's readers to Pekko.
+defect, and run on whichever backend the graph names. Every stream here, the
+in-process bus's readers included, runs on Forks.
 
 **What it gives.**
 
@@ -461,17 +470,16 @@ adds less, and ties the bus's readers to Pekko.
   stays `Nothing`.
 - **A defect is not the end.** `restartOnDefect` runs the relay again after a
   claim that throws, and the rolled-back claim loses nothing.
-- **An idempotent consumer is two operators.** `statefulMap` carries the `seq`s
-  seen and `scan` the tally, as plain Kotlin values.
+- **An in-process bus is a library type.** `Hub` fans one publisher out to
+  every reader on any backend, holds what is published before the first reader,
+  and refuses rather than blocks when a reader is full.
 - **A run stops from outside.** `Run.start` answers a `Running`, whose `close`
   is the node's release.
-- **One description, more than one backend.** The relay runs on Lark's Forks,
-  and the arrivals and the projection on Pekko, because the bus is a Pekko hub.
-  The binding that picks the backend is one line, and the relay's tests run the
-  same description on a test clock.
+- **One description, more than one backend.** The binding that picks the
+  backend is one line, Forks for everything here, and the relay's tests run the
+  same description on a clock the test owns.
 
-**Its limits.** A Pekko-native source runs only on Pekko, so whatever reads the
-in-process bus is pinned to it. Forks' `stop` interrupts the loop, which should
+**Its limits.** Forks' `stop` interrupts the loop, which should
 cut a claim blocked on Postgres short and roll it back; no test here holds that
 yet.
 
@@ -552,7 +560,7 @@ supports it.
 
 ### ExoQuery
 
-**Verdict: not here, yet.** The outbox has three statements. Typing them is real,
+**Verdict: not here, yet.** The outbox and the catalogue have six statements between them. Typing them is real,
 but a separate build on Kotlin 2.3.0, a conversion layer and a `free` block for
 the locking clause cost more than the SQL they replace. Worth another look
 when it loads on the project's Kotlin, or with many more queries.
@@ -569,11 +577,11 @@ on 2.3.0, and `app` converts events to rows and back.
 ## Sharp edges
 
 **Three type systems can agree on something that fails.** Kotlin, Pelican and
-the actor protocol all accepted an actor answering "no such pet" with `null`,
-and Pekko refuses a null message at run time. Running it is what finds that.
-`ask` makes a nullable reply a compile error, and the general point
-stands: a declared failure is only as good as everything beneath it.
-*Handled:* by `ask`, and by the shop's actor moving to `lark-actor`.
+the actor protocol can all accept an actor answering "no such pet" with `null`,
+when the actor runtime underneath refuses a null message, as Pekko's does, at
+run time. Running it is what finds that, and a declared failure is only as good
+as everything beneath it. *Handled:* the shop's actor is a `lark-actor`
+behaviour, whose replies cannot be null.
 
 **An annotation that crosses a fork can still be lost at the backend.**
 Flattening the pairs onto the message reads correctly to a person, while

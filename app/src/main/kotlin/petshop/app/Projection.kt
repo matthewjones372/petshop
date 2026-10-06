@@ -43,21 +43,13 @@ private val nothingYet = Tally(events = 0, duplicates = 0, bySpecies = Species.e
  *
  * The bus is at-least-once, so it knows events by `seq`. It keeps every `seq` it has seen rather than
  * the highest, because a retried event arrives after later ones and a high-water mark would drop it.
- * It runs on [ProjectionStreams], and is stopped before the bus closes.
+ * It runs on the graph's [StreamBackend], and is stopped before the bus closes.
  */
-/**
- * What the projection's consumer runs on, which is not always what the relay does: the relay is a loop
- * over Postgres and runs anywhere, while the in-process bus is a Pekko hub only Pekko can read. A key of
- * its own, so each is decided where the bus is.
- */
-@JvmInline
-value class ProjectionStreams(val backend: StreamBackend)
-
 val projection: Module =
     singleOf(
-        { bus: EventBus, streams: ProjectionStreams ->
+        { bus: EventBus, streams: StreamBackend ->
             val latest = AtomicReference(Seen(emptySet(), nothingYet))
-            Projection(latest, bus.consume { event -> latest.updateAndGet { it + event } }.start(streams.backend))
+            Projection(latest, bus.consume { event -> latest.updateAndGet { it + event } }.start(streams))
         },
         { projection -> projection.running.close() },
     )
