@@ -3,7 +3,7 @@ plugins {
     id("io.github.matthewjones372.kimney") version "0.3.0"
 }
 
-val pelicanVersion = "1.0.0-RC3"
+val pelicanVersion: String = providers.gradleProperty("pelicanVersion").get()
 val pekkoVersion = "1.2.1"
 
 dependencies {

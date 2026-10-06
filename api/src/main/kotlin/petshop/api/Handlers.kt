@@ -29,7 +29,8 @@ fun petshopApi(shop: PetShop, health: () -> Healthy, scrape: () -> String, tally
                         is ProblemDto.NoSuchPet -> petMissing(problem)
                         is ProblemDto.AlreadyAdopted -> petTaken(problem)
                         is ProblemDto.NotChipped -> petNotChipped(problem)
-                        is ProblemDto.Unavailable -> unavailable(problem)
+                        is ProblemDto.RegistryDown -> registryDown(problem)
+                        is ProblemDto.NotRecorded -> notRecorded(problem)
                     }
                 },
                 { pet -> ok(pet.toDto()) },

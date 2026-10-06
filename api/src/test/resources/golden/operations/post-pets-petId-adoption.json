@@ -58,11 +58,25 @@
             }
           },
           "503": {
-            "description": "The adoption could not be finished just now; try again",
+            "description": "The chip registry could not be reached; try again; The adoption could not be recorded; try again",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unavailable"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/RegistryDown"
+                    },
+                    {
+                      "$ref": "#/components/schemas/NotRecorded"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "registry_down": "#/components/schemas/RegistryDown",
+                      "not_recorded": "#/components/schemas/NotRecorded"
+                    }
+                  }
                 }
               }
             }
@@ -161,7 +175,23 @@
           "message"
         ]
       },
-      "Unavailable": {
+      "RegistryDown": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "message"
+        ]
+      },
+      "NotRecorded": {
         "type": "object",
         "properties": {
           "id": {

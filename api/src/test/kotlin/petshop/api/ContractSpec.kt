@@ -83,8 +83,8 @@ class ContractSpec {
     fun `the registry's refusals, and a sale the shop could not record, reach the caller as declared failures`() {
         listOf(
             NotChipped(1) to ProblemDto.NotChipped(1, NotChipped(1).message),
-            RegistryDown(1) to ProblemDto.Unavailable(1, RegistryDown(1).message),
-            NotRecorded(1) to ProblemDto.Unavailable(1, NotRecorded(1).message),
+            RegistryDown(1) to ProblemDto.RegistryDown(1, RegistryDown(1).message),
+            NotRecorded(1) to ProblemDto.NotRecorded(1, NotRecorded(1).message),
         ).forEach { (refusal, declared) ->
             val refusing = petshopApi(
                 shop = object : PetShop by OnePet(nibbles) {
