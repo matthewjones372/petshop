@@ -11,6 +11,7 @@ import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.shouldBeOk
+import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
 import io.github.matthewjones372.proofload.at
 import io.github.matthewjones372.proofload.engine.Proofload
 import io.github.matthewjones372.proofload.junit5.LoadTest
@@ -22,11 +23,13 @@ import io.github.matthewjones372.proofload.warmingUp
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.withClue
 import io.kotest.matchers.comparables.shouldBeLessThan
+import io.kotest.matchers.longs.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.extension.RegisterExtension
+import petshop.api.ProblemDto
 import petshop.api.adoptPet
 import petshop.api.listPets
 import petshop.api.stats
@@ -37,15 +40,12 @@ import petshop.app.RegistrySettings
 import petshop.app.TestPostgres
 import petshop.app.onAFreshDatabase
 import petshop.app.onDatabase
+import petshop.app.petshop
 import petshop.app.recorded
 import petshop.app.unsent
-import io.kotest.matchers.longs.shouldBeGreaterThan
-import petshop.app.petshop
-import petshop.domain.AlreadyAdopted
 import petshop.registry.ChipRecord
 import petshop.registry.lookupChip
 import petshop.registry.recordKeeper
-import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
 
 /**
  * The whole application under load, started by its own graph in this process: the actor, the arrivals
@@ -125,7 +125,7 @@ class PetshopLoadTest {
                         when (val answer = client.outcome(adoptPet, 1L)) {
                             is Outcome.Ok -> step.fail("the tortoise was sold twice")
                             is Outcome.Err ->
-                                if (answer.error !is AlreadyAdopted) step.fail("not the declared failure")
+                                if (answer.error !is ProblemDto.AlreadyAdopted) step.fail("not the declared failure")
                         }
                     }
                 }
