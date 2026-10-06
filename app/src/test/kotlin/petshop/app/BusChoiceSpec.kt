@@ -3,8 +3,6 @@ package petshop.app
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import io.github.matthewjones372.lark.app.testNode
-import io.github.matthewjones372.lark.stream.Forks
-import io.github.matthewjones372.lark.stream.PekkoStreams
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -26,9 +24,6 @@ class BusChoiceSpec {
             petshopFrom(ConfigFactory.load())
         }
         Then("its bus is the in-process hub") { testNode(graph) { bus: EventBus -> bus.shouldBeInstanceOf<HubBus>() } }
-        And("the projection reads it on Pekko, the only backend that can read a hub") {
-            testNode(graph) { streams: ProjectionStreams -> streams.backend.shouldBeInstanceOf<PekkoStreams>() }
-        }
     }
 
     @Test
@@ -46,9 +41,6 @@ class BusChoiceSpec {
             )
         }
         Then("its bus is KafkaBus") { testNode(graph) { bus: EventBus -> bus.shouldBeInstanceOf<KafkaBus>() } }
-        And("the projection reads it on Forks, where a blocking poll is one loop on a virtual thread") {
-            testNode(graph) { streams: ProjectionStreams -> streams.backend.shouldBeInstanceOf<Forks>() }
-        }
     }
 
     @Test

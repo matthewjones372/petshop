@@ -18,15 +18,13 @@ dependencies {
     api(project(":api"))
     implementation(project(":registry"))
     implementation("io.github.matthewjones372:lark-app:$larkVersion")
-    implementation("io.github.matthewjones372:lark-app-pekko:$larkVersion")
+    // The shop is an actor in a Lark flock, a node in the graph like any other.
+    implementation("io.github.matthewjones372:lark-actor:$larkVersion")
+    implementation("io.github.matthewjones372:lark-app-actor:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
-    // The Pekko backend, which brings lark-stream with it: the arrivals feed and the projection run on
-    // the actor system, because the bus they read is a Pekko hub.
-    implementation("io.github.matthewjones372:lark-stream-pekko:$larkVersion")
-    // Forks, which the relay runs on. Its description names no backend: the graph decides, and
-    // RelaySpec runs the same description on a clock the test moves.
+    // Forks, which every stream runs on: the relay, the arrivals and the projection. Their descriptions
+    // name no backend; the graph decides, and RelaySpec runs the relay on a clock the test moves.
     implementation("io.github.matthewjones372:lark-stream-forks:$larkVersion")
-    implementation("io.github.matthewjones372:lark-pekko:$larkVersion")
     // The bus on Kafka: a consumer loop on whichever backend the graph names, committing what it handled.
     implementation("io.github.matthewjones372:lark-kafka:$larkVersion")
     // Avro records carried in the schema registry's wire format, and derived from Kotlin classes.

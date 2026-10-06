@@ -2,14 +2,7 @@ package petshop.app
 
 import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import io.confluent.kafka.schemaregistry.testutil.MockSchemaRegistry
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.boundTo
-import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.singleOf
-import io.github.matthewjones372.lark.app.subgraph
-import io.github.matthewjones372.lark.app.testApp
-import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.kafka.DEAD_LETTER_HEADER
 import io.github.matthewjones372.lark.kafka.DecodeError
 import io.github.matthewjones372.lark.kafka.Topic
@@ -25,14 +18,10 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
-import petshop.api.Tally
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
 import petshop.domain.PetId
-import petshop.domain.PetShop
 import petshop.domain.Species
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -40,17 +29,13 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
 /** What a test watches from: the shop to act on, the bus to publish to, the consumer to read. */
-private class OnKafka(val shop: PetShop, val bus: EventBus, val projection: Projection)
-
-private val onKafka: Module =
-    single { shop: PetShop, bus: EventBus, projection: Projection, _: OutboxRelay -> OnKafka(shop, bus, projection) }
-
 /**
  * The shop's events on Kafka, as Avro in the schema registry's wire format, read back by lark-kafka's
- * consumer loop. The registry is Confluent's in-process mock, `mock://`: the serializers and the wire
- * format are the real ones, and no registry server runs.
+ * consumer loop. What every bus promises is [EventBusContract]'s; what is here is Kafka's own. The registry
+ * is Confluent's in-process mock, `mock://`: the serializers and the wire format are the real ones, and no
+ * registry server runs.
  */
-class KafkaBusSpec {
+class KafkaBusSpec : EventBusContract() {
 
     companion object {
         @JvmField
@@ -58,44 +43,23 @@ class KafkaBusSpec {
         val kafka = KafkaBroker()
     }
 
+    override fun bus(name: String): EventBus = kafkaBus(name)
+
+    override val remembersReaders = true
+
+    override fun handled(name: String): Long? = kafka.committed("projection-$name", name)
+
     private fun registry(scope: String): Map<String, Any> = mapOf("schema.registry.url" to "mock://$scope")
 
-    private fun bus(name: String, deadLetters: ((DecodeError) -> Unit)? = null) =
+    private fun kafkaBus(name: String, deadLetters: ((DecodeError) -> Unit)? = null) =
         KafkaBus(Topic(name), kafka.bootstrap, group = "projection-$name", registry(name), deadLetters)
-
-    /** The whole service with its bus on Kafka, and its projection on [backend]. No port, no arrivals. */
-    private fun shopOnKafka(name: String, backend: String): Module {
-        val kafkaBus = singleOf<KafkaBus>({ bus(name) }, { bus -> bus.close() }).boundTo<EventBus>()
-        val graph = petshop.overriding(single<petshop.domain.ChipRegistry> { FakeRegistry() }).overriding(kafkaBus)
-            .onAFreshDatabase()
-        val streams = if (backend == "Forks") graph.overriding(single { -> ProjectionStreams(Forks()) }) else graph
-        return (streams + onKafka).subgraph<OnKafka>().overridingConfig("petshop.outboxEvery = 50ms")
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = ["Forks", "Pekko"])
-    fun `an adoption reaches the projection through Kafka, on either backend`(backend: String) = story {
-        val shop = Given("the whole service with its bus on Kafka, and its projection on $backend") {
-            shopOnKafka("adoptions-$backend", backend)
-        }
-        testApp(shop) { app: OnKafka ->
-            When("Ada adopts Nibbles") { app.shop.adopt(PetId(1), by = "Ada") }
-            val tally = Then("the projection counts a tortoise adopted").eventually(30.seconds) {
-                app.projection.tally().also { it.adopted(Species.Tortoise) shouldBe 1 }
-            }
-            And("it counted one event") { tally.events shouldBe 1 }
-            And("its consumer committed what it folded in").eventually(30.seconds) {
-                kafka.committed("projection-adoptions-$backend", "adoptions-$backend") shouldBe 1L
-            }
-        }
-    }
 
     @Test
     fun `an event on the wire is the registry's Avro, and reads back as the domain event it was`() = story {
         val nibbles = Given("Ada's adoption of Nibbles, as event 3") {
             PetAdopted(seq = 3, pet = Pet(PetId(1), "Nibbles", Species.Tortoise, adopted = true), by = "Ada")
         }
-        When("the bus publishes it") { bus("wire").use { it.publish(nibbles) } }
+        When("the bus publishes it") { kafkaBus("wire").use { it.publish(nibbles) } }
         val record = Then("one record is on the topic").eventually(30.seconds) {
             kafka.records("wire", StringDeserializer(), ByteArrayDeserializer()).single()
         }
@@ -117,7 +81,7 @@ class KafkaBusSpec {
         val dead = ConcurrentLinkedQueue<DecodeError>()
         val seen = ConcurrentLinkedQueue<Any>()
 
-        bus("mixed", deadLetters = dead::add).use { bus ->
+        kafkaBus("mixed", deadLetters = dead::add).use { bus ->
             When("the bus publishes Waffle, and a consumer reads the topic") {
                 bus.publish(waffle)
                 bus.consume { event -> seen.add(event) }.start(Forks())
@@ -140,7 +104,7 @@ class KafkaBusSpec {
         val waffle = PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog))
         val seen = ConcurrentLinkedQueue<Any>()
 
-        bus("lettered").use { bus ->
+        kafkaBus("lettered").use { bus ->
             When("the bus publishes Waffle behind it, and a consumer reads the topic") {
                 bus.publish(waffle)
                 bus.consume { event -> seen.add(event) }.start(Forks())
@@ -169,5 +133,3 @@ class KafkaBusSpec {
             .use { it.send(ProducerRecord(topic, "junk", "not avro".toByteArray())).get(30, TimeUnit.SECONDS) }
     }
 }
-
-private fun Tally.adopted(species: Species): Int = bySpecies.single { it.species == species }.adopted

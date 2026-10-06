@@ -12,10 +12,17 @@ import javax.sql.DataSource
 data class DatabaseSettings(val url: String, val user: String, val password: String)
 
 /**
- * The one table the shop keeps. `seq` is Postgres's to hand out, so it keeps counting across restarts
+ * The shop's two tables. `pets` is the catalogue as the shop last left it, and `outbox` the events that changed
+ * it, written together in one transaction. `seq` is Postgres's to hand out, so it keeps counting across restarts
  * and across every instance writing to the same table, which a counter in the actor could not.
  */
 private val schema = """
+    CREATE TABLE IF NOT EXISTS pets (
+        id      BIGINT  PRIMARY KEY,
+        name    TEXT    NOT NULL,
+        species TEXT    NOT NULL,
+        adopted BOOLEAN NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS outbox (
         seq        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         kind       TEXT    NOT NULL CHECK (kind IN ('arrived', 'adopted', 'returned')),

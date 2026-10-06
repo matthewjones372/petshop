@@ -20,8 +20,9 @@ import io.github.matthewjones372.lark.stream.restartOnDefect
 import io.github.matthewjones372.lark.stream.runFold
 import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.stream.tick
-import petshop.domain.ShopEvent
 import kotlin.time.Duration
+import petshop.domain.Pet
+import petshop.domain.ShopEvent
 
 /**
  * Where the shop writes what happened, and where the relay reads it back from.
@@ -31,8 +32,14 @@ import kotlin.time.Duration
  */
 interface Outbox {
 
-    /** Writes the event [numbered] makes, with the next `seq`, and answers it numbered. */
-    fun record(numbered: (seq: Long) -> ShopEvent): ShopEvent
+    /**
+     * Writes [pet] as it now is and the event [numbered] makes, with the next `seq`, in one transaction: both or
+     * neither. Answers the event numbered.
+     */
+    fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent
+
+    /** The catalogue as the shop last left it, stocked with [opening]'s pets the first time it is empty of them. */
+    fun shelf(opening: List<Pet>): List<Pet>
 
     /**
      * Up to [limit] of the events nobody has published, oldest first, held from every other claim while

@@ -5,6 +5,10 @@ import io.github.matthewjones372.lark.app.testApp
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import javax.sql.DataSource
 import org.junit.jupiter.api.Test
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
@@ -13,9 +17,9 @@ import petshop.domain.PetId
 import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+import petshop.outbox.OutboxRow
+import petshop.outbox.OutboxTable
+import petshop.outbox.PetRow
 
 private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 private val barnaby = Pet(PetId(2), "Barnaby", Species.Dog)
@@ -39,9 +43,9 @@ class PostgresOutboxSpec {
         onItsOwn { outbox ->
             val recorded = When("Nibbles arrives, is adopted and is returned") {
                 listOf(
-                    outbox.record { seq -> PetArrived(seq, nibbles) },
-                    outbox.record { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") },
-                    outbox.record { seq -> PetReturned(seq, nibbles) },
+                    outbox.record(nibbles) { seq -> PetArrived(seq, nibbles) },
+                    outbox.record(nibbles.copy(adopted = true)) { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") },
+                    outbox.record(nibbles) { seq -> PetReturned(seq, nibbles) },
                 )
             }
             Then("Postgres numbered them 1, 2 and 3: the seq is the table's, so it counts on across restarts") {
@@ -55,8 +59,8 @@ class PostgresOutboxSpec {
     fun `what the bus took leaves the table, and what it refused stays for the next claim`() = story {
         onItsOwn { outbox ->
             val (arrived, adopted) = Given("Nibbles' arrival and adoption in the outbox") {
-                outbox.record { seq -> PetArrived(seq, nibbles) } to
-                    outbox.record { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") }
+                outbox.record(nibbles) { seq -> PetArrived(seq, nibbles) } to
+                    outbox.record(nibbles.copy(adopted = true)) { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") }
             }
             val taken = When("a claim's bus takes the adoption and refuses the arrival") {
                 outbox.claim(10) { claimed -> claimed.filter { it.seq == adopted.seq } }
@@ -69,7 +73,7 @@ class PostgresOutboxSpec {
     @Test
     fun `a claim that throws halfway takes nothing`() = story {
         onItsOwn { outbox ->
-            val arrived = Given("Nibbles' arrival in the outbox") { outbox.record { seq -> PetArrived(seq, nibbles) } }
+            val arrived = Given("Nibbles' arrival in the outbox") { outbox.record(nibbles) { seq -> PetArrived(seq, nibbles) } }
             When("a claim falls over after publishing") {
                 shouldThrow<IllegalStateException> { outbox.claim(10) { error("the process fell over after publishing") } }
             }
@@ -83,8 +87,8 @@ class PostgresOutboxSpec {
     fun `a second claim skips the rows the first is holding, rather than waiting for them`() = story {
         onItsOwn { outbox ->
             val (first, second) = Given("two of Nibbles' arrivals, then two of Barnaby's") {
-                (1..2).map { outbox.record { seq -> PetArrived(seq, nibbles) } } to
-                    (1..2).map { outbox.record { seq -> PetArrived(seq, barnaby) } }
+                (1..2).map { outbox.record(nibbles) { seq -> PetArrived(seq, nibbles) } } to
+                    (1..2).map { outbox.record(barnaby) { seq -> PetArrived(seq, barnaby) } }
             }
 
             val holding = CountDownLatch(1)
@@ -114,6 +118,40 @@ class PostgresOutboxSpec {
                 letGo.countDown()
                 slow.get(5, TimeUnit.SECONDS) shouldBe first
                 outbox.left() shouldBe second
+            }
+        }
+    }
+
+    @Test
+    fun `the shelf starts as the opening catalogue, and keeps every change written to it`() = story {
+        onItsOwn { outbox ->
+            val first = When("the shelf is read for the first time") { outbox.shelf(listOf(nibbles, barnaby)) }
+            Then("it is the opening catalogue") { first shouldBe listOf(nibbles, barnaby) }
+            When("Nibbles' adoption is recorded") {
+                outbox.record(nibbles.copy(adopted = true)) { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") }
+            }
+            Then("the shelf has her adopted, and the opening catalogue does not put her back") {
+                outbox.shelf(listOf(nibbles, barnaby)) shouldBe listOf(nibbles.copy(adopted = true), barnaby)
+            }
+        }
+    }
+
+    @Test
+    fun `a pet's change and its event are one transaction, so an event that fails leaves the pet as it was`() = story {
+        testApp(petshop.onAFreshDatabase().subgraph<DataSource>()) { dataSource: DataSource ->
+            val table = Given("a pets table with Nibbles on the shelf") {
+                OutboxTable(dataSource).also { it.stock(listOf(PetRow(1, "Nibbles", "Tortoise", adopted = false))) }
+            }
+            When("her adoption is recorded with an event the outbox table refuses") {
+                shouldThrow<Exception> {
+                    table.record(
+                        PetRow(1, "Nibbles", "Tortoise", adopted = true),
+                        OutboxRow(0, "sold", 1, "Nibbles", "Tortoise", adopted = true, adoptedBy = "Ada"),
+                    )
+                }
+            }
+            Then("she is still on the shelf, because the pet's row rolled back with the event") {
+                table.pets().single().adopted shouldBe false
             }
         }
     }
