@@ -18,7 +18,8 @@ docker compose -f demo/docker-compose.yml up -d postgres registry
 ./gradlew loadTest         # 200 requests a second at the real graph; not part of test or build
 ```
 
-`demo/` adds Prometheus and Grafana to watch the running shop; see `demo/README.md`.
+`demo/` adds Prometheus, Grafana, Alertmanager and [Estate](https://github.com/matthewjones372/estate) to watch the
+running shop. Grafana is at <http://localhost:3000> and Estate at <http://localhost:8095>; see `demo/README.md`.
 
 ## Libraries and dependencies
 
