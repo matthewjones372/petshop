@@ -9,4 +9,9 @@ pluginManagement {
     }
 }
 
+// Where the JDK 21 this build compiles for comes from when it is not installed. Gradle 10 will
+// not download a toolchain without being told where from, and the petshop's own settings do not
+// reach an included build.
+plugins { id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0" }
+
 rootProject.name = "outbox-table"
