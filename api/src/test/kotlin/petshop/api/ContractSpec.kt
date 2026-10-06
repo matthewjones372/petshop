@@ -49,7 +49,7 @@ class ContractSpec {
 
     @Test
     fun `a test names the endpoint, not the URL`() {
-        app.outcome(getPet, 1L).shouldBeOk() shouldBe nibbles
+        app.outcome(getPet, 1L).shouldBeOk() shouldBe nibbles.toDto()
     }
 
     @Test
@@ -64,17 +64,27 @@ class ContractSpec {
 
     @Test
     fun `adopting twice answers the failure the endpoint declared`() {
-        app.outcome(adoptPet, 1L).shouldBeOk() shouldBe nibbles.copy(adopted = true)
+        app.outcome(adoptPet, 1L).shouldBeOk() shouldBe nibbles.copy(adopted = true).toDto()
 
-        app.outcome(adoptPet, 1L).shouldBeError() shouldBe AlreadyAdopted(1)
+        app.outcome(adoptPet, 1L).shouldBeError() shouldBe ProblemDto.AlreadyAdopted(1, "Pet 1 is already adopted")
+    }
+
+    @Test
+    fun `a missing pet answers the declared 404, with the domain's own message`() {
+        app.outcome(getPet, 2L).shouldBeError() shouldBe ProblemDto.NoSuchPet(2, "No pet 2")
+    }
+
+    @Test
+    fun `the DTO carries the id inside PetId, so the JSON id is a plain number`() {
+        nibbles.toDto() shouldBe PetDto(1, "Nibbles", SpeciesDto.Tortoise, adopted = false)
     }
 
     @Test
     fun `the registry's refusals, and a sale the shop could not record, reach the caller as declared failures`() {
         listOf(
-            NotChipped(1) to NotChipped(1),
-            RegistryDown(1) to Unavailable(1, RegistryDown(1).message),
-            NotRecorded(1) to Unavailable(1, NotRecorded(1).message),
+            NotChipped(1) to ProblemDto.NotChipped(1, NotChipped(1).message),
+            RegistryDown(1) to ProblemDto.Unavailable(1, RegistryDown(1).message),
+            NotRecorded(1) to ProblemDto.Unavailable(1, NotRecorded(1).message),
         ).forEach { (refusal, declared) ->
             val refusing = petshopApi(
                 shop = object : PetShop by OnePet(nibbles) {

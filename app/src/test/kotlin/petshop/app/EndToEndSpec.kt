@@ -7,6 +7,7 @@ import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.use
+import io.github.matthewjones372.lark.test.story
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.PelicanServer
@@ -24,6 +25,7 @@ import petshop.api.adoptPet
 import petshop.api.getPet
 import petshop.api.health
 import petshop.api.stats
+import petshop.api.toDto
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.NotChipped
@@ -51,7 +53,7 @@ import petshop.registry.recordKeeper
  *   broker, with Confluent's in-process `mock://` schema registry. The test holds on to
  *   both, so it can look in the table and on the topic as well as at the API.
  *
- * It reads as a story (`Story.kt`, a prototype of Lark specs 0115 and 0116): each step's text is what a
+ * It reads as a story, lark-test's: each step's text is what a
  * failure says, and a step's value is what the next one checks.
  *
  * The port is 0, so the test never fights the demo, or anything else, for 8080. Arrivals are an hour
@@ -108,13 +110,13 @@ class EndToEndSpec {
                 Then("Nibbles is hers") { nibbles.shouldBeOk().adopted shouldBe true }
 
                 val again = When("somebody else asks for Nibbles too") { shop.outcome(adoptPet, 1L) }
-                Then("they are told she is taken") { again.shouldBeError() shouldBe AlreadyAdopted(1) }
+                Then("they are told she is taken") { again.shouldBeError() shouldBe AlreadyAdopted(1).toDto() }
 
                 val nobody = When("somebody asks for a pet the shop never had") { shop.outcome(adoptPet, 999L) }
-                Then("there is no such pet") { nobody.shouldBeError() shouldBe NoSuchPet(999) }
+                Then("there is no such pet") { nobody.shouldBeError() shouldBe NoSuchPet(999).toDto() }
 
                 val peel = When("somebody asks for Mrs Peel") { shop.outcome(adoptPet, 3L) }
-                Then("she has no chip on record") { peel.shouldBeError() shouldBe NotChipped(3) }
+                Then("she has no chip on record") { peel.shouldBeError() shouldBe NotChipped(3).toDto() }
                 And("she is still in the shop") { shop.outcome(getPet, 3L).shouldBeOk().adopted shouldBe false }
 
                 Then("the registry recorded one new keeper, for the one adoption that happened") {

@@ -38,7 +38,7 @@ class KafkaBus(
     group: String,
     private val registry: Map<String, Any>,
     deadLetters: ((DecodeError) -> Unit)? = null,
-) : EventBus, AutoCloseable {
+) : EventBus {
 
     private val consumer: Map<String, Any> = mapOf(
         ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrap,

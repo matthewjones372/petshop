@@ -18,15 +18,13 @@ dependencies {
     api(project(":api"))
     implementation(project(":registry"))
     implementation("io.github.matthewjones372:lark-app:$larkVersion")
-    implementation("io.github.matthewjones372:lark-app-pekko:$larkVersion")
+    // The shop is an actor in a Lark flock, a node in the graph like any other.
+    implementation("io.github.matthewjones372:lark-actor:$larkVersion")
+    implementation("io.github.matthewjones372:lark-app-actor:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
-    // The Pekko backend, which brings lark-stream with it: the arrivals feed and the projection run on
-    // the actor system, because the bus they read is a Pekko hub.
-    implementation("io.github.matthewjones372:lark-stream-pekko:$larkVersion")
-    // Forks, which the relay runs on. Its description names no backend: the graph decides, and
-    // RelaySpec runs the same description on a clock the test moves.
+    // Forks, which every stream runs on: the relay, the arrivals and the projection. Their descriptions
+    // name no backend; the graph decides, and RelaySpec runs the relay on a clock the test moves.
     implementation("io.github.matthewjones372:lark-stream-forks:$larkVersion")
-    implementation("io.github.matthewjones372:lark-pekko:$larkVersion")
     // The bus on Kafka: a consumer loop on whichever backend the graph names, committing what it handled.
     implementation("io.github.matthewjones372:lark-kafka:$larkVersion")
     // Avro records carried in the schema registry's wire format, and derived from Kotlin classes.
@@ -72,6 +70,9 @@ dependencies {
     // The relay on time the test owns: an interval of ticks is one clock.adjust, and nothing sleeps.
     testImplementation("io.github.matthewjones372:lark-stream-test:$larkVersion")
 
+    // Tests that read as stories: Given, When, Then, and a failure that says which step broke.
+    testImplementation("io.github.matthewjones372:lark-test:$larkVersion")
+
     // A Kafka broker in a container, started once for the whole run, as the Postgres is.
     testImplementation("org.testcontainers:testcontainers-kafka:2.0.5")
 
@@ -83,8 +84,8 @@ dependencies {
     testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC3")
 }
 
-// The story prototype's colour (Story.kt). A test worker does not see the shell's FORCE_COLOR or NO_COLOR,
-// so they are handed on, as is -Plark.test.colour=always|never.
+// lark-test's stories colour their console copy under FORCE_COLOR or -Plark.test.colour, and a test worker does
+// not see the shell's environment, so these are handed on. Lark spec 0118 has its wiring plugin do this instead.
 tasks.test {
     listOf("FORCE_COLOR", "NO_COLOR").forEach { name -> providers.environmentVariable(name).orNull?.let { environment(name, it) } }
     providers.gradleProperty("lark.test.colour").orNull?.let { systemProperty("lark.test.colour", it) }

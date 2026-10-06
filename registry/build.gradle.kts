@@ -18,6 +18,10 @@ dependencies {
 
 kotlin.sourceSets.named("main") { kotlin.srcDir("src/main/generated") }
 
+// Pelican's check loads `registrySpec()` in Gradle's own JVM, not this module's toolchain, so the module is
+// compiled for the 21 Gradle runs on. Nothing here needs lark, the one dependency that asks for 25.
+kotlin { jvmToolchain(21) }
+
 pelican {
     clients {
         create("registry") {

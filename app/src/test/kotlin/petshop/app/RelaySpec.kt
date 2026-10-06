@@ -5,13 +5,17 @@ import arrow.core.left
 import arrow.core.right
 import io.github.matthewjones372.lark.TestClock
 import io.github.matthewjones372.lark.stream.Exit
-import io.github.matthewjones372.lark.stream.Running
 import io.github.matthewjones372.lark.stream.Run
+import io.github.matthewjones372.lark.stream.Running
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.TestStreams
 import io.github.matthewjones372.lark.stream.start
+import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import java.sql.SQLTransientConnectionException
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Test
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
@@ -20,9 +24,6 @@ import petshop.domain.PetId
 import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
-import java.sql.SQLTransientConnectionException
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * An outbox in a list, for a test about what the relay does on each tick rather than about the table:
@@ -37,8 +38,10 @@ private class Recorded(vararg events: ShopEvent, private val claiming: () -> Uni
 
     fun record(event: ShopEvent) = synchronized(waiting) { waiting += event }
 
-    override fun record(numbered: (seq: Long) -> ShopEvent): ShopEvent =
+    override fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent =
         synchronized(waiting) { numbered(waiting.size + 1L).also { waiting += it } }
+
+    override fun shelf(opening: List<Pet>): List<Pet> = opening
 
     override fun claim(limit: Int, publish: (List<ShopEvent>) -> List<ShopEvent>): List<ShopEvent> {
         claiming()
@@ -67,6 +70,8 @@ private class Taking(private val refuses: (ShopEvent) -> Boolean = { false }) : 
         }
 
     override fun consume(each: (ShopEvent) -> Unit): Run<Nothing, Long> = error("nothing reads the bus in these tests")
+
+    override fun close() = Unit
 }
 
 private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)

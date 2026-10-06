@@ -54,11 +54,44 @@ registry under `petshop.events-value`:
 curl localhost:8081/subjects/petshop.events-value/versions/latest
 ```
 
+## Estate
+
+[Estate](https://github.com/matthewjones372/estate) answers "is the shop well, and if not, where do I look?" on one
+page, at <http://localhost:8095>. It reads the same Prometheus as Grafana, and the Alertmanager that
+`prometheus/rules.yml` fires into, so an alert arrives at the top of the page with what it means for adopters, a
+place for notes, and a silence that Alertmanager keeps.
+
+`:main` moves, and Docker keeps whatever it pulled last, so pull it before the first start:
+
+```bash
+docker compose pull estate
+```
+
+To see an alert, stop the registry and adopt something; `ChipRegistryUnreachable` fires on the next evaluation, and
+resolves once the registry is back:
+
+```bash
+docker compose stop registry
+curl -X POST localhost:8080/pets/2/adoption   # registry_down
+docker compose start registry
+```
+
+The demo has no Kubernetes, Flux or CI, and Estate says so at the top of the page rather than leaving those parts
+blank. For the same reason it shows the shop as "not running": it reads that from a cluster or ECS, and the shop
+here is a process on your machine. There is no p99 either: the adoption timer is a summary without percentiles.
+
+| | |
+|---|---|
+| `estate/catalog.yaml` | the petshop as one service in one environment: its load from adoptions, its stats, the vitals and the map |
+| `estate/estate.yaml` | Estate's settings: no sign-in (every visitor is an operator), and the demo's Prometheus and Alertmanager as its sources |
+| `prometheus/rules.yml` | the alerts, each keeping `job="petshop"`, which is how Estate knows an alert is the petshop's |
+| `alertmanager/alertmanager.yml` | routes every alert nowhere: Estate reads them, and keeps its silences there |
+
 ## What is where
 
 | | |
 |---|---|
-| `docker-compose.yml` | Prometheus, Grafana, the outbox's Postgres and a WireMock stand-in for the chip registry — the app is the thing being demonstrated |
+| `docker-compose.yml` | Prometheus, Alertmanager, Grafana, Estate, the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry — the app is the thing being demonstrated |
 | `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
 | `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds, which on Linux needs the app started with `HOST=0.0.0.0` |
 | `grafana/provisioning/` | the datasource and the dashboard provider |
@@ -100,5 +133,7 @@ Prometheus convention is seconds, so `petshop_adopt_duration_sum` is not a
 
 ## Anonymous admin
 
-Grafana runs with the login form off and anonymous access as Admin. That is fine
-for something on a laptop for ten minutes and is not fine anywhere else.
+Grafana runs with the login form off and anonymous access as Admin, and Estate
+lets every visitor in as an operator, who may silence alerts, with a session
+secret written in `estate/estate.yaml`. That is fine for something on a laptop
+for ten minutes and is not fine anywhere else.
