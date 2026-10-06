@@ -547,8 +547,7 @@ adds Confluent's repository, limited to `io.confluent`. avro4k's serde needs
 Confluent 8.3 or later, which asks for its own `8.3.0-ccs` build of the Kafka
 4.3 client, so the build pins Apache's `4.3.0` to keep one client on the
 classpath. `lark-kafka` is built against 3.8 and runs on it; `KafkaBusSpec`
-is what says so. The test broker is still the 3.8 image, which a 4.3 client
-talks to.
+is what says so. The test broker and the demo's are the 4.3 image.
 
 **Its limits.** Delivery is at least once, not exactly once: `lark-kafka` has
 no transactions, so a consumer that dies after folding an event and before
@@ -625,6 +624,7 @@ OpenTelemetry SDK `1.51.0`, Micrometer's Prometheus registry `1.12.0`, Logback
 `1.5.20`, Kotest `6.2.4`, JUnit `6.1.3`. kimney `0.3.0`, avro4k `2.12.0`,
 Confluent's Avro serializer `8.3.0` with avro4k's Confluent serde, Kafka
 client `4.3.0`, the
-`apache/kafka-native:3.8.0` image for tests. Kotlin 2.4.10 (2.3.0 for `outbox-table/`), JDK 25 (21 for `registry/`, which Pelican's check loads in Gradle's JVM, and `outbox-table/`).
+`apache/kafka-native:4.3.1` image for tests and the demo, and
+`confluentinc/cp-schema-registry:8.3.2` in the demo. Kotlin 2.4.10 (2.3.0 for `outbox-table/`), JDK 25 (21 for `registry/`, which Pelican's check loads in Gradle's JVM, and `outbox-table/`).
 
 All five libraries being tried out are at an early stage, and say so.
