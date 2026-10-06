@@ -27,13 +27,15 @@ dependencies {
     implementation("io.github.matthewjones372:lark-stream-forks:$larkVersion")
     // The bus on Kafka: a consumer loop on whichever backend the graph names, committing what it handled.
     implementation("io.github.matthewjones372:lark-kafka:$larkVersion")
-    // Avro records carried in the schema registry's wire format, and derived from Kotlin classes.
-    // 7.8 is built on Kafka 3.8, the client lark-kafka is.
-    implementation("io.confluent:kafka-avro-serializer:7.8.0")
-    // Confluent 7.8 asks for its own build of the 3.8 client, 7.8.0-ccs; the Apache one it is built from is
-    // the one lark-kafka is built against, so there is one Kafka client on the classpath.
-    implementation("org.apache.kafka:kafka-clients") { version { strictly("3.8.0") } }
+    // Avro records carried in the schema registry's wire format, and derived from Kotlin classes: avro4k's
+    // own serde for Confluent's registry, which asks for Confluent 8.3 or later.
     implementation("com.github.avro-kotlin.avro4k:avro4k-core:2.12.0")
+    implementation("com.github.avro-kotlin.avro4k:avro4k-confluent-kafka-serializer:2.12.0")
+    implementation("io.confluent:kafka-avro-serializer:8.3.0")
+    // Confluent 8.3 asks for its own build of the Kafka 4.3 client, 8.3.0-ccs, which is not on Maven Central;
+    // the Apache one it is built from stands in, so there is one Kafka client on the classpath. lark-kafka is
+    // built against 3.8 and runs on it: KafkaBusSpec is the proof.
+    implementation("org.apache.kafka:kafka-clients") { version { strictly("4.3.0") } }
     implementation("io.github.matthewjones372:lark-otel:$larkVersion")
     implementation("io.opentelemetry:opentelemetry-sdk:1.51.0")
 
