@@ -5,6 +5,7 @@ import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.capturingLogs
+import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.maps.shouldContainKey
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain

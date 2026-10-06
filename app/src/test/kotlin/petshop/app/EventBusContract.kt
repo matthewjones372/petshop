@@ -9,8 +9,11 @@ import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.start
+import io.github.matthewjones372.lark.test.story
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Test
 import petshop.api.Tally
 import petshop.domain.ChipRegistry
@@ -20,8 +23,6 @@ import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.ShopEvent
 import petshop.domain.Species
-import java.util.concurrent.ConcurrentLinkedQueue
-import kotlin.time.Duration.Companion.seconds
 
 /** The shop to act on, and the projection reading the bus. The relay is a dependency so that it runs. */
 private class Served(val shop: PetShop, val projection: Projection)

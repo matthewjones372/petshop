@@ -8,8 +8,13 @@ import io.github.matthewjones372.lark.kafka.DecodeError
 import io.github.matthewjones372.lark.kafka.Topic
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.start
+import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
@@ -23,10 +28,6 @@ import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
 import petshop.domain.PetId
 import petshop.domain.Species
-import java.nio.ByteBuffer
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.TimeUnit
-import kotlin.time.Duration.Companion.seconds
 
 /** What a test watches from: the shop to act on, the bus to publish to, the consumer to read. */
 /**
