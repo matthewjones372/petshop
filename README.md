@@ -618,12 +618,12 @@ files from the same typed stubs the tests use.
 
 ## Versions
 
-Pelican `1.0.0-RC3`, Lark `0.7.0` (its Gradle wiring plugin `0.2.0`), Proofload
+Pelican `1.0.0-RC3`, Lark `0.9.0` (its Gradle wiring plugin `0.2.0`), Proofload
 `0.1.0-rc4`, ExoQuery `2.0.4.PL`. Pekko `1.2.1`, Pekko HTTP `1.3.0`, Arrow
 `2.1.2`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`, HikariCP `7.1.0`,
 OpenTelemetry SDK `1.51.0`, Micrometer's Prometheus registry `1.12.0`, Logback
 `1.5.20`, Kotest `6.2.4`, JUnit `6.1.3`. kimney `0.3.0`, avro4k `2.12.0`,
 Confluent's Avro serializer `7.8.0`, Kafka client `3.8.0`, the
-`apache/kafka-native:3.8.0` image for tests. Kotlin 2.4.10 (2.3.0 for `outbox-table/`), JDK 21.
+`apache/kafka-native:3.8.0` image for tests. Kotlin 2.4.10 (2.3.0 for `outbox-table/`), JDK 25 (21 for `registry/`, which Pelican's check loads in Gradle's JVM, and `outbox-table/`).
 
 All five libraries being tried out are at an early stage, and say so.
