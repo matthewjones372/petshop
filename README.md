@@ -45,7 +45,7 @@ What they run on, and what the tests use:
 | Arrow | `Either` and `Raise` for declared failures, from the domain up |
 | OpenTelemetry, Micrometer, Prometheus, Grafana | traces through the graph, metrics at `/metrics`, and the demo's dashboard |
 | Logback | where Lark's log lines end up, through `lark-slf4j`, and Pekko's |
-| Apache Kafka, avro4k, Confluent's Avro serializer | the bus on a broker: events as Avro in the schema registry's wire format; tests run the broker in a container and Confluent's in-process `mock://` registry |
+| Apache Kafka, avro4k, Confluent's schema registry client | the bus on a broker: events as Avro in the schema registry's wire format, written by avro4k's Confluent serde; tests run the broker in a container and Confluent's in-process `mock://` registry |
 
 ## Modules
 
@@ -199,9 +199,9 @@ loop, which commits an offset only once the projection has folded that event
 in.
 
 ```
-ShopEvent ──kimney──▶ wire record ──avro4k──▶ GenericRecord ──Confluent──▶ [0][schema id][Avro]
-                                                                              │
-ShopEvent ◀──kimney── wire record ◀──avro4k── GenericRecord ◀──Confluent──────┘
+ShopEvent ──kimney──▶ wire record ──avro4k's Confluent serde──▶ [0][schema id][Avro]
+                                                                 │
+ShopEvent ◀──kimney── wire record ◀──avro4k's Confluent serde────┘
     │                                        (a record that will not read: dead letters, committed past)
     └─▶ projection, on the graph's stream backend ─▶ runCommitting()
 ```
@@ -212,6 +212,10 @@ ShopEvent ◀──kimney── wire record ◀──avro4k── GenericRecord 
   kimney derives both mappings at compile time: `ShopEvent.toWire()` and
   `WireEvent.toDomain()` are one `transformInto()` each, and a field that
   either side cannot fill does not compile.
+- **avro4k writes the registry's format itself.** Its Confluent serde encodes
+  the wire record straight to Avro and registers its schema, with no
+  `GenericRecord` between them. The serde is marked experimental, and
+  `Avro.kt` opts in to it.
 - **One schema per topic.** The three events are a union inside one
   `ShopEventRecord`, so the registry holds versions of one subject instead of
   a record type per case.
@@ -539,10 +543,12 @@ a value, `PublishFailed`, which the shop turns into the `BusRefused` the relay
 already handles.
 
 **What it costs.** Confluent's serializer is not on Maven Central, so the build
-adds Confluent's repository, limited to `io.confluent`. Confluent 7.8 asks for
-its own `7.8.0-ccs` build of the Kafka 3.8 client, so the build pins Apache's
-`3.8.0`, the version `lark-kafka` is built against, to keep one client on the
-classpath.
+adds Confluent's repository, limited to `io.confluent`. avro4k's serde needs
+Confluent 8.3 or later, which asks for its own `8.3.0-ccs` build of the Kafka
+4.3 client, so the build pins Apache's `4.3.0` to keep one client on the
+classpath. `lark-kafka` is built against 3.8 and runs on it; `KafkaBusSpec`
+is what says so. The test broker is still the 3.8 image, which a 4.3 client
+talks to.
 
 **Its limits.** Delivery is at least once, not exactly once: `lark-kafka` has
 no transactions, so a consumer that dies after folding an event and before
@@ -617,7 +623,8 @@ Pelican `1.0.0-RC3`, Lark `0.10.0` (its Gradle wiring plugin too), Proofload
 `2.1.2`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`, HikariCP `7.1.0`,
 OpenTelemetry SDK `1.51.0`, Micrometer's Prometheus registry `1.12.0`, Logback
 `1.5.20`, Kotest `6.2.4`, JUnit `6.1.3`. kimney `0.3.0`, avro4k `2.12.0`,
-Confluent's Avro serializer `7.8.0`, Kafka client `3.8.0`, the
+Confluent's Avro serializer `8.3.0` with avro4k's Confluent serde, Kafka
+client `4.3.0`, the
 `apache/kafka-native:3.8.0` image for tests. Kotlin 2.4.10 (2.3.0 for `outbox-table/`), JDK 25 (21 for `registry/`, which Pelican's check loads in Gradle's JVM, and `outbox-table/`).
 
 All five libraries being tried out are at an early stage, and say so.
