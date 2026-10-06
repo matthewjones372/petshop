@@ -2,7 +2,7 @@ plugins {
     application
     `java-test-fixtures`
     // Checks every graph in this project on `check`, and renders each one.
-    id("io.github.matthewjones372.lark.wiring") version "0.2.0"
+    id("io.github.matthewjones372.lark.wiring")
     // The shop's events on the wire are Avro records, derived by avro4k from @Serializable classes.
     kotlin("plugin.serialization")
     // Domain events to wire records and back, derived at compile time: a field that cannot be mapped
@@ -82,11 +82,4 @@ dependencies {
 
     // The shop's own typed client, for the end-to-end test: it calls the service by endpoint, not URL.
     testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC3")
-}
-
-// lark-test's stories colour their console copy under FORCE_COLOR or -Plark.test.colour, and a test worker does
-// not see the shell's environment, so these are handed on. Lark spec 0118 has its wiring plugin do this instead.
-tasks.test {
-    listOf("FORCE_COLOR", "NO_COLOR").forEach { name -> providers.environmentVariable(name).orNull?.let { environment(name, it) } }
-    providers.gradleProperty("lark.test.colour").orNull?.let { systemProperty("lark.test.colour", it) }
 }
