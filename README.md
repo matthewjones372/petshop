@@ -266,9 +266,8 @@ Every test in `app` reads as a story: `Given`, `When`, `Then`, `And` and `But`
 each run a block, time it and answer its value, so the next step checks what the
 last one did. A failing step ends the story with an `AssertionError` whose
 message is the story up to that step, so CI and the JUnit XML show where it
-broke. The console copy is coloured under `FORCE_COLOR` or IntelliJ. The code
-is a prototype in `app/src/test/kotlin/petshop/app/Story.kt`; Lark specs 0115
-and 0116 move it into a `lark-test` module.
+broke. The console copy is coloured under `FORCE_COLOR` or IntelliJ. It is Lark's
+`lark-test`, which grew out of a prototype in this repository.
 
 The end-to-end test is the whole graph `main` starts, with three nodes swapped:
 where the registry is, which database the outbox is in, and the bus, which is
@@ -489,9 +488,8 @@ yet.
 
 `Schedule.spaced(…) zipLeft Schedule.upTo(…)`, retried, waits for something
 eventually consistent without `suspend`, rethrowing the last failure, on a
-clock a test can drive. `upTo` and `lark-test`'s `eventually` and stories are
-on Lark's `main` and not yet in a release, which is why the story code here is
-a prototype in `app`'s tests.
+clock a test can drive. `lark-test`'s `eventually` is that as a step, and its
+stories are what every test here is written in.
 
 ### Proofload
 

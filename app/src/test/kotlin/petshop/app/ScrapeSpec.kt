@@ -5,6 +5,7 @@ import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.metrics
 import io.github.matthewjones372.lark.micrometer.MicrometerMetrics
+import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.string.shouldContain
 import io.micrometer.prometheus.PrometheusConfig
 import io.micrometer.prometheus.PrometheusMeterRegistry

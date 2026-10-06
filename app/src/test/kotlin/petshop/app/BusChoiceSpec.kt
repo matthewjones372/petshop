@@ -3,6 +3,7 @@ package petshop.app
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import io.github.matthewjones372.lark.app.testNode
+import io.github.matthewjones372.lark.test.story
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
