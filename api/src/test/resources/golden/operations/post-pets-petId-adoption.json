@@ -58,7 +58,7 @@
             }
           },
           "503": {
-            "description": "The chip registry could not be reached; try again; The adoption could not be recorded; try again",
+            "description": "One of:\n\n- `registry_down`: The chip registry could not be reached; try again\n- `not_recorded`: The adoption could not be recorded; try again",
             "content": {
               "application/json": {
                 "schema": {
@@ -178,6 +178,10 @@
       "RegistryDown": {
         "type": "object",
         "properties": {
+          "kind": {
+            "type": "string",
+            "const": "registry_down"
+          },
           "id": {
             "type": "integer",
             "format": "int64"
@@ -187,13 +191,19 @@
           }
         },
         "required": [
+          "kind",
           "id",
           "message"
-        ]
+        ],
+        "description": "The chip registry could not be reached; try again"
       },
       "NotRecorded": {
         "type": "object",
         "properties": {
+          "kind": {
+            "type": "string",
+            "const": "not_recorded"
+          },
           "id": {
             "type": "integer",
             "format": "int64"
@@ -203,9 +213,11 @@
           }
         },
         "required": [
+          "kind",
           "id",
           "message"
-        ]
+        ],
+        "description": "The adoption could not be recorded; try again"
       },
       "ApiError": {
         "type": "object",

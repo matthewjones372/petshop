@@ -394,12 +394,12 @@ status codes, and a failure arrives as the value the endpoint declared.
 **What it costs.** Two things to look up once: `errorJson` for a declared
 failure, and the import for `orFail`.
 
-**Its limits.** The demo's registry stubs are generated from the same
-endpoints (`DemoStubsSpec` writes `demo/registry/mappings/chips.json`), except
-recording a keeper: its answer is built from the request body, and a mapping
-file can only template from the path, so `keeper.json` is still written by
-hand. A declared status whose body does not match the declared shape is not treated as
-that failure: the generated client cannot decode it and throws
+The demo's registry stubs are generated from the same endpoints too:
+`DemoStubsSpec` writes `demo/registry/mappings/chips.json`, including recording
+a keeper, whose answer is templated from the request body.
+
+**Its limits.** A declared status whose body does not match the declared shape
+is not treated as that failure: the generated client cannot decode it and throws
 `ApiCallFailed`, which the shop treats as the registry being unreachable. A
 stand-in that answers a bare 404, where the contract says a 404 carries a
 `Problem`, gets `registry_down` instead of `not_chipped`.
