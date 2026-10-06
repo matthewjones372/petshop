@@ -26,7 +26,7 @@ private object TestKafka {
 
     // The native image starts in about a second, and runs KRaft, so there is no ZooKeeper beside it.
     val container: KafkaContainer by lazy {
-        KafkaContainer(DockerImageName.parse("apache/kafka-native:3.8.0"))
+        KafkaContainer(DockerImageName.parse("apache/kafka-native:4.3.1"))
             // A group's first member is not kept waiting for others to join, which is 3s a test by default.
             .withEnv("KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS", "0")
             .apply { start() }

@@ -29,7 +29,7 @@ services:
   # The bus, for BUS=kafka: one KRaft node, so there is no ZooKeeper beside it. The shop on the host
   # reaches it on 9092; the schema registry, in here, on kafka:29092.
   kafka:
-    image: apache/kafka-native:3.8.0
+    image: apache/kafka-native:4.3.1
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -48,7 +48,7 @@ services:
 
   # Where the events' Avro schema is registered. application.conf points at it when BUS=kafka.
   schema-registry:
-    image: confluentinc/cp-schema-registry:7.8.0
+    image: confluentinc/cp-schema-registry:8.3.2
     depends_on: [kafka]
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
