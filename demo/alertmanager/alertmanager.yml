@@ -1,0 +1,7 @@
+# Alerts go nowhere: Estate reads them from here, and silences written on its page are kept here.
+route:
+  receiver: nowhere
+  group_wait: 5s
+  group_interval: 30s
+receivers:
+  - name: nowhere

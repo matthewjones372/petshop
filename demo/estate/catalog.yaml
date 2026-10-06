@@ -1,0 +1,57 @@
+# The petshop as Estate shows it: one service in one environment, read from the demo's Prometheus.
+environments:
+  - name: demo
+    title: The demo, on this machine
+    sources: demo
+
+services:
+  - name: petshop
+    category: Shop
+    description: Adopt a pet. The HTTP API, the shop's actor, its outbox in Postgres and the relay to the bus
+    repository: github:matthewjones372/petshop
+    runbook: https://github.com/matthewjones372/petshop/blob/main/demo/README.md
+    environments: [ demo ]
+    # Adoptions are what the shop serves, so its load is adoptions: every outcome is a request, and the outcomes that
+    # are the shop's or a dependency's fault are its errors. A refusal it declared (no such pet, already adopted, no
+    # chip) is an answer, not an error. There is no p99: the adoption timer is a summary without percentiles.
+    load:
+      requests: sum(rate(petshop_adoptions_total[1m]))
+      errors: sum(rate(petshop_adoptions_total{outcome=~"registry_down|not_recorded"}[1m])) or vector(0)
+    links:
+      app: http://localhost:8080/pets
+      api: http://localhost:8080/api-docs
+      dashboard: http://localhost:3000
+    stats:
+      extra:
+        - { title: Pets in the shop, query: max(petshop_pets_in_shop) }
+        - { title: Mean adoption, query: 'sum(petshop_adopt_duration_sum) / clamp_min(sum(petshop_adopt_duration_count), 1)', unit: ms }
+        - { title: Events published, query: 'sum(rate(petshop_outbox_published_total[1m]))', unit: /s }
+        - { title: Claimed per tick, query: max(petshop_outbox_claimed) }
+        - { title: Refused by the bus, query: 'sum(rate(petshop_outbox_refused_total[1m])) or vector(0)', unit: /s }
+
+# What each alert means for the people adopting, beside its own `impact` annotation in demo/prometheus/rules.yml.
+alerts:
+  ChipRegistryUnreachable: { impact: "Adopters are told to try again later, and the pet stays on the shelf." }
+  AdoptionsNotRecorded: { impact: "Every adoption is refused with a 503 until the database answers again." }
+
+vitals:
+  - title: Adoptions
+    query: sum(rate(petshop_adoptions_total{outcome="taken"}[5m])) or vector(0)
+    unit: /s
+  - title: Refused
+    query: 100 * sum(rate(petshop_adoptions_total{outcome!="taken"}[5m])) / clamp_min(sum(rate(petshop_adoptions_total[5m])), 0.0001)
+    unit: "%"
+  - title: Arrivals
+    query: sum(rate(petshop_arrivals_total[5m]))
+    unit: /s
+
+map:
+  nodes:
+    - { id: petshop, service: petshop }
+    - { id: registry, title: Chip registry, kind: external }
+    - { id: postgres, title: Postgres, kind: store }
+    - { id: bus, title: The bus, kind: store }
+  edges:
+    - { from: petshop, to: registry, label: chips, rate: 'sum(rate(petshop_adoptions_total{outcome=~"taken|not_chipped|registry_down"}[1m]))', alert: ChipRegistryUnreachable }
+    - { from: petshop, to: postgres, label: records, alert: AdoptionsNotRecorded }
+    - { from: postgres, to: bus, label: relays, rate: 'sum(rate(petshop_outbox_published_total[1m]))', alert: BusRefusingEvents }

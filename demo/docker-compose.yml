@@ -65,6 +65,7 @@ services:
       - --storage.tsdb.retention.time=1h
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules.yml:/etc/prometheus/rules.yml:ro
     ports:
       - "9090:9090"
     # Linux has no host.docker.internal of its own; Docker Desktop ignores this.
@@ -85,3 +86,25 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
       - "3000:3000"
+
+  # Where the rules in prometheus/rules.yml fire. It sends them nowhere: Estate reads them from here, and the silences
+  # written on Estate's page are kept here.
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+
+  # Estate: is the petshop well, and if not, where to look. Its catalog is estate/catalog.yaml; it reads the
+  # Prometheus and Alertmanager above. http://localhost:8095
+  estate:
+    image: ghcr.io/matthewjones372/estate:main
+    depends_on: [prometheus, alertmanager]
+    volumes:
+      - ./estate:/etc/estate:ro
+    ports:
+      - "8095:8080"
+

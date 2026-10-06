@@ -1,0 +1,18 @@
+# Estate's settings for the demo: nobody signs in, and its one environment reads the demo's own Prometheus and
+# Alertmanager. There is no Kubernetes, Flux or CI here, and Estate says so where those parts would be.
+port: 8080
+catalog: /etc/estate/catalog.yaml
+
+auth:
+  # Only for a demo on a laptop: a session secret anyone can read, and every visitor an operator, so silences and
+  # notes work without signing in.
+  sessionSecret: the-petshop-demo-runs-on-a-laptop-only
+  roles:
+    viewer: [ developers ]
+    operator: [ ops ]
+  anonymous: { name: visitor, role: operator }
+
+sources:
+  demo:
+    prometheus: { url: http://prometheus:9090 }
+    alertmanager: { url: http://alertmanager:9093 }

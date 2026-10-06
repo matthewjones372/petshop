@@ -1,0 +1,42 @@
+# What the demo alerts on, for Estate to show beside the service. Every rule keeps the `job` label, which is how
+# Estate knows an alert is petshop's: its catalog names a service `petshop`, and the scrape job is called that.
+groups:
+  - name: petshop
+    rules:
+      - alert: PetshopDown
+        expr: up{job="petshop"} == 0
+        for: 20s
+        labels: { severity: critical }
+        annotations:
+          summary: Prometheus cannot scrape the petshop.
+          impact: Nobody can browse or adopt; arrivals and the outbox relay have stopped with it.
+
+      - alert: ChipRegistryUnreachable
+        expr: sum by (job) (rate(petshop_adoptions_total{outcome="registry_down"}[1m])) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: Adoptions are failing because the chip registry cannot be reached.
+          impact: Adopters are told to try again later, and the pet stays on the shelf.
+
+      - alert: AdoptionsNotRecorded
+        expr: sum by (job) (rate(petshop_adoptions_total{outcome="not_recorded"}[1m])) > 0
+        labels: { severity: critical }
+        annotations:
+          summary: The shop cannot write to Postgres, so it refuses adoptions it could not record.
+          impact: Every adoption is refused with a 503 until the database answers again.
+
+      - alert: OutboxBacklog
+        expr: max by (job) (petshop_outbox_claimed) >= 100
+        for: 30s
+        labels: { severity: warning }
+        annotations:
+          summary: Every claim takes the full batch of 100, so the outbox fills faster than the relay drains it.
+          impact: /stats falls behind what the shop has done.
+
+      - alert: BusRefusingEvents
+        expr: sum by (job) (rate(petshop_outbox_refused_total[1m])) > 0
+        for: 30s
+        labels: { severity: warning }
+        annotations:
+          summary: The bus is turning events away; they stay in the outbox and go again.
+          impact: /stats falls behind until the bus takes them.
