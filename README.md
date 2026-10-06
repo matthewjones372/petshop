@@ -28,7 +28,7 @@ The libraries under evaluation:
 | [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`, with its Typesafe Config and Gradle wiring-check modules); the shop's actor, on virtual threads in a `flock` (`lark-actor`, `lark-app-actor`); the background work and the in-process bus as `Stream`s on Lark's Forks (`lark-stream`); Kafka as a `Stream` that commits what it handled (`lark-kafka`); retries on schedules; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
 | [Proofload](https://github.com/matthewjones372/proofload) | load tests that start the whole service in-process, assert correctness under load, and write an HTML report |
 | [ExoQuery](https://github.com/ExoQuery/ExoQuery) | every statement against the outbox table, written as Kotlin and checked at compile time |
-| [kimney](https://github.com/matthewjones372/kimney) | the mappings between the shop's events and their wire records, derived at compile time |
+| [kimney](https://github.com/matthewjones372/kimney) | the mappings between the shop's events and their wire records, and between the domain and the API's DTOs, derived at compile time |
 
 What they run on, and what the tests use:
 
@@ -50,7 +50,7 @@ What they run on, and what the tests use:
 |---|---|---|
 | `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | Arrow |
 | `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
-| `api` | the endpoints, their failures, the handlers | Pelican, Pekko HTTP |
+| `api` | the endpoints, their failures, the handlers, the DTOs | Pelican, Pekko HTTP, kimney |
 | `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus (in process, or Kafka carrying Avro) and its consumer, the wiring, `main` | Lark, kimney |
 | `outbox-table` | the outbox's row and its SQL, in an included build on the Kotlin ExoQuery is built for | ExoQuery |
 | `loadtest` | the shop under load, started in-process | Proofload |
@@ -61,7 +61,7 @@ What they run on, and what the tests use:
 val adoptPet = endpoint(petId) {
     post("pets" / petId / "adoption")
     summary = "Take a pet home"
-    json<Pet>().orFail(petMissing, petTaken, petNotChipped, unavailable)
+    json<PetDto>().orFail(petMissing, petTaken, petNotChipped, unavailable)
 }
 ```
 
@@ -69,6 +69,25 @@ The route, the OpenAPI document at `/openapi.json` and the Swagger page at
 `/api-docs` all come from that. The handler must answer with `ok` or one of the
 four declared failures. A `when` over the sealed error type is exhaustive, and
 returning a failure the endpoint never declared does not compile.
+
+### The wire is not the domain
+
+`Pet` stays in `domain`; the endpoints answer a `PetDto`, and the declared
+failures are a sealed `ProblemDto`. [kimney](https://github.com/matthewjones372/kimney)
+writes each crossing at compile time:
+
+```kotlin
+fun Pet.toDto(): PetDto = transformInto()                // PetId unwrapped, Species by name
+fun List<Pet>.toDto(): List<PetDto> = transformInto()
+fun PetShopError.toDto(): ProblemDto = into<_, ProblemDto>()
+    .withSealedCaseRenamed(RegistryDown::class, ProblemDto.Unavailable::class)
+    .withSealedCaseRenamed(NotRecorded::class, ProblemDto.Unavailable::class)
+    .transform()                                          // the rest by name
+```
+
+`id` is a plain number on the wire. A species added to the domain, or a field
+added to a DTO, is a compile error at the crossing rather than a new value on
+the wire.
 
 ### One writer, no locks
 
@@ -342,7 +361,7 @@ exec(adoptTaken) { step ->
 | Lark, schedules and waiting | **Worth it.** Small, and blocking, which is what lets the tests wait without coroutines |
 | Lark, Kafka | **Worth it.** A topic is a stream like the others, and an offset is committed only once its event is handled |
 | Proofload | **Worth it.** The cheapest win: correctness under load in a few lines |
-| kimney | **Worth it** once events have a wire format of their own; a missing field is a compile error |
+| kimney | **Worth it** once events or the API have a wire format of their own; a missing field is a compile error |
 | ExoQuery | **Not here, yet.** Real type checking, but for three statements it costs a separate build on an older Kotlin |
 
 
@@ -520,10 +539,18 @@ committing sees it again, which is why the projection dedupes by `seq`.
 Kafka gives them.
 
 **What it gives.** The domain events and their wire records are separate types,
-and the mapping between them is derived at compile time, so a field one side
-cannot fill is a compile error rather than a null on the wire.
+and so are the HTTP API's DTOs (`api/Dtos.kt`), and every mapping between them
+is derived at compile time. A field one side cannot fill, a species the DTO
+does not have, a failure added to `PetShopError` without a place in
+`ProblemDto`: each is a compile error on the call that meets it, rather than a
+null or a new value on the wire, and the error names the fix. The errors show
+in IntelliJ as you type once Help → Find Action → Registry has
+`kotlin.k2.only.bundled.compiler.plugins.enabled` unchecked, the same setting
+Lark's underline needs.
 
-**What it costs.** A compiler plugin, applied in `app`'s build.
+**What it costs.** A compiler plugin, applied in `api`'s and `app`'s builds,
+supporting Kotlin 2.4 and stopping the build on another minor until a release
+supports it.
 
 ### ExoQuery
 
