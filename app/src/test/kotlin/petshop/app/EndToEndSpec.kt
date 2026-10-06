@@ -18,7 +18,7 @@ import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
 import kotlin.time.Duration.Companion.seconds
-import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.kafka.common.serialization.LongDeserializer
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import petshop.api.adoptPet
@@ -133,10 +133,10 @@ class EndToEndSpec {
                 }
 
                 val onTheTopic = When("the topic is read as the broker holds it") {
-                    kafka.records(TOPIC, StringDeserializer(), ShopEventDeserializer(schemas))
+                    kafka.records(TOPIC, LongDeserializer(), ShopEventDeserializer(schemas))
                 }
                 Then("every event the outbox recorded is on it once, keyed by its seq") {
-                    onTheTopic.map { it.key().toLong() }.sorted() shouldBe (1..database.recorded()).toList()
+                    onTheTopic.map { it.key() }.sorted() shouldBe (1..database.recorded()).toList()
                 }
                 And("the adoptions read back from the Avro as Nibbles adopted, then Mrs Peel adopted and returned") {
                     // The actor says yes before the registry says Mrs Peel has no chip, so the undo is an event of its own.

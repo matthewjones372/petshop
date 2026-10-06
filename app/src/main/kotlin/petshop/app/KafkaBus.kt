@@ -19,7 +19,8 @@ import io.github.matthewjones372.lark.stream.Run
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.ByteArraySerializer
-import org.apache.kafka.common.serialization.StringSerializer
+import org.apache.kafka.common.serialization.LongDeserializer
+import org.apache.kafka.common.serialization.LongSerializer
 import petshop.domain.ShopEvent
 
 /**
@@ -55,7 +56,7 @@ class KafkaBus(
         ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG to SEND_WITHIN_MS,
     )
 
-    private val events = Kafka.producer(producing, StringSerializer(), ShopEventSerializer(registry))
+    private val events = Kafka.producer(producing, LongSerializer(), ShopEventSerializer(registry))
 
     private val letters = Kafka.producer(producing, ByteArraySerializer(), ByteArraySerializer())
 
@@ -64,7 +65,7 @@ class KafkaBus(
 
     /** Taken once the broker has it: a refusal, or no answer in time, leaves the event in the outbox. */
     override fun publish(event: ShopEvent): Either<BusRefused, ShopEvent> =
-        events.publish(topic.record(event.seq.toString(), event))
+        events.publish(topic.record(event.seq, event))
             .mapLeft { failed -> BusRefused(event.seq, "${failed.cause}") }
             .map { event }
 
@@ -72,7 +73,8 @@ class KafkaBus(
         Kafka.consume(
             consumer,
             topic,
-            key = Decoder.string(),
+            // The seq as a number, so anything reading the topic orders keys as the events were numbered.
+            key = Decoder(LongDeserializer()) { false },
             value = Decoder(ShopEventDeserializer(registry), transient = ::registryDown),
         )
             .divertLefts(deadLetters)

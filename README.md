@@ -193,7 +193,7 @@ starts its own through Testcontainers, with a fresh schema per graph.
 
 `KafkaBus` is the same `EventBus` on a real broker, and the projection does not
 change. Each event goes out as an Avro record in the schema registry's wire
-format, keyed by its `seq`, and comes back through `lark-kafka`'s consumer
+format, keyed by its `seq` as a number, and comes back through `lark-kafka`'s consumer
 loop, which commits an offset only once the projection has folded that event
 in.
 
@@ -306,10 +306,10 @@ fun `somebody adopts a tortoise, and every part of the service hears about it`()
             }
 
             val onTheTopic = When("the topic is read as the broker holds it") {
-                kafka.records(TOPIC, StringDeserializer(), ShopEventDeserializer(schemas))
+                kafka.records(TOPIC, LongDeserializer(), ShopEventDeserializer(schemas))
             }
             Then("every event the outbox recorded is on it once, keyed by its seq") {
-                onTheTopic.map { it.key().toLong() }.sorted() shouldBe (1..database.recorded()).toList()
+                onTheTopic.map { it.key() }.sorted() shouldBe (1..database.recorded()).toList()
             }
             And("the projection committed every event").eventually(5.seconds) {
                 kafka.committed(GROUP, TOPIC) shouldBe database.recorded()
@@ -603,11 +603,6 @@ thread comes from a pool and is reused. Fixed by `lark-slf4j`.
 ./gradlew test` sets nothing in the JVM the tests run in.
 `app/build.gradle.kts` passes `FORCE_COLOR`, `NO_COLOR` and `lark.test.colour`
 on. Lark spec 0118 has the wiring plugin do this for every test task.
-
-**Keys stored as text sort as text.** The topic's keys are each event's `seq`
-as a string, so a test comparing them has to sort them as numbers, or `"10"`
-comes before `"2"`. Handled in the test; a numeric key would remove the
-problem.
 
 **Demo stubs must follow the contract too.** The demo's registry stand-in has
 to answer a 404 with the `Problem` body the contract declares, or the shop

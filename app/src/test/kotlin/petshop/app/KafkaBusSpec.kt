@@ -19,6 +19,7 @@ import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.kafka.common.serialization.ByteArraySerializer
+import org.apache.kafka.common.serialization.LongDeserializer
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.junit.jupiter.api.Test
@@ -62,9 +63,9 @@ class KafkaBusSpec : EventBusContract() {
         }
         When("the bus publishes it") { kafkaBus("wire").use { it.publish(nibbles) } }
         val record = Then("one record is on the topic").eventually(30.seconds) {
-            kafka.records("wire", StringDeserializer(), ByteArrayDeserializer()).single()
+            kafka.records("wire", LongDeserializer(), ByteArrayDeserializer()).single()
         }
-        And("its key is the event's seq, so a partition keeps one event's copies in order") { record.key() shouldBe "3" }
+        And("its key is the event's seq, as a number, so a partition keeps one event's copies in order") { record.key() shouldBe 3L }
         val body = ByteBuffer.wrap(record.value())
         And("it is Confluent's wire format: a zero magic byte, then the id the registry gave the schema") {
             body.get() shouldBe 0.toByte()
