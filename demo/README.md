@@ -1,8 +1,9 @@
 # Watching the numbers
 
-Two terminals. The application runs on the host; Prometheus, Grafana and the
-Postgres its outbox is in run in Docker. Compose goes first, because the
-application will not start without its database.
+Two terminals. The application runs on the host. Everything else runs in
+Docker: Prometheus, Grafana, Alertmanager, Estate, the Postgres the outbox is in,
+Kafka and its schema registry, and a stand-in chip registry. Compose goes first,
+because the application will not start without its database.
 
 ```bash
 cd demo && docker compose up -d
@@ -20,8 +21,9 @@ serves the shop to your network, which is why it is not the default. Docker
 Desktop on a Mac or Windows forwards `host.docker.internal` to loopback, so
 there it is harmless either way.
 
-Then open <http://localhost:3000>. The dashboard is provisioned, so there is
-nothing to import and nothing to log into.
+Then open Grafana at <http://localhost:3000>, or Estate at
+<http://localhost:8095> (see [Estate](#estate) below). Grafana's dashboard is
+provisioned, so there is nothing to import and nothing to log into.
 
 Make something happen:
 
@@ -91,7 +93,7 @@ here is a process on your machine. There is no p99 either: the adoption timer is
 
 | | |
 |---|---|
-| `docker-compose.yml` | Prometheus, Alertmanager, Grafana, Estate, the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry — the app is the thing being demonstrated |
+| `docker-compose.yml` | Prometheus, Alertmanager, Grafana, Estate, the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
 | `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
 | `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds, which on Linux needs the app started with `HOST=0.0.0.0` |
 | `grafana/provisioning/` | the datasource and the dashboard provider |
@@ -116,16 +118,16 @@ means the table is filling faster than a tick drains it. An adoption the shop
 could not write to the table at all shows in the adoptions panel as
 `not_recorded`.
 
-## Two things the panels are making a point about
+## Two things the panels show
 
 **`outcome` is a label, not three metric names.** One counter answers "how many
-adoptions" and "how many were refused" because the outcome is a tag —
+adoptions" and "how many were refused" because the outcome is a tag:
 `sum by (outcome) (rate(petshop_adoptions_total[1m]))`.
 
 Every branch tags the same key and only that key. Prometheus requires one set of
 label names per metric name, and a series registered with a different set is
-dropped **without a word** — which is how the first version of this lost every
-refusal while looking like it worked.
+dropped silently. That is how the first version of this lost every refusal while
+appearing to work.
 
 **The durations are milliseconds.** `timed` records in milliseconds and
 Prometheus convention is seconds, so `petshop_adopt_duration_sum` is not a
