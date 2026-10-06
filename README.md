@@ -28,7 +28,7 @@ The libraries under evaluation:
 | [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`, with its Typesafe Config and Gradle wiring-check modules); the shop's actor, on virtual threads in a `flock` (`lark-actor`, `lark-app-actor`); the background work and the in-process bus as `Stream`s on Lark's Forks (`lark-stream`); Kafka as a `Stream` that commits what it handled (`lark-kafka`); retries on schedules; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
 | [Proofload](https://github.com/matthewjones372/proofload) | load tests that start the whole service in-process, assert correctness under load, and write an HTML report |
 | [ExoQuery](https://github.com/ExoQuery/ExoQuery) | every statement against the outbox table, written as Kotlin and checked at compile time |
-| [kimney](https://github.com/matthewjones372/kimney) | the mappings between the shop's events and their wire records, derived at compile time |
+| [kimney](https://github.com/matthewjones372/kimney) | the mappings between the shop's events and their wire records, and between the domain and the API's DTOs, derived at compile time |
 
 What they run on, and what the tests use:
 
@@ -50,7 +50,7 @@ What they run on, and what the tests use:
 |---|---|---|
 | `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | Arrow |
 | `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
-| `api` | the endpoints, their failures, the handlers | Pelican, Pekko HTTP |
+| `api` | the endpoints, their failures, the handlers, the DTOs | Pelican, Pekko HTTP, kimney |
 | `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus (in process, or Kafka carrying Avro) and its consumer, the wiring, `main` | Lark, kimney |
 | `outbox-table` | the outbox's row and its SQL, in an included build on the Kotlin ExoQuery is built for | ExoQuery |
 | `loadtest` | the shop under load, started in-process | Proofload |
@@ -61,7 +61,7 @@ What they run on, and what the tests use:
 val adoptPet = endpoint(petId) {
     post("pets" / petId / "adoption")
     summary = "Take a pet home"
-    json<Pet>().orFail(petMissing, petTaken, petNotChipped, unavailable)
+    json<PetDto>().orFail(petMissing, petTaken, petNotChipped, unavailable)
 }
 ```
 
@@ -70,12 +70,32 @@ The route, the OpenAPI document at `/openapi.json` and the Swagger page at
 four declared failures. A `when` over the sealed error type is exhaustive, and
 returning a failure the endpoint never declared does not compile.
 
-### One writer, no locks
+### The wire is not the domain
+
+`Pet` stays in `domain`; the endpoints answer a `PetDto`, and the declared
+failures are a sealed `ProblemDto`. [kimney](https://github.com/matthewjones372/kimney)
+writes each crossing at compile time:
+
+```kotlin
+fun Pet.toDto(): PetDto = transformInto()                // PetId unwrapped, Species by name
+fun List<Pet>.toDto(): List<PetDto> = transformInto()
+fun PetShopError.toDto(): ProblemDto = into<_, ProblemDto>()
+    .withSealedCaseRenamed(RegistryDown::class, ProblemDto.Unavailable::class)
+    .withSealedCaseRenamed(NotRecorded::class, ProblemDto.Unavailable::class)
+    .transform()                                          // the rest by name
+```
+
+`id` is a plain number on the wire. A species added to the domain, or a field
+added to a DTO, is a compile error at the crossing rather than a new value on
+the wire.
+
+### One writer
 
 Two people adopting the same tortoise is the race the shop has to lose on
 purpose. An actor handles one message at a time, so the second adopter is told
-the pet is taken rather than both being told yes. There is no lock anywhere in
-this repository.
+the pet is taken rather than both being told yes. The app's own code takes no
+lock: the actor serialises the shop's changes, and the relay's claim locks rows
+in Postgres with `FOR UPDATE SKIP LOCKED`.
 
 ### The background work is a stream
 
@@ -89,7 +109,7 @@ service reads them: a projection that tallies arrivals and adoptions by species
 and serves the result at `/stats`.
 
 ```
-Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only if the row went in
+Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT ─▶ actor changes      both rows, or neither
                               │
    relay: tick ─▶ BEGIN; SELECT … FOR UPDATE SKIP LOCKED
                    ─▶ publish ─▶ DELETE what the bus took; COMMIT     at least once
@@ -98,9 +118,11 @@ Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only 
           (stays, next tick)          dedupe by seq, fold
 ```
 
-- **The outbox is a Postgres table.** The actor writes the event's row first
-  and changes the pet only once the row is in, so the shop never sells a pet it
-  has not recorded selling. If the write throws, the actor carries on as it was
+- **The outbox is a Postgres table, written in one transaction with the
+  catalogue.** The actor writes the pet's new state to `pets` and the event's row
+  to `outbox` together, and changes its own state only once both have committed:
+  the table never records a sale the catalogue does not hold, and the shop never
+  sells a pet it has not recorded selling. If the write throws, the actor carries on as it was
   and answers `NotRecorded`, a 503: the pet is still on the shelf, and the
   registry is never asked. That 503 is the same response as a registry that
   cannot be reached (`Unavailable`, with a message saying which), because
@@ -148,9 +170,12 @@ Adopt ─▶ shop actor ─▶ INSERT INTO outbox ─▶ pet changes       only 
   holding every `seq` seen, because at-least-once means some arrive twice, and
   the `Tally` the rest add up to. `/stats` reports how many duplicates it dropped.
 
-The pets are the actor's, in memory. The table is what makes
-the events durable: a restart forgets the catalogue, but not an event it
-recorded and had yet to publish. The order within one relay is the order the
+The catalogue is the `pets` table. The actor holds it in memory as the one
+writer, reads it back when it starts, and stocks it with the opening catalogue
+only where a pet is not there yet, so a restart opens the shop as it was left,
+and new arrivals are numbered on from the highest id it holds. `RestartSpec`
+adopts a pet, stops the shop, starts it again on the same database, and finds
+her adopted. The order within one relay is the order the
 events were recorded. With more than one relay, each one's batch is in order
 and the batches interleave.
 
@@ -191,8 +216,12 @@ ShopEvent ◀──kimney── wire record ◀──avro4k── GenericRecord 
   owner to start again. Confluent throws the same exception for both, so
   `registryDown` reads what it wraps.
 
-The service starts on the in-process bus. Kafka is one node swapped, as
-`KafkaBusSpec` and the end-to-end test do; it is not chosen by configuration.
+`petshop.bus.kind` picks the bus, `BUS` in the environment: `in-process` by
+default, or `kafka`, which reads `petshop.bus.kafka`'s broker, topic, group and
+registry. The choice is made where the graph is assembled, with lark-app's
+`Config.choosing`, so the branch not taken has no node: a shop on the
+in-process bus opens no producer, and a shop on Kafka starts no hub. A `kind`
+that is neither refuses the start, naming where it was set.
 
 **What a bus promises is a test of its own.** `EventBusContract` holds what any
 `EventBus` must do: an event published before anyone reads reaches the first
@@ -338,8 +367,8 @@ exec(adoptTaken) { step ->
 | Lark, schedules and waiting | **Worth it.** Small, and blocking, which is what lets the tests wait without coroutines |
 | Lark, Kafka | **Worth it.** A topic is a stream like the others, and an offset is committed only once its event is handled |
 | Proofload | **Worth it.** The cheapest win: correctness under load in a few lines |
-| kimney | **Worth it** once events have a wire format of their own; a missing field is a compile error |
-| ExoQuery | **Not here, yet.** Real type checking, but for three statements it costs a separate build on an older Kotlin |
+| kimney | **Worth it** once events or the API have a wire format of their own; a missing field is a compile error |
+| ExoQuery | **Not here, yet.** Real type checking, but for six statements it costs a separate build on an older Kotlin |
 
 
 ### Pelican
@@ -516,14 +545,22 @@ committing sees it again, which is why the projection dedupes by `seq`.
 Kafka gives them.
 
 **What it gives.** The domain events and their wire records are separate types,
-and the mapping between them is derived at compile time, so a field one side
-cannot fill is a compile error rather than a null on the wire.
+and so are the HTTP API's DTOs (`api/Dtos.kt`), and every mapping between them
+is derived at compile time. A field one side cannot fill, a species the DTO
+does not have, a failure added to `PetShopError` without a place in
+`ProblemDto`: each is a compile error on the call that meets it, rather than a
+null or a new value on the wire, and the error names the fix. The errors show
+in IntelliJ as you type once Help → Find Action → Registry has
+`kotlin.k2.only.bundled.compiler.plugins.enabled` unchecked, the same setting
+Lark's underline needs.
 
-**What it costs.** A compiler plugin, applied in `app`'s build.
+**What it costs.** A compiler plugin, applied in `api`'s and `app`'s builds,
+supporting Kotlin 2.4 and stopping the build on another minor until a release
+supports it.
 
 ### ExoQuery
 
-**Verdict: not here, yet.** The outbox has three statements. Typing them is real,
+**Verdict: not here, yet.** The outbox and the catalogue have six statements between them. Typing them is real,
 but a separate build on Kotlin 2.3.0, a conversion layer and a `free` block for
 the locking clause cost more than the SQL they replace. Worth another look
 when it loads on the project's Kotlin, or with many more queries.
