@@ -37,7 +37,7 @@ What they run on, and what the tests use:
 | | |
 |---|---|
 | Apache Pekko | HTTP only: Pelican's server and the chip registry's client run on Pekko HTTP |
-| PostgreSQL, HikariCP | the outbox table |
+| PostgreSQL, HikariCP | the `pets` and `outbox` tables |
 | Testcontainers | a real Postgres and a real Kafka broker for the tests, one container each per run: a fresh schema per graph, and topics and groups of each test's own |
 | WireMock | the chip registry in tests and the demo, stubbed through Pelican's `pelican-test-wiremock` |
 | Kotest assertions on JUnit 6 | every test; the end-to-end and app tests are written as stories (below) |
@@ -441,7 +441,7 @@ prevent the mistakes listed below.
   refusal carries the same pair, and the pair survives the fork the ask runs on
   and reaches Logback's MDC.
 
-**What it costs.** `app/src/main/kotlin/petshop/app/Wiring.kt` is about 240
+**What it costs.** `app/src/main/kotlin/petshop/app/Wiring.kt` is about 260
 lines, much of it comments, for a graph that a hand-written `main` might wire
 in fewer. `singleOf(::Thing)` shortens a node that is a plain constructor call,
 but few nodes are: most are a resource with a release, a factory, an actor, a
