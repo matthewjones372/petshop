@@ -607,7 +607,7 @@ thread comes from a pool and is reused. Fixed by `lark-slf4j`.
 
 **A test worker does not see the shell's environment.** `FORCE_COLOR=1
 ./gradlew test` sets nothing in the JVM the tests run in.
-Fixed: Lark's wiring plugin, from 0.10.0, passes `FORCE_COLOR`, `NO_COLOR` and
+Fixed: Lark's wiring plugin, from 0.11.0, passes `FORCE_COLOR`, `NO_COLOR` and
 `-Plark.test.colour` on to every test task (spec 0118).
 
 **Demo stubs must follow the contract too.** The demo's registry stand-in has
@@ -617,7 +617,7 @@ files from the same typed stubs the tests use.
 
 ## Versions
 
-Pelican `1.0.0-RC3`, Lark `0.10.0` (its Gradle wiring plugin too), Proofload
+Pelican `1.0.0-RC3`, Lark `0.11.0` (its Gradle wiring plugin too), Proofload
 `0.1.0-rc4`, ExoQuery `2.0.4.PL`. Pekko `1.2.1`, Pekko HTTP `1.3.0`, Arrow
 `2.1.2`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`, HikariCP `7.1.0`,
 OpenTelemetry SDK `1.51.0`, Micrometer's Prometheus registry `1.12.0`, Logback
