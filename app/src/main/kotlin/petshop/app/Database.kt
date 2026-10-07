@@ -4,9 +4,13 @@ import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
+import io.github.matthewjones372.lark.app.probe
 import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.config
+import io.micrometer.core.instrument.Metrics
+import java.sql.SQLException
 import javax.sql.DataSource
+import kotlin.time.Duration.Companion.seconds
 
 /** Where the shop's Postgres is. */
 data class DatabaseSettings(val url: String, val user: String, val password: String)
@@ -42,6 +46,12 @@ private fun pool(settings: DatabaseSettings): HikariDataSource {
             username = settings.user
             password = settings.password
             poolName = "petshop"
+            // Two seconds, not Hikari's thirty: with Postgres gone an adoption is refused and the health probe
+            // fails while someone is still watching, instead of half a minute later.
+            connectionTimeout = 2_000
+            // The pool's own meters (hikaricp_connections_active, _pending, _timeout_total), on Micrometer's
+            // global composite, where /metrics reads them.
+            metricRegistry = Metrics.globalRegistry
         },
     )
     runCatching { pool.connection.use { connection -> connection.createStatement().use { it.execute(schema) } } }
@@ -58,3 +68,15 @@ val database: Module =
         // nothing is left to borrow from it.
         singleOf({ settings: DatabaseSettings -> pool(settings) }, { pool -> pool.close() })
             .boundTo<DataSource>()
+            // A connection the pool can hand out and Postgres says is good, or the shop is not ready. A pool with no
+            // connection to give throws rather than answering, and Lark's health registry lets a throw out of
+            // readiness(), which would fail /health and the scrape with it; so a throw is a "no" here.
+            .probe("database", timeout = 3.seconds) { pool: DataSource ->
+                try {
+                    pool.connection.use { it.isValid(PROBE_SECONDS) }
+                } catch (_: SQLException) {
+                    false
+                }
+            }
+
+private const val PROBE_SECONDS = 2

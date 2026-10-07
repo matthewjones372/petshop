@@ -1,6 +1,8 @@
 package petshop.app
 
 import io.github.matthewjones372.lark.app.Module
+import io.github.matthewjones372.lark.app.overriding
+import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.metrics
@@ -9,9 +11,12 @@ import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.string.shouldContain
 import io.micrometer.prometheus.PrometheusConfig
 import io.micrometer.prometheus.PrometheusMeterRegistry
+import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Test
+import petshop.domain.ChipRegistry
 import petshop.domain.PetId
 import petshop.domain.PetShop
+import javax.sql.DataSource
 
 /**
  * What a scrape of this service says after somebody adopts something.
@@ -19,6 +24,12 @@ import petshop.domain.PetShop
  * The registry is this test's own rather than the graph's global one, so two tests running together
  * cannot read each other's numbers.
  */
+/** The graph's registry and its meters, with the shop and the pool started so their probes have something to ask. */
+private class Scraped(val registry: PrometheusMeterRegistry, val meters: Meters)
+
+private val scraped: Module =
+    single { registry: PrometheusMeterRegistry, meters: Meters, _: PetShop, _: DataSource -> Scraped(registry, meters) }
+
 class ScrapeSpec {
 
     private val settled: Module = shopWith(FakeRegistry())
@@ -41,6 +52,29 @@ class ScrapeSpec {
         }
         And("timed recorded into a distribution, which Prometheus reads as a summary") {
             scrape shouldContain "petshop_adopt_duration_count"
+        }
+    }
+
+    @Test
+    fun `the scrape says how the JVM, the pool and every health check are`() = story {
+        val service = Given("the shop on a fresh database") {
+            (petshop.overriding(single<ChipRegistry> { FakeRegistry() }).onAFreshDatabase() + scraped).subgraph<Scraped>()
+        }
+        testApp(service) { app: Scraped ->
+            val scrape = When("Prometheus scrapes it") { app.registry.scrape() }
+            Then("the JVM's meters are there, under the names a JVM dashboard reads") {
+                scrape shouldContain "jvm_memory_used_bytes"
+                scrape shouldContain "jvm_threads_live_threads"
+                scrape shouldContain "process_cpu_usage"
+            }
+            And("so is the pool") { scrape shouldContain """hikaricp_connections_active{pool="petshop",""" }
+            // The probes are asked on their own thread, once a second, so the first answer is a moment behind.
+            And("the shop is ready, and each check answers").eventually(10.seconds) {
+                val now = app.registry.scrape()
+                now shouldContain "petshop_ready 1.0"
+                now shouldContain """petshop_health_check{check="database",} 1.0"""
+                now shouldContain """petshop_health_check{check="shop",} 1.0"""
+            }
         }
     }
 }

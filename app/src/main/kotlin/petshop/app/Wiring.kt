@@ -188,7 +188,12 @@ private val telemetry: Module =
         // boundTo rather than a type argument: `getTracer` is Java, so the inferred key is the
         // platform type `Tracer!` that nothing matches — and naming the key as a type argument would
         // force naming the dependency as one too.
-        single { sdk: OpenTelemetrySdk -> sdk.getTracer("petshop") }.boundTo<Tracer>()
+        single { sdk: OpenTelemetrySdk -> sdk.getTracer("petshop") }.boundTo<Tracer>() +
+        // The JVM's meters and the shop's health, on the registry /metrics scrapes.
+        singleOf(
+            { registry: PrometheusMeterRegistry, health: HealthRegistry -> Meters(registry, health) },
+            { meters -> meters.close() },
+        )
 
 /**
  * Pekko, for HTTP and nothing else: Pelican's server binds the port on it, and the chip registry's
@@ -221,7 +226,7 @@ private val web: Module =
     // is what lets a load test start the whole application in its own process.
     singleOf(
         { shop: PetShop, config: Settings, system: TypedSystem<Void>, health: HealthRegistry,
-            registry: PrometheusMeterRegistry, projection: Projection, _: Arrivals, _: OutboxRelay ->
+            registry: PrometheusMeterRegistry, projection: Projection, _: Arrivals, _: OutboxRelay, _: Meters ->
             petshopApi(shop, { asked(health) }, registry::scrape, projection::tally)
                 .startWithDocs(system, port = config.port, host = config.host, docs = docs { docsPath = "/api-docs" })
         },

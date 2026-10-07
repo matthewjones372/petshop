@@ -40,3 +40,41 @@ groups:
         annotations:
           summary: The bus is turning events away; they stay in the outbox and go again.
           impact: /stats falls behind until the bus takes them.
+
+      # The shop's own view of itself: /health's checks, each exported as petshop_health_check. Fires whatever
+      # the shop is doing, so a database that dies while nobody adopts is still seen.
+      - alert: PetshopNotReady
+        expr: max by (job) (petshop_ready) == 0
+        for: 10s
+        labels: { severity: critical }
+        annotations:
+          summary: "The shop's health check is failing: {{ with query \"petshop_health_check == 0\" }}{{ range . }}{{ .Labels.check }} {{ end }}{{ end }}"
+          impact: The shop says it cannot serve; /health lists what is failing.
+
+  # The stores the shop depends on. Each keeps a `store` label naming its catalog entry, which is how Estate puts
+  # the alert on the store, and the edge from the shop turns red by the alert's name.
+  - name: stores
+    rules:
+      - alert: PostgresDown
+        expr: max(pg_up{job="postgres"}) == 0 or absent(pg_up{job="postgres"})
+        for: 10s
+        labels: { severity: critical, store: outbox-db }
+        annotations:
+          summary: Postgres is not answering, so neither the catalogue nor the outbox can be written.
+          impact: Every adoption is refused with a 503, arrivals stop, and no events reach the bus.
+
+      - alert: KafkaDown
+        expr: max(kafka_brokers{job="kafka"}) < 1 or absent(kafka_brokers{job="kafka"})
+        for: 20s
+        labels: { severity: critical, store: events }
+        annotations:
+          summary: No Kafka broker is answering.
+          impact: Events stay in the outbox, and /stats stops moving, until the broker is back.
+
+      - alert: ProjectionFallingBehind
+        expr: sum(kafka_consumergroup_lag{job="kafka", consumergroup="petshop-projection"}) > 50
+        for: 1m
+        labels: { severity: warning, store: events }
+        annotations:
+          summary: The projection is more than 50 events behind the topic.
+          impact: /stats shows the shop as it was a while ago.
