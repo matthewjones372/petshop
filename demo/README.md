@@ -1,7 +1,7 @@
 # Watching the numbers
 
 Two terminals. The application runs on the host. Everything else runs in
-Docker: Prometheus, Grafana, Alertmanager, Estate, Loki, the Postgres the outbox is in,
+Docker: Prometheus, Grafana, Alertmanager, Estate, Loki, a traffic generator, the Postgres the outbox is in,
 Kafka and its schema registry, an exporter for each of those two, and a stand-in
 chip registry. Compose goes first,
 because the application will not start without its database.
@@ -32,14 +32,17 @@ Then open Grafana at <http://localhost:3000>, or Estate at
 <http://localhost:8095> (see [Estate](#estate) below). Grafana's dashboard is
 provisioned, so there is nothing to import and nothing to log into.
 
-For steady traffic, run Proofload against the shop in a third terminal:
+Compose also brings steady traffic: its `traffic` service runs Proofload's
+visitors against the shop on the host, starting once the shop answers and
+following it across restarts. `docker compose stop traffic` quiets it. The same
+visitors run from Gradle, for half an hour by default:
 
 ```bash
 ./gradlew :loadtest:demoTraffic
 ```
 
-Five visitors a second for half an hour, each looking at a pet and the stats, and
-one in four trying to adopt. The adoptions land on every outcome the shop
+Five visitors a second, each looking at a pet and the stats, and one in four
+trying to adopt. The adoptions land on every outcome the shop
 declares (taken, already adopted, not chipped, no such pet), so Estate and
 Grafana show refusals as well as sales. `RATE`, `DURATION` (`10m`) and
 `PETSHOP_URL` change how many, for how long, and where. Proofload's report is
@@ -127,7 +130,7 @@ here is a process on your machine. There is no p99 either: the adoption timer is
 
 | | |
 |---|---|
-| `docker-compose.yml` | Prometheus, Alertmanager, Grafana, Estate, Loki, the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
+| `docker-compose.yml` | Prometheus, Alertmanager, Grafana, Estate, Loki, Proofload's visitors (`traffic/Dockerfile`), the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
 | `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
 | `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds, which on Linux needs the app started with `HOST=0.0.0.0`, and the Postgres and Kafka exporters |
 | `grafana/provisioning/` | the datasource and the dashboard provider |
