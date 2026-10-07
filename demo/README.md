@@ -32,7 +32,20 @@ Then open Grafana at <http://localhost:3000>, or Estate at
 <http://localhost:8095> (see [Estate](#estate) below). Grafana's dashboard is
 provisioned, so there is nothing to import and nothing to log into.
 
-Make something happen:
+For steady traffic, run Proofload against the shop in a third terminal:
+
+```bash
+./gradlew :loadtest:demoTraffic
+```
+
+Five visitors a second for half an hour, each looking at a pet and the stats, and
+one in four trying to adopt. The adoptions land on every outcome the shop
+declares (taken, already adopted, not chipped, no such pet), so Estate and
+Grafana show refusals as well as sales. `RATE`, `DURATION` (`10m`) and
+`PETSHOP_URL` change how many, for how long, and where. Proofload's report is
+written to `loadtest/build/reports/proofload/demo-traffic.html`.
+
+Or make something happen by hand:
 
 ```bash
 curl -X POST localhost:8080/pets/1/adoption   # taken
