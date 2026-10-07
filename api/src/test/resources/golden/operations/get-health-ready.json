@@ -19,7 +19,7 @@
             }
           },
           "503": {
-            "description": "Success.",
+            "description": "A check failed; take this out of rotation",
             "content": {
               "application/health+json": {
                 "schema": {

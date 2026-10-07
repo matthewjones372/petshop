@@ -10,9 +10,6 @@ import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
 import io.github.matthewjones372.pelican.health.Status
 import io.github.matthewjones372.pelican.health.health
-import io.github.matthewjones372.pelican.test.ApiCallFailed
-import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
@@ -120,12 +117,10 @@ class ContractSpec {
             tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
         ).inMemory("petshop-contract-down")
 
-        // The 503 is declared as one of the probe's answers, but Pelican's client treats any 5xx as the call
-        // failing, so a failing report arrives as ApiCallFailed carrying the body rather than as a value.
-        val refused = shouldThrow<ApiCallFailed> { down.outcome(failing.ready, Unit) }
-        refused.response.status shouldBe 503
-        refused.response.body shouldContain "\"status\":\"fail\""
-        refused.response.body shouldContain "database:responseTime"
+        // A failing probe is pelican-health's declared failure (Pelican spec 0070), so the report comes back as a value.
+        val report = down.outcome(failing.ready, Unit).shouldBeError()
+        report.status shouldBe "fail"
+        report.checks.keys shouldBe setOf("database:responseTime")
         down.outcome(failing.live, Unit).shouldBeOk().status shouldBe "pass"
     }
 }
