@@ -94,4 +94,6 @@ map:
     - { from: petshop, to: registry, label: chips, rate: 'sum(rate(petshop_adoptions_total{outcome=~"taken|not_chipped|registry_down"}[1m]))', alert: ChipRegistryUnreachable }
     - { from: petshop, to: postgres, label: records, alert: PostgresDown }
     - { from: postgres, to: bus, label: relays, rate: 'sum(rate(petshop_outbox_published_total[1m]))', alert: BusRefusingEvents }
-    - { from: bus, to: petshop, label: projects, rate: 'sum(rate(kafka_consumergroup_current_offset_sum{consumergroup="petshop-projection"}[1m]))', alert: ProjectionFallingBehind }
+    # The projection reads the topic back, but drawn from the shop to the bus: an edge back to the shop would close
+    # a loop (shop, Postgres, bus, shop), and Estate lays a map out in columns, which a loop pushes off the canvas.
+    - { from: petshop, to: bus, label: reads back, rate: 'sum(rate(kafka_consumergroup_current_offset_sum{consumergroup="petshop-projection"}[1m]))', alert: ProjectionFallingBehind }
