@@ -20,3 +20,13 @@ scrape_configs:
       # The app runs on the host, not in this compose file. On Linux this name is the Docker
       # bridge, so the app has to be listening there: HOST=0.0.0.0 ./gradlew :app:run.
       - targets: ["host.docker.internal:8080"]
+
+  # The outbox's Postgres, through its exporter: pg_up is 0 when the database does not answer.
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+
+  # The bus, through its exporter: offsets per partition and the projection's lag.
+  - job_name: kafka
+    static_configs:
+      - targets: ["kafka-exporter:9308"]

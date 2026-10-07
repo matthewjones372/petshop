@@ -2,7 +2,8 @@
 
 Two terminals. The application runs on the host. Everything else runs in
 Docker: Prometheus, Grafana, Alertmanager, Estate, the Postgres the outbox is in,
-Kafka and its schema registry, and a stand-in chip registry. Compose goes first,
+Kafka and its schema registry, an exporter for each of those two, and a stand-in
+chip registry. Compose goes first,
 because the application will not start without its database.
 
 ```bash
@@ -10,8 +11,12 @@ cd demo && docker compose up -d
 ```
 
 ```bash
-HOST=0.0.0.0 ./gradlew :app:run
+BUS=kafka HOST=0.0.0.0 ./gradlew :app:run
 ```
+
+`BUS=kafka` puts the shop's events on the demo's Kafka, which is what gives Estate's
+Kafka store and the projection's lag something to show. Without it the events stay
+in the process.
 
 `HOST=0.0.0.0` is for Linux. There, `host.docker.internal` is the Docker bridge
 (`host-gateway`, usually 172.17.0.1) rather than the host's loopback. The app
@@ -78,15 +83,29 @@ curl -X POST localhost:8080/pets/2/adoption   # registry_down
 docker compose start registry
 ```
 
+Stop the database and two alerts fire within about ten seconds, with nobody adopting anything:
+`PostgresDown`, from the exporter's `pg_up`, on the Postgres store and the map's edge to it, and `PetshopNotReady`,
+from the shop's own health check, whose `database` probe stops answering. Stop Kafka and `KafkaDown` fires on the
+Kafka store.
+
+```bash
+docker compose stop postgres
+docker compose start postgres
+```
+
+The shop's page carries its JVM (heap, GC pauses, threads, CPU), its connection pool, and how many health checks
+are failing. The Postgres store shows connections, transactions, size and the events waiting in the outbox. The
+Kafka store shows the topic's offsets and the projection's lag.
+
 The demo has no Kubernetes, Flux or CI, and Estate says so at the top of the page rather than leaving those parts
 blank. For the same reason it shows the shop as "not running": it reads that from a cluster or ECS, and the shop
 here is a process on your machine. There is no p99 either: the adoption timer is a summary without percentiles.
 
 | | |
 |---|---|
-| `estate/catalog.yaml` | the petshop as one service in one environment: its load from adoptions, its stats, the vitals and the map |
+| `estate/catalog.yaml` | the petshop as one service in one environment, with its Postgres and Kafka as stores: its load from adoptions, its JVM and pool, the stores' stats, the vitals and the map |
 | `estate/estate.yaml` | Estate's settings: no sign-in (every visitor is an operator), and the demo's Prometheus and Alertmanager as its sources |
-| `prometheus/rules.yml` | the alerts, each keeping `job="petshop"`, which is how Estate knows an alert is the petshop's |
+| `prometheus/rules.yml` | the alerts: the shop's keep `job="petshop"`, which is how Estate knows an alert is the petshop's, and the stores' carry `store:` naming theirs |
 | `alertmanager/alertmanager.yml` | routes every alert nowhere: Estate reads them, and keeps its silences there |
 
 ## What is where
@@ -95,7 +114,7 @@ here is a process on your machine. There is no p99 either: the adoption timer is
 |---|---|
 | `docker-compose.yml` | Prometheus, Alertmanager, Grafana, Estate, the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
 | `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
-| `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds, which on Linux needs the app started with `HOST=0.0.0.0` |
+| `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds, which on Linux needs the app started with `HOST=0.0.0.0`, and the Postgres and Kafka exporters |
 | `grafana/provisioning/` | the datasource and the dashboard provider |
 | `grafana/dashboards/petshop.json` | the dashboard itself |
 
