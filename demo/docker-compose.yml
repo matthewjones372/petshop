@@ -46,6 +46,25 @@ services:
     ports:
       - "9092:9092"
 
+  # Postgres as Prometheus sees it: whether it answers (pg_up), its connections, transactions and size, and
+  # each table's live rows, which is how many events wait in the outbox. Estate's postgres store reads these.
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    depends_on: [postgres]
+    environment:
+      DATA_SOURCE_URI: postgres:5432/petshop?sslmode=disable
+      DATA_SOURCE_USER: petshop
+      DATA_SOURCE_PASS: petshop
+
+  # Kafka as Prometheus sees it: each partition's offsets and the projection's consumer lag. Estate's kafka
+  # store reads these. The broker speaks Kafka 4, which dropped the protocol versions the exporter asks for
+  # unless it is told which version it is talking to.
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.10.0
+    depends_on: [kafka]
+    command: ["--kafka.server=kafka:29092", "--kafka.version=3.9.0"]
+    restart: unless-stopped
+
   # Where the events' Avro schema is registered. application.conf points at it when BUS=kafka.
   schema-registry:
     image: confluentinc/cp-schema-registry:8.3.2
