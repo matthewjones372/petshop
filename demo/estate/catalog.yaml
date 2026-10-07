@@ -58,6 +58,9 @@ stores:
     engine: kafka
     selector: job="kafka"
     links: { schemas: http://localhost:8081/subjects }
+    # Estate's default calls any growth in lag a concern, and a projection one event behind for a second reads as
+    # growth. A lag climbing by more than one event every ten seconds, for ten minutes, is.
+    attention: { growing: 0.1 }
     extra:
       - { title: Events on the topic, query: 'sum(kafka_topic_partition_current_offset{topic="petshop.events"})' }
       - { title: Projection lag, query: 'sum(kafka_consumergroup_lag{consumergroup="petshop-projection"}) or vector(0)' }

@@ -8,6 +8,7 @@ import io.github.matthewjones372.lark.app.probe
 import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.config
 import io.micrometer.core.instrument.Metrics
+import java.sql.SQLException
 import javax.sql.DataSource
 import kotlin.time.Duration.Companion.seconds
 
@@ -67,9 +68,15 @@ val database: Module =
         // nothing is left to borrow from it.
         singleOf({ settings: DatabaseSettings -> pool(settings) }, { pool -> pool.close() })
             .boundTo<DataSource>()
-            // A connection the pool can hand out and Postgres says is good, or the shop is not ready.
+            // A connection the pool can hand out and Postgres says is good, or the shop is not ready. A pool with no
+            // connection to give throws rather than answering, and Lark's health registry lets a throw out of
+            // readiness(), which would fail /health and the scrape with it; so a throw is a "no" here.
             .probe("database", timeout = 3.seconds) { pool: DataSource ->
-                pool.connection.use { it.isValid(PROBE_SECONDS) }
+                try {
+                    pool.connection.use { it.isValid(PROBE_SECONDS) }
+                } catch (_: SQLException) {
+                    false
+                }
             }
 
 private const val PROBE_SECONDS = 2

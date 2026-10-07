@@ -11,6 +11,7 @@ import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.string.shouldContain
 import io.micrometer.prometheus.PrometheusConfig
 import io.micrometer.prometheus.PrometheusMeterRegistry
+import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Test
 import petshop.domain.ChipRegistry
 import petshop.domain.PetId
@@ -59,17 +60,21 @@ class ScrapeSpec {
         val service = Given("the shop on a fresh database") {
             (petshop.overriding(single<ChipRegistry> { FakeRegistry() }).onAFreshDatabase() + scraped).subgraph<Scraped>()
         }
-        val scrape = When("Prometheus scrapes it") { testApp(service) { app: Scraped -> app.registry.scrape() } }
-        Then("the JVM's meters are there, under the names a JVM dashboard reads") {
-            scrape shouldContain "jvm_memory_used_bytes"
-            scrape shouldContain "jvm_threads_live_threads"
-            scrape shouldContain "process_cpu_usage"
-        }
-        And("so is the pool") { scrape shouldContain """hikaricp_connections_active{pool="petshop"""" }
-        And("the shop is ready, and each check answers") {
-            scrape shouldContain "petshop_ready 1.0"
-            scrape shouldContain """petshop_health_check{check="database",} 1.0"""
-            scrape shouldContain """petshop_health_check{check="shop",} 1.0"""
+        testApp(service) { app: Scraped ->
+            val scrape = When("Prometheus scrapes it") { app.registry.scrape() }
+            Then("the JVM's meters are there, under the names a JVM dashboard reads") {
+                scrape shouldContain "jvm_memory_used_bytes"
+                scrape shouldContain "jvm_threads_live_threads"
+                scrape shouldContain "process_cpu_usage"
+            }
+            And("so is the pool") { scrape shouldContain """hikaricp_connections_active{pool="petshop",""" }
+            // The probes are asked on their own thread, once a second, so the first answer is a moment behind.
+            And("the shop is ready, and each check answers").eventually(10.seconds) {
+                val now = app.registry.scrape()
+                now shouldContain "petshop_ready 1.0"
+                now shouldContain """petshop_health_check{check="database",} 1.0"""
+                now shouldContain """petshop_health_check{check="shop",} 1.0"""
+            }
         }
     }
 }
