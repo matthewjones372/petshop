@@ -20,19 +20,55 @@ services:
     links:
       app: http://localhost:8080/pets
       api: http://localhost:8080/api-docs
+      health: http://localhost:8080/health
+      metrics: http://localhost:8080/metrics
       dashboard: http://localhost:3000
+      prometheus: http://localhost:9090/alerts
+    # The JVM the shop runs in, by the names Micrometer's binders give it: heap, GC pauses, threads and CPU.
     stats:
+      preset: jvm
+      selector: job="petshop"
       extra:
         - { title: Pets in the shop, query: max(petshop_pets_in_shop) }
         - { title: Mean adoption, query: 'sum(petshop_adopt_duration_sum) / clamp_min(sum(petshop_adopt_duration_count), 1)', unit: ms }
         - { title: Events published, query: 'sum(rate(petshop_outbox_published_total[1m]))', unit: /s }
         - { title: Claimed per tick, query: max(petshop_outbox_claimed) }
         - { title: Refused by the bus, query: 'sum(rate(petshop_outbox_refused_total[1m])) or vector(0)', unit: /s }
+        - { title: Connections in use, query: 'max(hikaricp_connections_active{pool="petshop"})' }
+        - { title: Waiting for a connection, query: 'max(hikaricp_connections_pending{pool="petshop"})' }
+        - { title: Health checks failing, query: 'count(petshop_health_check == 0) or vector(0)' }
+
+# What the shop keeps its state in and sends its events through, each read from its exporter. An alert carrying
+# `store: <name>` is shown on the store; demo/prometheus/rules.yml has PostgresDown and KafkaDown.
+stores:
+  - name: outbox-db
+    category: Shop
+    description: The catalogue and the outbox, written together in one transaction
+    environments: [ demo ]
+    engine: postgres
+    selector: job="postgres"
+    extra:
+      # Postgres's own estimate, from its table statistics: the events written and not yet relayed.
+      - { title: Events in the outbox, query: 'max(pg_stat_user_tables_n_live_tup{relname="outbox"})' }
+      - { title: Pets on record, query: 'max(pg_stat_user_tables_n_live_tup{relname="pets"})' }
+  - name: events
+    category: Shop
+    description: The shop's events, as Avro in the schema registry's wire format, when the shop runs with BUS=kafka
+    environments: [ demo ]
+    engine: kafka
+    selector: job="kafka"
+    links: { schemas: http://localhost:8081/subjects }
+    extra:
+      - { title: Events on the topic, query: 'sum(kafka_topic_partition_current_offset{topic="petshop.events"})' }
+      - { title: Projection lag, query: 'sum(kafka_consumergroup_lag{consumergroup="petshop-projection"}) or vector(0)' }
 
 # What each alert means for the people adopting, beside its own `impact` annotation in demo/prometheus/rules.yml.
 alerts:
   ChipRegistryUnreachable: { impact: "Adopters are told to try again later, and the pet stays on the shelf." }
   AdoptionsNotRecorded: { impact: "Every adoption is refused with a 503 until the database answers again." }
+  PetshopNotReady: { impact: "The shop says it cannot serve; /health lists what is failing." }
+  PostgresDown: { impact: "Every adoption is refused with a 503, arrivals stop, and no events reach the bus." }
+  KafkaDown: { impact: "Events stay in the outbox, and /stats stops moving, until the broker is back." }
 
 vitals:
   - title: Adoptions
@@ -49,9 +85,10 @@ map:
   nodes:
     - { id: petshop, service: petshop }
     - { id: registry, title: Chip registry, kind: external }
-    - { id: postgres, title: Postgres, kind: store }
-    - { id: bus, title: The bus, kind: store }
+    - { id: postgres, title: Postgres, store: outbox-db }
+    - { id: bus, title: Kafka, store: events }
   edges:
     - { from: petshop, to: registry, label: chips, rate: 'sum(rate(petshop_adoptions_total{outcome=~"taken|not_chipped|registry_down"}[1m]))', alert: ChipRegistryUnreachable }
-    - { from: petshop, to: postgres, label: records, alert: AdoptionsNotRecorded }
+    - { from: petshop, to: postgres, label: records, alert: PostgresDown }
     - { from: postgres, to: bus, label: relays, rate: 'sum(rate(petshop_outbox_published_total[1m]))', alert: BusRefusingEvents }
+    - { from: bus, to: petshop, label: projects, rate: 'sum(rate(kafka_consumergroup_current_offset_sum{consumergroup="petshop-projection"}[1m]))', alert: ProjectionFallingBehind }
