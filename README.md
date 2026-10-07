@@ -550,8 +550,8 @@ already handles.
 adds Confluent's repository, limited to `io.confluent`. avro4k's serde needs
 Confluent 8.3 or later, which asks for its own `8.3.0-ccs` build of the Kafka
 4.3 client, so the build pins Apache's `4.3.0` to keep one client on the
-classpath. `lark-kafka` is built against 3.8 and runs on it; `KafkaBusSpec`
-is what says so. The test broker and the demo's are the 4.3 image.
+classpath, the same client `lark-kafka` is built against. The test broker and
+the demo's are the 4.3 image.
 
 **Its limits.** Delivery is at least once, not exactly once: `lark-kafka` has
 no transactions, so a consumer that dies after folding an event and before
@@ -611,8 +611,8 @@ thread comes from a pool and is reused. Fixed by `lark-slf4j`.
 
 **A test worker does not see the shell's environment.** `FORCE_COLOR=1
 ./gradlew test` sets nothing in the JVM the tests run in.
-`app/build.gradle.kts` passes `FORCE_COLOR`, `NO_COLOR` and `lark.test.colour`
-on. Lark spec 0118 has the wiring plugin do this for every test task.
+Fixed: Lark's wiring plugin, from 0.11.0, passes `FORCE_COLOR`, `NO_COLOR` and
+`-Plark.test.colour` on to every test task (spec 0118).
 
 **Demo stubs must follow the contract too.** The demo's registry stand-in has
 to answer a 404 with the `Problem` body the contract declares, or the shop
@@ -621,7 +621,7 @@ files from the same typed stubs the tests use.
 
 ## Versions
 
-Pelican `1.0.0-RC3`, Lark `0.9.0` (its Gradle wiring plugin `0.2.0`), Proofload
+Pelican `1.0.0-RC3`, Lark `0.11.0` (its Gradle wiring plugin too), Proofload
 `0.1.0-rc4`, ExoQuery `2.0.4.PL`. Pekko `1.2.1`, Pekko HTTP `1.3.0`, Arrow
 `2.1.2`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`, HikariCP `7.1.0`,
 OpenTelemetry SDK `1.51.0`, Micrometer's Prometheus registry `1.12.0`, Logback

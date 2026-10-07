@@ -36,7 +36,7 @@ class Meters(registry: MeterRegistry, private val health: HealthRegistry) : Auto
         listOf(JvmMemoryMetrics(), gc, JvmThreadMetrics(), ClassLoaderMetrics(), ProcessorMetrics(), UptimeMetrics())
             .forEach { it.bindTo(registry) }
 
-        asking.scheduleWithFixedDelay(::ask, 0, ASK_EVERY_MILLIS, TimeUnit.MILLISECONDS)
+        asking.scheduleWithFixedDelay({ last.set(health.readiness()) }, 0, ASK_EVERY_MILLIS, TimeUnit.MILLISECONDS)
 
         Gauge.builder("petshop.ready") { if (readiness() is Health.Down) 0.0 else 1.0 }
             .description("1 while every critical probe answers, as /health says ready")
@@ -56,18 +56,6 @@ class Meters(registry: MeterRegistry, private val health: HealthRegistry) : Auto
     }
 
     private fun readiness(): Health = last.get()
-
-    // A scheduled task that throws is never run again, which would leave the gauges reading their last answer for
-    // good; and Lark lets a probe's throw out of readiness(). A throw is the shop not knowing, so it is not ready.
-    private fun ask() {
-        last.set(
-            try {
-                health.readiness()
-            } catch (failure: RuntimeException) {
-                Health.Down(listOf("health: ${failure.message}"))
-            },
-        )
-    }
 
     override fun close() {
         asking.shutdownNow()

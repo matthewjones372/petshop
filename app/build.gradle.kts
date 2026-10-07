@@ -2,7 +2,7 @@ plugins {
     application
     `java-test-fixtures`
     // Checks every graph in this project on `check`, and renders each one.
-    id("io.github.matthewjones372.lark.wiring") version "0.2.0"
+    id("io.github.matthewjones372.lark.wiring")
     // The shop's events on the wire are Avro records, derived by avro4k from @Serializable classes.
     kotlin("plugin.serialization")
     // Domain events to wire records and back, derived at compile time: a field that cannot be mapped
@@ -39,8 +39,8 @@ dependencies {
     implementation("com.github.avro-kotlin.avro4k:avro4k-confluent-kafka-serializer:2.12.0")
     implementation("io.confluent:kafka-avro-serializer:8.3.0")
     // Confluent 8.3 asks for its own build of the Kafka 4.3 client, 8.3.0-ccs, which is not on Maven Central;
-    // the Apache one it is built from stands in, so there is one Kafka client on the classpath. lark-kafka is
-    // built against 3.8 and runs on it: KafkaBusSpec is the proof.
+    // the Apache one it is built from stands in, so there is one Kafka client on the classpath. It is the one
+    // lark-kafka is built against, since Lark spec 0125.
     implementation("org.apache.kafka:kafka-clients") { version { strictly("4.3.0") } }
     implementation("io.github.matthewjones372:lark-otel:$larkVersion")
     implementation("io.opentelemetry:opentelemetry-sdk:1.51.0")
@@ -92,11 +92,4 @@ dependencies {
 
     // The shop's own typed client, for the end-to-end test: it calls the service by endpoint, not URL.
     testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC3")
-}
-
-// lark-test's stories colour their console copy under FORCE_COLOR or -Plark.test.colour, and a test worker does
-// not see the shell's environment, so these are handed on. Lark spec 0118 has its wiring plugin do this instead.
-tasks.test {
-    listOf("FORCE_COLOR", "NO_COLOR").forEach { name -> providers.environmentVariable(name).orNull?.let { environment(name, it) } }
-    providers.gradleProperty("lark.test.colour").orNull?.let { systemProperty("lark.test.colour", it) }
 }

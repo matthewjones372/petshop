@@ -1,9 +1,17 @@
 pluginManagement {
+    // The wiring plugin ships from the same build as the library, at the same version, so it is pinned here to
+    // larkVersion rather than in a build script, where it would drift.
+    val larkVersion = providers.gradleProperty("larkVersion").get()
     repositories {
-        // The wiring plugin ships from the same build as the library, and from
-        // the same place.
         mavenCentral()
         gradlePluginPortal()
+        if (larkVersion.endsWith("-SNAPSHOT")) {
+            maven("https://central.sonatype.com/repository/maven-snapshots/")
+            mavenLocal()
+        }
+    }
+    plugins {
+        id("io.github.matthewjones372.lark.wiring") version larkVersion
     }
 }
 
