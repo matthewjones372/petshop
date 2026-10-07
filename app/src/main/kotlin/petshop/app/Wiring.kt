@@ -232,7 +232,10 @@ private val web: Module =
         { shop: PetShop, config: Settings, system: TypedSystem<Void>, pool: DataSource,
             registry: PrometheusMeterRegistry, projection: Projection, _: Arrivals, _: OutboxRelay, _: Meters ->
             petshopApi(shop, probes(shop, pool), registry::scrape, projection::tally)
-                .startWithDocs(system, port = config.port, host = config.host, docs = docs { docsPath = "/api-docs" })
+                .startWithDocs(system, port = config.port, host = config.host, docs = docs {
+                    docsPath = "/api-docs"
+                    shopReference()
+                })
         },
         { server -> server.stop() },
     )
