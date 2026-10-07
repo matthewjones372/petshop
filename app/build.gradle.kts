@@ -19,6 +19,7 @@ tasks.named<JavaExec>("run") {
 }
 
 val larkVersion: String = providers.gradleProperty("larkVersion").get()
+val pelicanVersion: String = providers.gradleProperty("pelicanVersion").get()
 
 dependencies {
     api(project(":api"))
@@ -52,7 +53,7 @@ dependencies {
     implementation("com.zaxxer:HikariCP:7.1.0")
 
     // The shop's client for the chip registry sends through Pekko HTTP, on the system it already runs.
-    implementation("io.github.matthewjones372:pelican-client-pekko:1.0.0-RC3")
+    implementation("io.github.matthewjones372:pelican-client-pekko:$pelicanVersion")
 
     // On the classpath and nothing else: each registers itself through a
     // ServiceLoader, so the service's own lines and numbers go where its
@@ -87,11 +88,11 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-kafka:2.0.5")
 
     // A real HTTP server playing the registry, stubbed in the registry's own endpoints.
-    testImplementation("io.github.matthewjones372:pelican-test-wiremock:1.0.0-RC3")
+    testImplementation("io.github.matthewjones372:pelican-test-wiremock:$pelicanVersion")
     testImplementation(project(":registry"))
 
     // The shop's own typed client, for the end-to-end test: it calls the service by endpoint, not URL.
-    testImplementation("io.github.matthewjones372:pelican-test:1.0.0-RC3")
+    testImplementation("io.github.matthewjones372:pelican-test:$pelicanVersion")
 }
 
 // lark-test's stories colour their console copy under FORCE_COLOR or -Plark.test.colour, and a test worker does

@@ -1,6 +1,7 @@
 package petshop.api
 
 import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.health.Health
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.handledNow
@@ -13,9 +14,9 @@ import petshop.domain.PetShop
  * The endpoints answered. A handler names the declared failure it is producing, so returning one the
  * endpoint never declared does not compile.
  */
-fun petshopApi(shop: PetShop, health: () -> Healthy, scrape: () -> String, tally: () -> Tally) = api(
-    endpoints = listOf(
-        petshop.api.health handledNow { health() },
+fun petshopApi(shop: PetShop, health: Health, scrape: () -> String, tally: () -> Tally) = api(
+    // /health/live and /health/ready are pelican-health's, answered from the checks the service declares.
+    endpoints = health.endpoints + listOf(
         metrics handledNow { scrape() },
         stats handledNow { tally() },
         listPets handledNow { shop.all().toDto() },
@@ -29,7 +30,8 @@ fun petshopApi(shop: PetShop, health: () -> Healthy, scrape: () -> String, tally
                         is ProblemDto.NoSuchPet -> petMissing(problem)
                         is ProblemDto.AlreadyAdopted -> petTaken(problem)
                         is ProblemDto.NotChipped -> petNotChipped(problem)
-                        is ProblemDto.Unavailable -> unavailable(problem)
+                        is ProblemDto.RegistryDown -> registryDown(problem)
+                        is ProblemDto.NotRecorded -> notRecorded(problem)
                     }
                 },
                 { pet -> ok(pet.toDto()) },

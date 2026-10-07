@@ -19,11 +19,17 @@ import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
 import kotlin.time.Duration.Companion.seconds
 import org.apache.kafka.common.serialization.LongDeserializer
+import io.github.matthewjones372.pelican.health.health
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import petshop.api.adoptPet
 import petshop.api.getPet
-import petshop.api.health
 import petshop.api.stats
 import petshop.api.toDto
 import petshop.domain.AlreadyAdopted
@@ -37,6 +43,9 @@ import petshop.registry.Problem
 import petshop.registry.lookupChip
 import petshop.registry.noSuchChip
 import petshop.registry.recordKeeper
+
+/** The probes as a client names them: any `health { }` describes the same two endpoints, whatever its checks. */
+private val probes = health { }
 
 /**
  * The whole service, end to end, in about as many lines as it takes to say what it should do.
@@ -104,7 +113,7 @@ class EndToEndSpec {
 
         theService.use { server: PelicanServer ->
             apiClient(server.baseUrl, JacksonCodecs).use { shop ->
-                Given("the whole service, started as main starts it") { shop.call(health, Unit).ready shouldBe true }
+                Given("the whole service, started as main starts it") { shop.call(probes.ready, Unit).status shouldBe "pass" }
 
                 val nibbles = When("Ada adopts Nibbles") { shop.outcome(adoptPet, 1L) }
                 Then("Nibbles is hers") { nibbles.shouldBeOk().adopted shouldBe true }
@@ -152,6 +161,30 @@ class EndToEndSpec {
                 And("the projection committed every event").eventually(5.seconds) {
                     kafka.committed(GROUP, TOPIC) shouldBe database.recorded()
                 }
+            }
+        }.shouldBeRight()
+    }
+
+    @Test
+    fun `the reference is served beside Swagger, in the shop's colours, over the same document`() = story {
+        theService.use { server: PelicanServer ->
+            val http = HttpClient.newHttpClient()
+            fun get(path: String) = http.send(
+                HttpRequest.newBuilder(URI.create(server.baseUrl + path)).build(),
+                HttpResponse.BodyHandlers.ofString(),
+            )
+
+            val reference = When("someone opens /reference") { get("/reference") }
+            Then("it is Redoc, in the shop's colours, with the paw for a logo") {
+                reference.statusCode() shouldBe 200
+                reference.body() shouldContain "Redoc.init("
+                reference.body() shouldContain "#D9822B"
+                reference.body() shouldContain "x-logo"
+                reference.body() shouldContain "fonts.googleapis.com"
+            }
+            And("Swagger is where it was, and the document every client reads carries no logo") {
+                get("/api-docs").statusCode() shouldBe 200
+                get("/openapi.json").body() shouldNotContain "x-logo"
             }
         }.shouldBeRight()
     }

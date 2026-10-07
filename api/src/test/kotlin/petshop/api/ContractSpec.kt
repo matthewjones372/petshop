@@ -8,6 +8,8 @@ import io.github.matthewjones372.pelican.test.shouldBeError
 import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
+import io.github.matthewjones372.pelican.health.Status
+import io.github.matthewjones372.pelican.health.health
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
@@ -40,9 +42,11 @@ class ContractSpec {
 
     private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 
+    private val probes = health { live("always") { Status.Pass } }
+
     private val app = petshopApi(
         shop = OnePet(nibbles),
-        health = { Healthy(ready = true, failing = emptyList()) },
+        health = probes,
         scrape = { "petshop_adoptions_total 1.0" },
         tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
     ).inMemory("petshop-contract")
@@ -57,7 +61,8 @@ class ContractSpec {
         app.request(getPet, 1L) shouldBuild "GET /pets/1"
         app.request(adoptPet, 1L) shouldBuild "POST /pets/1/adoption"
         app.request(listPets, Unit) shouldBuild "GET /pets"
-        app.request(health, Unit) shouldBuild "GET /health"
+        app.request(probes.live, Unit) shouldBuild "GET /health/live"
+        app.request(probes.ready, Unit) shouldBuild "GET /health/ready"
         app.request(metrics, Unit) shouldBuild "GET /metrics"
         app.request(stats, Unit) shouldBuild "GET /stats"
     }
@@ -83,14 +88,14 @@ class ContractSpec {
     fun `the registry's refusals, and a sale the shop could not record, reach the caller as declared failures`() {
         listOf(
             NotChipped(1) to ProblemDto.NotChipped(1, NotChipped(1).message),
-            RegistryDown(1) to ProblemDto.Unavailable(1, RegistryDown(1).message),
-            NotRecorded(1) to ProblemDto.Unavailable(1, NotRecorded(1).message),
+            RegistryDown(1) to ProblemDto.RegistryDown(1, RegistryDown(1).message),
+            NotRecorded(1) to ProblemDto.NotRecorded(1, NotRecorded(1).message),
         ).forEach { (refusal, declared) ->
             val refusing = petshopApi(
                 shop = object : PetShop by OnePet(nibbles) {
                     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = refusal.left()
                 },
-                health = { Healthy(ready = true, failing = emptyList()) },
+                health = health { live("always") { Status.Pass } },
                 scrape = { "" },
                 tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
             ).inMemory("petshop-refusing-${refusal::class.simpleName}")
@@ -99,4 +104,23 @@ class ContractSpec {
         }
     }
 
+
+    @Test
+    fun `the probes answer in health+json, and a failing check takes the shop out of rotation`() {
+        app.outcome(probes.ready, Unit).shouldBeOk().status shouldBe "pass"
+
+        val failing = health { ready("database") { Status.Fail("no connection") } }
+        val down = petshopApi(
+            shop = OnePet(nibbles),
+            health = failing,
+            scrape = { "" },
+            tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+        ).inMemory("petshop-contract-down")
+
+        // A failing probe is pelican-health's declared failure (Pelican spec 0070), so the report comes back as a value.
+        val report = down.outcome(failing.ready, Unit).shouldBeError()
+        report.status shouldBe "fail"
+        report.checks.keys shouldBe setOf("database:responseTime")
+        down.outcome(failing.live, Unit).shouldBeOk().status shouldBe "pass"
+    }
 }

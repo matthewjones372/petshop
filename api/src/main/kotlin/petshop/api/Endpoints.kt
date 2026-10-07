@@ -15,7 +15,7 @@ import petshop.domain.Species
  */
 val petId = pathParam<Long>("petId", description = "The pet's id")
 
-/** The two ways a request about a pet can fail, each with the status the document publishes. */
+/** The ways a request about a pet can fail, each with the status the document publishes. */
 val petMissing = errorJson<ProblemDto.NoSuchPet>(404, "No pet with that id")
 
 val petTaken = errorJson<ProblemDto.AlreadyAdopted>(409, "That pet has already been adopted")
@@ -23,16 +23,16 @@ val petTaken = errorJson<ProblemDto.AlreadyAdopted>(409, "That pet has already b
 /** The registry has no chip, which is the registry's answer and not the shop's. */
 val petNotChipped = errorJson<ProblemDto.NotChipped>(422, "The registry has no chip for that pet")
 
-val unavailable = errorJson<ProblemDto.Unavailable>(503, "The adoption could not be finished just now; try again")
+/**
+ * Two reasons an adoption could not be finished just now, both worth trying again and so both a 503. A status
+ * names one response unless its failures are tagged: the tag is written into the body as `kind`, and the
+ * client reads the failure back by it (Pelican spec 0063).
+ */
+val registryDown = errorJson<ProblemDto.RegistryDown>(503, "The chip registry could not be reached; try again")
+    .tagged("registry_down")
 
-/** What the shop says when asked whether it can serve. */
-data class Healthy(val ready: Boolean, val failing: List<String>)
-
-val health = endpoint {
-    get("health")
-    summary = "Whether the shop can serve"
-    json<Healthy>()
-}
+val notRecorded = errorJson<ProblemDto.NotRecorded>(503, "The adoption could not be recorded; try again")
+    .tagged("not_recorded")
 
 val listPets = endpoint {
     get("pets")
@@ -49,7 +49,7 @@ val getPet = endpoint(petId) {
 val adoptPet = endpoint(petId) {
     post("pets" / petId / "adoption")
     summary = "Take a pet home"
-    json<PetDto>().orFail(petMissing, petTaken, petNotChipped, unavailable)
+    json<PetDto>().orFail(petMissing, petTaken, petNotChipped, registryDown, notRecorded)
 }
 
 /**

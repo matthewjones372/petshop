@@ -20,7 +20,7 @@ val checks = listOf("shop", "database")
 /**
  * What the shop says about itself beyond its own counters: the JVM it runs in, under the names a JVM dashboard
  * expects (`jvm_memory_used_bytes`, `jvm_gc_pause_seconds`, `process_cpu_usage`), and its health, so a probe that
- * stops answering is an alert rather than something found by asking `/health`.
+ * stops answering is an alert rather than something found by asking `/health/ready`.
  */
 class Meters(registry: MeterRegistry, private val health: HealthRegistry) : AutoCloseable {
 
@@ -39,7 +39,7 @@ class Meters(registry: MeterRegistry, private val health: HealthRegistry) : Auto
         asking.scheduleWithFixedDelay(::ask, 0, ASK_EVERY_MILLIS, TimeUnit.MILLISECONDS)
 
         Gauge.builder("petshop.ready") { if (readiness() is Health.Down) 0.0 else 1.0 }
-            .description("1 while every critical probe answers, as /health says ready")
+            .description("1 while every critical probe answers")
             .register(registry)
         checks.forEach { check ->
             Gauge.builder("petshop.health.check") { if (check in failing()) 0.0 else 1.0 }

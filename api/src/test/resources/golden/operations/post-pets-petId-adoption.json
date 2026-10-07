@@ -58,11 +58,25 @@
             }
           },
           "503": {
-            "description": "The adoption could not be finished just now; try again",
+            "description": "One of:\n\n- `registry_down`: The chip registry could not be reached; try again\n- `not_recorded`: The adoption could not be recorded; try again",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Unavailable"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/RegistryDown"
+                    },
+                    {
+                      "$ref": "#/components/schemas/NotRecorded"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "registry_down": "#/components/schemas/RegistryDown",
+                      "not_recorded": "#/components/schemas/NotRecorded"
+                    }
+                  }
                 }
               }
             }
@@ -161,9 +175,13 @@
           "message"
         ]
       },
-      "Unavailable": {
+      "RegistryDown": {
         "type": "object",
         "properties": {
+          "kind": {
+            "type": "string",
+            "const": "registry_down"
+          },
           "id": {
             "type": "integer",
             "format": "int64"
@@ -173,9 +191,33 @@
           }
         },
         "required": [
+          "kind",
           "id",
           "message"
-        ]
+        ],
+        "description": "The chip registry could not be reached; try again"
+      },
+      "NotRecorded": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "not_recorded"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "message"
+        ],
+        "description": "The adoption could not be recorded; try again"
       },
       "ApiError": {
         "type": "object",
