@@ -33,3 +33,12 @@ tasks.register<Test>("loadTest") {
     // A measurement, not a build output: a cached pass says nothing about this machine now.
     outputs.upToDateWhen { false }
 }
+
+// Traffic for the demo, against the shop already running: `./gradlew :loadtest:demoTraffic`, with PETSHOP_URL,
+// RATE and DURATION to change where, how many visitors a second, and for how long. See DemoTraffic.kt.
+tasks.register<JavaExec>("demoTraffic") {
+    description = "Sends visitors to a running shop, so the demo's dashboards have something to show."
+    group = "demo"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("petshop.load.DemoTrafficKt")
+}
