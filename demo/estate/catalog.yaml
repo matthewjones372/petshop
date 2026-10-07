@@ -24,6 +24,8 @@ services:
       metrics: http://localhost:8080/metrics
       dashboard: http://localhost:3000
       prometheus: http://localhost:9090/alerts
+    # Its lines in Loki, pushed by its logback when it runs with LOKI_URL set.
+    logs: { selector: '{app="petshop"}', errors: ERROR }
     # The JVM the shop runs in, by the names Micrometer's binders give it: heap, GC pauses, threads and CPU.
     stats:
       preset: jvm
