@@ -94,7 +94,9 @@ map:
     - { id: bus, title: Kafka, store: events }
   edges:
     - { from: petshop, to: registry, label: chips, rate: 'sum(rate(petshop_adoptions_total{outcome=~"taken|not_chipped|registry_down"}[1m]))', alert: ChipRegistryUnreachable }
-    - { from: petshop, to: postgres, label: records, alert: PostgresDown }
+    # Estate draws an edge with no rate, or a rate of nought, as dead, so this one carries the transactions the
+    # shop's database commits: the catalogue and the outbox written together, and the relay's claims.
+    - { from: petshop, to: postgres, label: records, rate: 'sum(rate(pg_stat_database_xact_commit{datname="petshop"}[1m]))', alert: PostgresDown }
     - { from: postgres, to: bus, label: relays, rate: 'sum(rate(petshop_outbox_published_total[1m]))', alert: BusRefusingEvents }
     # The projection reads the topic back, but drawn from the shop to the bus: an edge back to the shop would close
     # a loop (shop, Postgres, bus, shop), and Estate lays a map out in columns, which a loop pushes off the canvas.
