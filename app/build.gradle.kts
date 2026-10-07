@@ -33,8 +33,8 @@ dependencies {
     implementation("com.github.avro-kotlin.avro4k:avro4k-confluent-kafka-serializer:2.12.0")
     implementation("io.confluent:kafka-avro-serializer:8.3.0")
     // Confluent 8.3 asks for its own build of the Kafka 4.3 client, 8.3.0-ccs, which is not on Maven Central;
-    // the Apache one it is built from stands in, so there is one Kafka client on the classpath. lark-kafka is
-    // built against 3.8 and runs on it: KafkaBusSpec is the proof.
+    // the Apache one it is built from stands in, so there is one Kafka client on the classpath. It is the one
+    // lark-kafka is built against, since Lark spec 0125.
     implementation("org.apache.kafka:kafka-clients") { version { strictly("4.3.0") } }
     implementation("io.github.matthewjones372:lark-otel:$larkVersion")
     implementation("io.opentelemetry:opentelemetry-sdk:1.51.0")

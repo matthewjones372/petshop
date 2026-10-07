@@ -546,8 +546,8 @@ already handles.
 adds Confluent's repository, limited to `io.confluent`. avro4k's serde needs
 Confluent 8.3 or later, which asks for its own `8.3.0-ccs` build of the Kafka
 4.3 client, so the build pins Apache's `4.3.0` to keep one client on the
-classpath. `lark-kafka` is built against 3.8 and runs on it; `KafkaBusSpec`
-is what says so. The test broker and the demo's are the 4.3 image.
+classpath, the same client `lark-kafka` is built against. The test broker and
+the demo's are the 4.3 image.
 
 **Its limits.** Delivery is at least once, not exactly once: `lark-kafka` has
 no transactions, so a consumer that dies after folding an event and before
