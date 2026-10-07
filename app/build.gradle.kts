@@ -12,6 +12,12 @@ plugins {
 
 application { mainClass.set("petshop.app.MainKt") }
 
+// With LOKI_URL set, the shop's lines also go to Loki. Picked by which file logback reads, so a run without it,
+// and every test, never tries to reach a Loki that is not there.
+tasks.named<JavaExec>("run") {
+    providers.environmentVariable("LOKI_URL").orNull?.let { systemProperty("logback.configurationFile", "logback-loki.xml") }
+}
+
 val larkVersion: String = providers.gradleProperty("larkVersion").get()
 val pelicanVersion: String = providers.gradleProperty("pelicanVersion").get()
 
@@ -61,6 +67,8 @@ dependencies {
 
     // So a failure in a handler reaches a terminal rather than an SLF4J no-op.
     runtimeOnly("ch.qos.logback:logback-classic:1.5.20")
+    // The shop's lines to Loki, for the demo's Estate; only read when LOKI_URL is set, see logback-loki.xml.
+    runtimeOnly("com.github.loki4j:loki-logback-appender:2.0.3")
 
     // A claim about a backend is worth having only against the real one.
     testImplementation("ch.qos.logback:logback-classic:1.5.20")
