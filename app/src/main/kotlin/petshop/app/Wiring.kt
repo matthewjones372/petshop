@@ -11,7 +11,6 @@ import io.github.matthewjones372.lark.actor.ActorRef
 import io.github.matthewjones372.lark.actor.Reply
 import io.github.matthewjones372.lark.actor.ask
 import io.github.matthewjones372.lark.app.AppScope
-import io.github.matthewjones372.lark.app.Health
 import io.github.matthewjones372.lark.app.HealthRegistry
 import io.github.matthewjones372.lark.app.LarkApp
 import io.github.matthewjones372.lark.app.Module
@@ -34,6 +33,11 @@ import io.github.matthewjones372.lark.otel.tracedSpan
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.lark.timed
+import io.github.matthewjones372.pelican.health.Status
+import io.github.matthewjones372.pelican.health.health
+import io.github.matthewjones372.pelican.health.heapHeadroom
+import io.github.matthewjones372.pelican.health.jdbc
+import io.github.matthewjones372.pelican.health.noDeadlockedThreads
 import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
@@ -44,11 +48,11 @@ import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import kotlin.reflect.typeOf
 import kotlin.time.Duration
+import javax.sql.DataSource
 import kotlin.time.Duration.Companion.seconds
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.typed.ActorSystem as TypedSystem
 import org.apache.pekko.actor.typed.javadsl.Adapter
-import petshop.api.Healthy
 import petshop.api.petshopApi
 import petshop.domain.AlreadyAdopted
 import petshop.domain.ChipRegistry
@@ -225,20 +229,31 @@ private val web: Module =
     // The port is a resource like any other: bound here, unbound when the graph is given back, which
     // is what lets a load test start the whole application in its own process.
     singleOf(
-        { shop: PetShop, config: Settings, system: TypedSystem<Void>, health: HealthRegistry,
+        { shop: PetShop, config: Settings, system: TypedSystem<Void>, pool: DataSource,
             registry: PrometheusMeterRegistry, projection: Projection, _: Arrivals, _: OutboxRelay, _: Meters ->
-            petshopApi(shop, { asked(health) }, registry::scrape, projection::tally)
+            petshopApi(shop, probes(shop, pool), registry::scrape, projection::tally)
                 .startWithDocs(system, port = config.port, host = config.host, docs = docs { docsPath = "/api-docs" })
         },
         { server -> server.stop() },
     )
 
-/** The registry's answer in the shape the endpoint publishes. */
-private fun asked(health: HealthRegistry): Healthy = when (val readiness = health.readiness()) {
-    is Health.Up -> Healthy(ready = true, failing = emptyList())
-    is Health.Degraded -> Healthy(ready = true, failing = readiness.failing)
-    is Health.Down -> Healthy(ready = false, failing = readiness.failing)
+/**
+ * What /health/live and /health/ready ask, each under its own timeout. Live is the process itself, so a failure
+ * there gets it restarted; ready is what it needs to take traffic, so Postgres going takes it out of rotation
+ * without restarting it.
+ */
+private fun probes(shop: PetShop, pool: DataSource) = health {
+    live("threads") { noDeadlockedThreads() }
+    // The actor answering at all: a shop that cannot is a process to restart, whatever the database is doing.
+    live("shop", timeout = 3.seconds) {
+        if (shop.all().isNotEmpty()) Status.Pass else Status.Fail("the shop answered with no pets")
+    }
+    ready("database", componentType = "datastore") { jdbc(pool) }
+    // A warning, not a failure: a heap running short is worth a look before it is an outage.
+    ready("heap", critical = false) { heapHeadroom(HEAP_HEADROOM_BYTES) }
 }
+
+private const val HEAP_HEADROOM_BYTES = 64L * 1024 * 1024
 
 /** The whole service, its bus chosen by [conf]'s `petshop.bus`. */
 fun petshopFrom(conf: Config): Module =

@@ -20,7 +20,7 @@ services:
     links:
       app: http://localhost:8080/pets
       api: http://localhost:8080/api-docs
-      health: http://localhost:8080/health
+      health: http://localhost:8080/health/ready
       metrics: http://localhost:8080/metrics
       dashboard: http://localhost:3000
       prometheus: http://localhost:9090/alerts
@@ -69,7 +69,7 @@ stores:
 alerts:
   ChipRegistryUnreachable: { impact: "Adopters are told to try again later, and the pet stays on the shelf." }
   AdoptionsNotRecorded: { impact: "Every adoption is refused with a 503 until the database answers again." }
-  PetshopNotReady: { impact: "The shop says it cannot serve; /health lists what is failing." }
+  PetshopNotReady: { impact: "The shop says it cannot serve; /health/ready lists what is failing." }
   PostgresDown: { impact: "Every adoption is refused with a 503, arrivals stop, and no events reach the bus." }
   KafkaDown: { impact: "Events stay in the outbox, and /stats stops moving, until the broker is back." }
 

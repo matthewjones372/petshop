@@ -41,7 +41,7 @@ groups:
           summary: The bus is turning events away; they stay in the outbox and go again.
           impact: /stats falls behind until the bus takes them.
 
-      # The shop's own view of itself: /health's checks, each exported as petshop_health_check. Fires whatever
+      # The shop's own view of itself: its probes, each exported as petshop_health_check. Fires whatever
       # the shop is doing, so a database that dies while nobody adopts is still seen.
       - alert: PetshopNotReady
         expr: max by (job) (petshop_ready) == 0
@@ -49,7 +49,7 @@ groups:
         labels: { severity: critical }
         annotations:
           summary: "The shop's health check is failing: {{ with query \"petshop_health_check == 0\" }}{{ range . }}{{ .Labels.check }} {{ end }}{{ end }}"
-          impact: The shop says it cannot serve; /health lists what is failing.
+          impact: The shop says it cannot serve; /health/ready lists what is failing.
 
   # The stores the shop depends on. Each keeps a `store` label naming its catalog entry, which is how Estate puts
   # the alert on the store, and the edge from the shop turns red by the alert's name.

@@ -399,6 +399,11 @@ status codes, and a failure arrives as the value the endpoint declared.
 **What it costs.** Two things to look up once: `errorJson` for a declared
 failure, and the import for `orFail`.
 
+`/health/live` and `/health/ready` are `pelican-health`'s, in
+`application/health+json`: live asks whether the actor answers and no threads
+are deadlocked, and ready adds Postgres, so a database outage takes the shop out
+of rotation with a 503 rather than getting it restarted.
+
 The demo's registry stubs are generated from the same endpoints too:
 `DemoStubsSpec` writes `demo/registry/mappings/chips.json`, including recording
 a keeper, whose answer is templated from the request body.

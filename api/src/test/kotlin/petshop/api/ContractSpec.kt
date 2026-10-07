@@ -8,6 +8,11 @@ import io.github.matthewjones372.pelican.test.shouldBeError
 import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
+import io.github.matthewjones372.pelican.health.Status
+import io.github.matthewjones372.pelican.health.health
+import io.github.matthewjones372.pelican.test.ApiCallFailed
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
@@ -40,9 +45,11 @@ class ContractSpec {
 
     private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 
+    private val probes = health { live("always") { Status.Pass } }
+
     private val app = petshopApi(
         shop = OnePet(nibbles),
-        health = { Healthy(ready = true, failing = emptyList()) },
+        health = probes,
         scrape = { "petshop_adoptions_total 1.0" },
         tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
     ).inMemory("petshop-contract")
@@ -57,7 +64,8 @@ class ContractSpec {
         app.request(getPet, 1L) shouldBuild "GET /pets/1"
         app.request(adoptPet, 1L) shouldBuild "POST /pets/1/adoption"
         app.request(listPets, Unit) shouldBuild "GET /pets"
-        app.request(health, Unit) shouldBuild "GET /health"
+        app.request(probes.live, Unit) shouldBuild "GET /health/live"
+        app.request(probes.ready, Unit) shouldBuild "GET /health/ready"
         app.request(metrics, Unit) shouldBuild "GET /metrics"
         app.request(stats, Unit) shouldBuild "GET /stats"
     }
@@ -90,7 +98,7 @@ class ContractSpec {
                 shop = object : PetShop by OnePet(nibbles) {
                     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = refusal.left()
                 },
-                health = { Healthy(ready = true, failing = emptyList()) },
+                health = health { live("always") { Status.Pass } },
                 scrape = { "" },
                 tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
             ).inMemory("petshop-refusing-${refusal::class.simpleName}")
@@ -99,4 +107,25 @@ class ContractSpec {
         }
     }
 
+
+    @Test
+    fun `the probes answer in health+json, and a failing check takes the shop out of rotation`() {
+        app.outcome(probes.ready, Unit).shouldBeOk().status shouldBe "pass"
+
+        val failing = health { ready("database") { Status.Fail("no connection") } }
+        val down = petshopApi(
+            shop = OnePet(nibbles),
+            health = failing,
+            scrape = { "" },
+            tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+        ).inMemory("petshop-contract-down")
+
+        // The 503 is declared as one of the probe's answers, but Pelican's client treats any 5xx as the call
+        // failing, so a failing report arrives as ApiCallFailed carrying the body rather than as a value.
+        val refused = shouldThrow<ApiCallFailed> { down.outcome(failing.ready, Unit) }
+        refused.response.status shouldBe 503
+        refused.response.body shouldContain "\"status\":\"fail\""
+        refused.response.body shouldContain "database:responseTime"
+        down.outcome(failing.live, Unit).shouldBeOk().status shouldBe "pass"
+    }
 }

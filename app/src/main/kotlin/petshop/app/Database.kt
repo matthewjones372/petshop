@@ -70,7 +70,7 @@ val database: Module =
             .boundTo<DataSource>()
             // A connection the pool can hand out and Postgres says is good, or the shop is not ready. A pool with no
             // connection to give throws rather than answering, and Lark's health registry lets a throw out of
-            // readiness(), which would fail /health and the scrape with it; so a throw is a "no" here.
+            // readiness(), which would fail the scrape that reads it; so a throw is a "no" here.
             .probe("database", timeout = 3.seconds) { pool: DataSource ->
                 try {
                     pool.connection.use { it.isValid(PROBE_SECONDS) }

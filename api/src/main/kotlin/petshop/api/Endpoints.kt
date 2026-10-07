@@ -34,15 +34,6 @@ val registryDown = errorJson<ProblemDto.RegistryDown>(503, "The chip registry co
 val notRecorded = errorJson<ProblemDto.NotRecorded>(503, "The adoption could not be recorded; try again")
     .tagged("not_recorded")
 
-/** What the shop says when asked whether it can serve. */
-data class Healthy(val ready: Boolean, val failing: List<String>)
-
-val health = endpoint {
-    get("health")
-    summary = "Whether the shop can serve"
-    json<Healthy>()
-}
-
 val listPets = endpoint {
     get("pets")
     summary = "Every pet in the shop"

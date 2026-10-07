@@ -19,11 +19,11 @@ import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
 import kotlin.time.Duration.Companion.seconds
 import org.apache.kafka.common.serialization.LongDeserializer
+import io.github.matthewjones372.pelican.health.health
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import petshop.api.adoptPet
 import petshop.api.getPet
-import petshop.api.health
 import petshop.api.stats
 import petshop.api.toDto
 import petshop.domain.AlreadyAdopted
@@ -37,6 +37,9 @@ import petshop.registry.Problem
 import petshop.registry.lookupChip
 import petshop.registry.noSuchChip
 import petshop.registry.recordKeeper
+
+/** The probes as a client names them: any `health { }` describes the same two endpoints, whatever its checks. */
+private val probes = health { }
 
 /**
  * The whole service, end to end, in about as many lines as it takes to say what it should do.
@@ -104,7 +107,7 @@ class EndToEndSpec {
 
         theService.use { server: PelicanServer ->
             apiClient(server.baseUrl, JacksonCodecs).use { shop ->
-                Given("the whole service, started as main starts it") { shop.call(health, Unit).ready shouldBe true }
+                Given("the whole service, started as main starts it") { shop.call(probes.ready, Unit).status shouldBe "pass" }
 
                 val nibbles = When("Ada adopts Nibbles") { shop.outcome(adoptPet, 1L) }
                 Then("Nibbles is hers") { nibbles.shouldBeOk().adopted shouldBe true }
