@@ -21,6 +21,10 @@ docker compose -f demo/docker-compose.yml up -d postgres registry
 `demo/` adds Prometheus, Grafana, Alertmanager and [Estate](https://github.com/matthewjones372/estate) to watch the
 running shop. Grafana is at <http://localhost:3000> and Estate at <http://localhost:8095>; see `demo/README.md`.
 
+[tweet-street](https://github.com/matthewjones372/tweet-street) uses the same libraries on something larger: a bank
+in four services, with accounts as actors on a three-node Lark cluster, transfers as sagas, and Proofload and chaos
+runs against it. Petshop stays the small one, where each library can be judged on its own.
+
 ## Libraries and dependencies
 
 The libraries being tried out:
