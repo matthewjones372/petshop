@@ -1,0 +1,17 @@
+<!-- The shop's lines on the console, at INFO: logback's default without a file is DEBUG, which is every Kafka
+     client's chatter. With LOKI_URL set, logback-loki.xml is read instead, and the same lines go to Loki too. -->
+<configuration>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} -- %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Kafka's and Confluent's clients print their whole configuration at INFO each time one is made. -->
+  <logger name="org.apache.kafka" level="WARN"/>
+  <logger name="io.confluent" level="WARN"/>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+</configuration>

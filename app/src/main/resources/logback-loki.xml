@@ -1,0 +1,43 @@
+<!-- Read in place of logback.xml when LOKI_URL is set (see app/build.gradle.kts): the console as before, and each
+     line pushed to Loki under app="petshop", which is the stream the demo's Estate reads the shop's logs from. -->
+<configuration>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} -- %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+    <http>
+      <url>${LOKI_URL}/loki/api/v1/push</url>
+    </http>
+    <!-- Every two seconds rather than loki4j's minute: the demo is watched, and a line a minute late reads as lost. -->
+    <batch>
+      <timeoutMs>2000</timeoutMs>
+    </batch>
+    <!-- Few labels, each with few values: a label per pet or per adopter would make a stream of each. -->
+    <labels>
+      app = petshop
+      level = %level
+    </labels>
+    <!-- What lark puts in the MDC about an adoption rides along without becoming a label. -->
+    <structuredMetadata>
+      logger = %logger
+      thread = %thread
+      pet_id = %mdc{pet_id}
+      adopted_by = %mdc{adopted_by}
+    </structuredMetadata>
+    <message>
+      <pattern>%-5level %logger{36} -- %msg%n%ex</pattern>
+    </message>
+  </appender>
+
+  <!-- Kafka's and Confluent's clients print their whole configuration at INFO each time one is made. -->
+  <logger name="org.apache.kafka" level="WARN"/>
+  <logger name="io.confluent" level="WARN"/>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="LOKI"/>
+  </root>
+</configuration>

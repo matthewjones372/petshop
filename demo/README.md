@@ -1,7 +1,7 @@
 # Watching the numbers
 
 Two terminals. The application runs on the host. Everything else runs in
-Docker: Prometheus, Grafana, Alertmanager, Estate, the Postgres the outbox is in,
+Docker: Prometheus, Grafana, Alertmanager, Estate, Loki, the Postgres the outbox is in,
 Kafka and its schema registry, an exporter for each of those two, and a stand-in
 chip registry. Compose goes first,
 because the application will not start without its database.
@@ -11,12 +11,14 @@ cd demo && docker compose up -d
 ```
 
 ```bash
-BUS=kafka HOST=0.0.0.0 ./gradlew :app:run
+BUS=kafka LOKI_URL=http://localhost:3100 HOST=0.0.0.0 ./gradlew :app:run
 ```
 
 `BUS=kafka` puts the shop's events on the demo's Kafka, which is what gives Estate's
 Kafka store and the projection's lag something to show. Without it the events stay
-in the process.
+in the process. `LOKI_URL` sends the shop's log lines to the demo's Loki as well as the
+console, under `app="petshop"`, which is where Estate's logs panel reads them; without it
+the shop logs to the console only.
 
 `HOST=0.0.0.0` is for Linux. There, `host.docker.internal` is the Docker bridge
 (`host-gateway`, usually 172.17.0.1) rather than the host's loopback. The app
@@ -112,7 +114,7 @@ here is a process on your machine. There is no p99 either: the adoption timer is
 
 | | |
 |---|---|
-| `docker-compose.yml` | Prometheus, Alertmanager, Grafana, Estate, the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
+| `docker-compose.yml` | Prometheus, Alertmanager, Grafana, Estate, Loki, the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
 | `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
 | `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds, which on Linux needs the app started with `HOST=0.0.0.0`, and the Postgres and Kafka exporters |
 | `grafana/provisioning/` | the datasource and the dashboard provider |

@@ -24,6 +24,8 @@ services:
       metrics: http://localhost:8080/metrics
       dashboard: http://localhost:3000
       prometheus: http://localhost:9090/alerts
+    # Its lines in Loki, pushed by its logback when it runs with LOKI_URL set.
+    logs: { selector: '{app="petshop"}', errors: ERROR }
     # The JVM the shop runs in, by the names Micrometer's binders give it: heap, GC pauses, threads and CPU.
     stats:
       preset: jvm
@@ -94,4 +96,6 @@ map:
     - { from: petshop, to: registry, label: chips, rate: 'sum(rate(petshop_adoptions_total{outcome=~"taken|not_chipped|registry_down"}[1m]))', alert: ChipRegistryUnreachable }
     - { from: petshop, to: postgres, label: records, alert: PostgresDown }
     - { from: postgres, to: bus, label: relays, rate: 'sum(rate(petshop_outbox_published_total[1m]))', alert: BusRefusingEvents }
-    - { from: bus, to: petshop, label: projects, rate: 'sum(rate(kafka_consumergroup_current_offset_sum{consumergroup="petshop-projection"}[1m]))', alert: ProjectionFallingBehind }
+    # The projection reads the topic back, but drawn from the shop to the bus: an edge back to the shop would close
+    # a loop (shop, Postgres, bus, shop), and Estate lays a map out in columns, which a loop pushes off the canvas.
+    - { from: petshop, to: bus, label: reads back, rate: 'sum(rate(kafka_consumergroup_current_offset_sum{consumergroup="petshop-projection"}[1m]))', alert: ProjectionFallingBehind }

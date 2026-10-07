@@ -76,6 +76,13 @@ services:
     ports:
       - "8081:8081"
 
+  # Where the shop's lines go when it runs with LOKI_URL=http://localhost:3100, and where Estate reads them.
+  loki:
+    image: grafana/loki:3.6.3
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "3100:3100"
+
   prometheus:
     image: prom/prometheus:v2.54.1
     command:
