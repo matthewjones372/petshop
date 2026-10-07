@@ -1,0 +1,8 @@
+# What the demo's traffic image does not need from the repository: build output, IDE and Git state.
+**/build
+**/.gradle
+.gradle
+.git
+.idea
+**/*.iml
+demo/grafana

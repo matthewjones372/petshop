@@ -41,3 +41,18 @@ tasks.register<JavaExec>("demoTraffic") {
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass.set("petshop.load.DemoTrafficKt")
 }
+
+// The same visitors as a program of their own, for the demo's compose file to run: the test classes as a jar and
+// the classpath beside it, in build/demo-traffic. See demo/traffic/Dockerfile.
+val demoTrafficJar = tasks.register<Jar>("demoTrafficJar") {
+    archiveBaseName.set("demo-traffic")
+    from(sourceSets.test.get().output)
+}
+
+tasks.register<Sync>("installDemoTraffic") {
+    description = "Lays out DemoTraffic and its classpath in build/demo-traffic, for the demo's traffic container."
+    group = "demo"
+    from(demoTrafficJar)
+    from(sourceSets.test.get().runtimeClasspath.filter { it.isFile })
+    into(layout.buildDirectory.dir("demo-traffic/lib"))
+}
