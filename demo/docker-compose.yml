@@ -76,6 +76,21 @@ services:
     ports:
       - "8081:8081"
 
+  # Visitors for the shop running on the host, from loadtest's DemoTraffic: five a second, each looking at a pet and
+  # the stats, one in four adopting. Restarted when it ends or when the shop is not up yet, so it waits for the shop
+  # and follows it across restarts. `docker compose stop traffic` for a quiet shop.
+  traffic:
+    build:
+      context: ..
+      dockerfile: demo/traffic/Dockerfile
+    environment:
+      PETSHOP_URL: http://host.docker.internal:8080
+      RATE: "5"
+      DURATION: 24h
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
   # Where the shop's lines go when it runs with LOKI_URL=http://localhost:3100, and where Estate reads them.
   loki:
     image: grafana/loki:3.6.3
