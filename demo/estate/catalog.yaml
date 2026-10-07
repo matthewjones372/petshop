@@ -20,6 +20,7 @@ services:
     links:
       app: http://localhost:8080/pets
       api: http://localhost:8080/api-docs
+      reference: http://localhost:8080/reference
       health: http://localhost:8080/health/ready
       metrics: http://localhost:8080/metrics
       dashboard: http://localhost:3000

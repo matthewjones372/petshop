@@ -23,3 +23,7 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 19:34:51.622 [virtual-99] INFO  lark -- Sprocket the Parrot arrived
 19:34:56.621 [virtual-99] INFO  lark -- Marmalade the Tortoise arrived
 19:35:01.624 [virtual-99] INFO  lark -- Biscuit the Cat arrived
+19:35:06.625 [virtual-99] INFO  lark -- Clementine the Dog arrived
+19:35:11.625 [virtual-99] INFO  lark -- Pickle the Parrot arrived
+19:35:16.623 [virtual-99] INFO  lark -- Waffle the Tortoise arrived
+19:35:21.623 [virtual-99] INFO  lark -- Sprocket the Cat arrived
