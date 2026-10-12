@@ -19,6 +19,7 @@ sources:
     alertmanager: { url: http://alertmanager:9093 }
     loki: { url: http://loki:3100 }
 
-# Ask AI on an alert's page: the alert's brief, and Estate's read tools for what it does not say, sent to Claude.
+# Ask AI on an alert's card: the alert's brief, and Estate's read tools for what it does not say, sent to Claude.
+# Sonnet answers "why is this firing" well at a fraction of Opus's price; the budget caps what a day can spend.
 # At most one answer per alert a minute, within the day's budget.
-ai: { provider: anthropic, apiKey: "${ANTHROPIC_API_KEY}", model: claude-opus-5-5, budget: { tokensPerDay: 300000 } }
+ai: { provider: anthropic, apiKey: "${ANTHROPIC_API_KEY}", model: claude-sonnet-5-5, budget: { tokensPerDay: 150000 } }
