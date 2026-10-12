@@ -1,0 +1,24 @@
+# The demo's Estate settings with Ask AI turned on: estate.yaml, and a model to ask. Read in place of estate.yaml when
+# Compose is started with docker-compose.ai.yml, which also passes ANTHROPIC_API_KEY through; estate.yaml itself
+# names no key, so the demo starts without one. Keep the two in step.
+port: 8080
+catalog: /etc/estate/catalog.yaml
+
+auth:
+  # Only for a demo on a laptop: a session secret anyone can read, and every visitor an operator, so silences and
+  # notes work without signing in.
+  sessionSecret: the-petshop-demo-runs-on-a-laptop-only
+  roles:
+    viewer: [ developers ]
+    operator: [ ops ]
+  anonymous: { name: visitor, role: operator }
+
+sources:
+  demo:
+    prometheus: { url: http://prometheus:9090 }
+    alertmanager: { url: http://alertmanager:9093 }
+    loki: { url: http://loki:3100 }
+
+# Ask AI on an alert's page: the alert's brief, and Estate's read tools for what it does not say, sent to Claude.
+# At most one answer per alert a minute, within the day's budget.
+ai: { provider: anthropic, apiKey: "${ANTHROPIC_API_KEY}", model: claude-opus-5-5, budget: { tokensPerDay: 300000 } }

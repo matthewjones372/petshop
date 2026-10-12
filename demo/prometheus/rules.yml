@@ -1,4 +1,5 @@
 # Every rule keeps the `job` label: that is how Estate knows an alert is petshop's.
+# keep_firing_for holds a rate-based alert for five minutes after its cause stops, long enough to Ask AI about it.
 groups:
   - name: petshop
     rules:
@@ -12,6 +13,7 @@ groups:
 
       - alert: ChipRegistryUnreachable
         expr: sum by (job) (rate(petshop_adoptions_total{outcome="registry_down"}[1m])) > 0
+        keep_firing_for: 5m
         labels: { severity: warning }
         annotations:
           summary: Adoptions are failing because the chip registry cannot be reached.
@@ -19,6 +21,7 @@ groups:
 
       - alert: AdoptionsNotRecorded
         expr: sum by (job) (rate(petshop_adoptions_total{outcome="not_recorded"}[1m])) > 0
+        keep_firing_for: 5m
         labels: { severity: critical }
         annotations:
           summary: The shop cannot write to Postgres, so it refuses adoptions it could not record.
@@ -35,6 +38,7 @@ groups:
       - alert: BusRefusingEvents
         expr: sum by (job) (rate(petshop_outbox_refused_total[1m])) > 0
         for: 30s
+        keep_firing_for: 5m
         labels: { severity: warning }
         annotations:
           summary: The bus is turning events away; they stay in the outbox and go again.

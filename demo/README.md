@@ -158,6 +158,32 @@ The shop's page carries its JVM (heap, GC pauses, threads, CPU), its connection 
 are failing. The Postgres store shows connections, transactions, size and the events waiting in the outbox. The
 Kafka store shows the topic's offsets and the projection's lag.
 
+### Ask AI, and breaking things to ask it about
+
+Estate's Ask AI reads an alert's brief (the alert, the shop's stats, its logs in Loki, what is around it) and asks
+Claude for the likely cause and what to do. It needs an Anthropic API key, from <https://console.anthropic.com>, in
+the shell that starts Compose; `read -s` keeps it out of your shell history:
+
+```bash
+read -rs ANTHROPIC_API_KEY && export ANTHROPIC_API_KEY
+docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d
+```
+
+`docker-compose.ai.yml` points Estate at `estate/estate-ai.yaml`, which is `estate.yaml` with `ai:` added. Without
+the override the demo runs as before, and Ask AI is hidden.
+
+`chaos.sh` breaks one thing at a time, says which alert to open, and what a useful answer would name. It leaves it
+broken until `./chaos.sh restore`, and the rate-based alerts keep firing for five minutes after, so there is time to
+read the page and ask:
+
+```bash
+./chaos.sh registry-down    # the chip registry stops
+./chaos.sh registry-slow    # it answers, but after the shop's 2s timeout: the same alert, a subtler cause
+./chaos.sh postgres-down    # the database stops
+./chaos.sh kafka-down       # the broker stops; the outbox fills
+./chaos.sh restore
+```
+
 The demo has no Kubernetes, Flux or CI, and Estate says so at the top of the page rather than leaving those parts
 blank. For the same reason it shows the shop as "not running": it reads that from a cluster or ECS, and the shop
 here is a process on your machine. There is no p99 either: the adoption timer is a summary without percentiles.
