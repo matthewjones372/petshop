@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm") version "2.4.10" apply false
-    kotlin("plugin.serialization") version "2.4.10" apply false
+    kotlin("jvm") version "2.4.20" apply false
+    kotlin("plugin.serialization") version "2.4.20" apply false
 }
 
 subprojects {
@@ -25,6 +25,8 @@ subprojects {
         // shouldBeRight and shouldBeLeft, so a test asserts on an Either rather than unwrapping one.
         "testImplementation"("io.kotest:kotest-assertions-arrow:6.2.4")
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
+        // jackson reaches every module through lark and pelican at 2.22.2, which has open advisories.
+        "implementation"(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
     }
 
     tasks.withType<Test> { useJUnitPlatform() }

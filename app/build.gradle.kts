@@ -42,8 +42,16 @@ dependencies {
     // the Apache one it is built from stands in, so there is one Kafka client on the classpath. lark-kafka is
     // built against 3.8 and runs on it: KafkaBusSpec is the proof.
     implementation("org.apache.kafka:kafka-clients") { version { strictly("4.3.0") } }
+    // Past open advisories in what these bring: lz4-java 1.10.2 under kafka-clients, and Apache
+    // HttpClient 5.5 and HttpCore 5.3.4 under Confluent's schema-registry client.
+    constraints {
+        implementation("at.yawk.lz4:lz4-java:1.11.4")
+        implementation("org.apache.httpcomponents.client5:httpclient5:5.6.3")
+        implementation("org.apache.httpcomponents.core5:httpcore5:5.4.3")
+        implementation("org.apache.httpcomponents.core5:httpcore5-h2:5.4.3")
+    }
     implementation("io.github.matthewjones372:lark-otel:$larkVersion")
-    implementation("io.opentelemetry:opentelemetry-sdk:1.51.0")
+    implementation("io.opentelemetry:opentelemetry-sdk:1.62.0")
 
     // The outbox is a Postgres table, and every statement against it but the schema is ExoQuery, in
     // a build of its own on the Kotlin ExoQuery's plugin is built for.
@@ -61,21 +69,24 @@ dependencies {
     implementation("io.github.matthewjones372:lark-micrometer:$larkVersion")
 
     // The registry that answers /metrics. Micrometer's global composite is what
-    // lark-micrometer writes to, and this is what is added to it.
-    implementation("io.micrometer:micrometer-registry-prometheus:1.12.0")
+    // lark-micrometer writes to, and this is what is added to it. The simpleclient build is the
+    // `io.micrometer.prometheus` registry 1.12 shipped as `micrometer-registry-prometheus`, so the
+    // names Estate queries stay as they are; 1.12's micrometer-core has an open advisory.
+    implementation("io.micrometer:micrometer-registry-prometheus-simpleclient:1.16.6")
 
     // So a failure in a handler reaches a terminal rather than an SLF4J no-op.
-    runtimeOnly("ch.qos.logback:logback-classic:1.5.20")
+    runtimeOnly("ch.qos.logback:logback-classic:1.5.34")
     // The shop's lines to Loki, for the demo's Estate; only read when LOKI_URL is set, see logback-loki.xml.
     runtimeOnly("com.github.loki4j:loki-logback-appender:2.0.3")
 
     // A claim about a backend is worth having only against the real one.
-    testImplementation("ch.qos.logback:logback-classic:1.5.20")
+    testImplementation("ch.qos.logback:logback-classic:1.5.34")
 
     // A real Postgres for every test that builds the shop, and for the load test, which builds all of it.
     testFixturesApi("org.testcontainers:testcontainers-postgresql:2.0.5")
     testFixturesImplementation("io.github.matthewjones372:lark-app:$larkVersion")
     testFixturesImplementation("org.postgresql:postgresql:42.7.13")
+    testFixturesImplementation(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
 
     // The relay on time the test owns: an interval of ticks is one clock.adjust, and nothing sleeps.
     testImplementation("io.github.matthewjones372:lark-stream-test:$larkVersion")
