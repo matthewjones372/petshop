@@ -59,7 +59,7 @@ visitors run from Gradle, for half an hour by default:
 Five visitors a second, each looking at a pet and the stats, and one in four
 trying to adopt. The adoptions land on every outcome the shop
 declares (taken, already adopted, not chipped, no such pet), so Estate and
-Grafana show refusals as well as sales. `RATE`, `DURATION` (`10m`) and
+Grafana show refusals as well as sales. `RATE`, `DURATION` (`24h`) and
 `PETSHOP_URL` change how many, for how long, and where. Proofload's report is
 written to `loadtest/build/reports/proofload/demo-traffic.html`.
 
