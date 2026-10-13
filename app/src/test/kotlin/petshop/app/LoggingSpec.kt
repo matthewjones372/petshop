@@ -37,7 +37,7 @@ class LoggingSpec {
         }
     }
 
-    private val backend = (LoggerFactory.getILoggerFactory() as LoggerContext).getLogger("lark")
+    private val backend = (LoggerFactory.getILoggerFactory() as LoggerContext).getLogger("petshop")
 
     private val settled: Module = shopWith(FakeRegistry())
 

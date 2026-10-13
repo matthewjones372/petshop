@@ -20,8 +20,10 @@
     <!--
       The service's own lines stay at INFO, because LoggingSpec reads them through an appender of its own,
       but they are not printed: the tests provoke refusals on purpose, and a story already says what each
-      test did.
+      test did. Lark names each line's logger after the class that wrote it, so the service's lines are
+      under petshop, and `lark` holds only the lines lark builds itself.
     -->
+    <logger name="petshop" level="INFO" additivity="false"/>
     <logger name="lark" level="INFO" additivity="false"/>
 
     <root level="WARN">
