@@ -16,3 +16,12 @@ dependencies {
 }
 
 kotlin { jvmToolchain(21) }
+
+// The ExoQuery plugin brings lz4 1.3.0 under its old coordinates, which has open advisories and no
+// fixed release there; the project carried on as at.yawk.lz4:lz4-java, with the same packages.
+// Kotlin stays at 2.3.0 for now: ExoQuery has no plugin built for a later compiler yet.
+configurations.configureEach {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("net.jpountz.lz4:lz4")).using(module("at.yawk.lz4:lz4-java:1.11.4"))
+    }
+}

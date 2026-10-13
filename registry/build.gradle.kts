@@ -14,6 +14,7 @@ dependencies {
     api("io.github.matthewjones372:pelican-core:$pelicanVersion")
     api("io.github.matthewjones372:pelican-jackson:$pelicanVersion")
     codegen("io.github.matthewjones372:pelican-codegen:$pelicanVersion")
+    codegen(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
 }
 
 kotlin.sourceSets.named("main") { kotlin.srcDir("src/main/generated") }
