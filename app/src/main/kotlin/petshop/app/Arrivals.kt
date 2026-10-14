@@ -2,7 +2,7 @@ package petshop.app
 
 import io.github.matthewjones372.lark.actor.ActorRef
 import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.counter
 import io.github.matthewjones372.lark.gauge
 import io.github.matthewjones372.lark.increment
@@ -21,12 +21,12 @@ import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.Species
 
-class Arrivals internal constructor(val running: Running<Nothing, Long>)
+class Arrivals internal constructor(val running: Running<Nothing, Long>) : AutoCloseable by running
 
 private val names = listOf("Pickle", "Waffle", "Sprocket", "Marmalade", "Biscuit", "Clementine")
 
 val arrivals: Module =
-    singleOf(
+    closingOf(
         { ref: ActorRef<Shop>, shop: PetShop, config: Settings, streams: StreamBackend ->
             // Start after the highest id held, so a pet arriving after a restart gets a new id.
             val next = AtomicLong(shop.all().maxOfOrNull { it.id.value } ?: opening.size.toLong())
@@ -49,5 +49,4 @@ val arrivals: Module =
                 .start(streams)
                 .let(::Arrivals)
         },
-        { arrivals -> arrivals.running.close() },
     )

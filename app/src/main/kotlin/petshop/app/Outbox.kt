@@ -3,9 +3,9 @@ package petshop.app
 import io.github.matthewjones372.lark.Schedule
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
+import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.app.liquibase.Migrated
 import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.counter
 import io.github.matthewjones372.lark.gauge
 import io.github.matthewjones372.lark.increment
@@ -39,7 +39,7 @@ interface Outbox {
     fun claim(limit: Int, publish: (List<ShopEvent>) -> List<ShopEvent>): List<ShopEvent>
 }
 
-class OutboxRelay internal constructor(val running: Running<Nothing, Long>)
+class OutboxRelay internal constructor(val running: Running<Nothing, Long>) : AutoCloseable by running
 
 private const val batch = 100
 
@@ -84,11 +84,10 @@ private fun published(claimed: List<ShopEvent>, bus: EventBus): List<ShopEvent> 
 
 val outbox: Module =
     single { source: DataSource, _: Migrated -> PostgresOutbox(source) }.boundTo<Outbox>() +
-        singleOf(
+        closingOf(
             { outbox: Outbox, config: Settings, bus: EventBus, streams: StreamBackend ->
                 relay(every = config.outboxEvery, outbox = outbox, bus = bus)
                     .start(streams)
                     .let(::OutboxRelay)
             },
-            { relay -> relay.running.close() },
         )

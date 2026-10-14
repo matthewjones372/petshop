@@ -5,6 +5,7 @@ import io.github.matthewjones372.lark.app.AppScope
 import io.github.matthewjones372.lark.app.LarkApp
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
+import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.Layered
@@ -49,7 +50,7 @@ private val telemetry: Module =
         { PrometheusMeterRegistry(PrometheusConfig.DEFAULT).also(MicrometerRegistries::addRegistry) },
         { registry -> MicrometerRegistries.removeRegistry(registry); registry.close() },
     ) +
-    singleOf<OpenTelemetrySdk>({ OpenTelemetrySdk.builder().build() }, { sdk -> sdk.close() }) +
+    closingOf<OpenTelemetrySdk> { OpenTelemetrySdk.builder().build() } +
         // boundTo because `getTracer` returns the platform type `Tracer!`, which no key matches.
         single { sdk: OpenTelemetrySdk -> sdk.getTracer("petshop") }.boundTo<Tracer>()
 

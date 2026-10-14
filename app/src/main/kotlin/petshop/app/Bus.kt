@@ -3,6 +3,7 @@ package petshop.app
 import arrow.core.Either
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
+import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.stream.Hub
 import io.github.matthewjones372.lark.stream.Run
@@ -38,4 +39,4 @@ class HubBus(private val hub: Hub<ShopEvent>) : EventBus {
 
 /** The hub, released by the graph after the bus that publishes to it. */
 fun hubBus(capacity: Int = 256): Module =
-    singleOf({ -> Hub<ShopEvent>(capacity) }, { hub -> hub.close() }) + singleOf(::HubBus).boundTo<EventBus>()
+    closingOf { -> Hub<ShopEvent>(capacity) } + singleOf(::HubBus).boundTo<EventBus>()

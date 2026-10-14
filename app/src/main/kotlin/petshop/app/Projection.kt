@@ -1,12 +1,13 @@
 package petshop.app
 
 import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.counter
 import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.stream.Running
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.lark.stream.start
+import java.util.concurrent.atomic.AtomicReference
 import petshop.api.SpeciesTally
 import petshop.api.Tally
 import petshop.domain.PetAdopted
@@ -14,12 +15,11 @@ import petshop.domain.PetArrived
 import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
-import java.util.concurrent.atomic.AtomicReference
 
 class Projection internal constructor(
     private val latest: AtomicReference<Seen>,
     internal val running: Running<Nothing, Long>,
-) {
+) : AutoCloseable by running {
 
     fun tally(): Tally = latest.get().tally
 }
@@ -39,12 +39,11 @@ private val nothingYet = Tally(events = 0, duplicates = 0, bySpecies = Species.e
  * arrive after later ones, and a high-water mark would drop it.
  */
 val projection: Module =
-    singleOf(
+    closingOf(
         { bus: EventBus, streams: StreamBackend ->
             val latest = AtomicReference(Seen(emptySet(), nothingYet))
             Projection(latest, bus.consume { event -> latest.updateAndGet { it + event } }.start(streams))
         },
-        { projection -> projection.running.close() },
     )
 
 private operator fun Tally.plus(delivery: Delivery): Tally {
