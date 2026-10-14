@@ -123,6 +123,13 @@ Loki as `{service_name="petshop-web"}`. With the shop running as above, click ab
 <http://localhost:5173> and the numbers appear on Estate within a minute. Compose's `browser` service does the
 clicking when nobody else is: see the traffic above.
 
+Estate reads the adoption's traces too. The catalog names it as a journey, *Adoption, click to screen*, with a stage
+for each step from the click to `live event`, and on the `petshop` and `petshop-web` pages *Show where its time goes*
+reads a sample of the last 15 minutes' adoptions from Tempo: each stage's p50 and p99, the largest marked, and a
+typical adoption drawn in lanes, one for each of the browser, the shop, the chip registry, Postgres and Kafka. Most of
+an adoption is usually *Waits in the outbox*, close to half of `outboxEvery`, since the relay polls. Each example
+opens its own page, where the same trace is also a waterfall.
+
 ## On Kafka
 
 Compose also runs a Kafka broker on 9092 and a schema registry on 8081. The
@@ -182,8 +189,8 @@ here is a process on your machine. There is no p99 either: the adoption timer is
 
 | | |
 |---|---|
-| `estate/catalog.yaml` | the petshop and its front end as two services in one environment, with its Postgres and Kafka as stores: the shop's load from adoptions, its JVM and pool, the front end's from Tempo's span metrics, the stores' stats, the vitals and the map |
-| `estate/estate.yaml` | Estate's settings: no sign-in (every visitor is an operator), and the demo's Prometheus and Alertmanager as its sources |
+| `estate/catalog.yaml` | the petshop and its front end as two services in one environment, with its Postgres and Kafka as stores: the shop's load from adoptions, its JVM and pool, the front end's from Tempo's span metrics, the stores' stats, the vitals, the map, and the adoption as a journey through them |
+| `estate/estate.yaml` | Estate's settings: no sign-in (every visitor is an operator), and the demo's Prometheus, Alertmanager, Loki and Tempo as its sources |
 | `prometheus/rules.yml` | the alerts: the shop's keep `job="petshop"`, which is how Estate knows an alert is the petshop's, the front end's keep `service="petshop-web"`, and the stores' carry `store:` naming theirs |
 | `alertmanager/alertmanager.yml` | routes every alert nowhere: Estate reads them, and keeps its silences there |
 | `estate/estate-ai.yaml` | `estate.yaml` with Ask AI turned on, read when Compose is started with `docker-compose.ai.yml` |

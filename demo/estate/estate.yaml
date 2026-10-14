@@ -14,3 +14,4 @@ sources:
     prometheus: { url: http://prometheus:9090 }
     alertmanager: { url: http://alertmanager:9093 }
     loki: { url: http://loki:3100 }
+    tempo: { url: http://tempo:3200 }

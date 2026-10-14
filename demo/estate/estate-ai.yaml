@@ -17,6 +17,7 @@ sources:
     prometheus: { url: http://prometheus:9090 }
     alertmanager: { url: http://alertmanager:9093 }
     loki: { url: http://loki:3100 }
+    tempo: { url: http://tempo:3200 }
 
 # Haiku is the cheapest Claude and good enough for "why is this firing"; the budget caps a day's spend.
 ai: { provider: anthropic, apiKey: "${ANTHROPIC_API_KEY}", model: claude-haiku-5-5, budget: { tokensPerDay: 150000 } }
