@@ -18,13 +18,7 @@ import petshop.domain.PetId
 import petshop.domain.PetShop
 import javax.sql.DataSource
 
-/**
- * What a scrape of this service says after somebody adopts something.
- *
- * The registry is this test's own rather than the graph's global one, so two tests running together
- * cannot read each other's numbers.
- */
-/** The graph's registry and its meters, with the shop and the pool started so their checks have something to ask. */
+/** A registry of this test's own, not the global one, so tests running together cannot read each other's numbers. */
 private class Scraped(val registry: PrometheusMeterRegistry, val meters: Meters)
 
 private val scraped: Module =
@@ -74,7 +68,6 @@ class ScrapeSpec {
                 now shouldContain "petshop_ready 1.0"
                 now shouldContain """petshop_health_check{check="database",} 1.0"""
                 now shouldContain """petshop_health_check{check="shop",} 1.0"""
-                // The work beside the requests, each its own series: one that stopped is named, not just counted.
                 listOf("relay", "projection", "arrivals").forEach { run ->
                     now shouldContain """petshop_health_check{check="$run",} 1.0"""
                 }

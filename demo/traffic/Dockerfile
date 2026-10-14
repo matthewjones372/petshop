@@ -1,5 +1,4 @@
-# The demo's visitors (loadtest/src/test/kotlin/petshop/load/DemoTraffic.kt), built from this repository and run on
-# their own, so `docker compose up` brings traffic with it. Built from the repository root: see docker-compose.yml.
+# The demo's visitors (loadtest's DemoTraffic). Built from the repository root: see docker-compose.yml.
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /src
 COPY . .

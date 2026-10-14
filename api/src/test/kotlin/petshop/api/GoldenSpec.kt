@@ -14,11 +14,8 @@ import petshop.domain.PetShopError
 import petshop.domain.Species
 
 /**
- * What the shop's callers were promised, recorded under `src/test/resources/golden`.
- *
- * A change that would break somebody already calling — a removed status, a new required field, a
- * renamed path — fails here and says so. A change that costs them nothing rewrites the file and
- * passes, and the rewritten file is in the diff for a reviewer to read.
+ * Recorded under `src/test/resources/golden`. A change that breaks a caller fails; one that does not
+ * rewrites the file, so the change shows in the diff.
  */
 class GoldenSpec {
 

@@ -19,15 +19,9 @@ import petshop.api.getPet
 import petshop.api.stats
 
 /**
- * Visitors for the demo, so Estate and Grafana have something to show: run against the shop already up on
- * `PETSHOP_URL` (http://localhost:8080 by default), at `RATE` visitors a second for `DURATION`, with
- * `./gradlew :loadtest:demoTraffic`.
- *
- * Each visitor looks at a pet and at the stats, and one in four tries to adopt. Adoptions land on every outcome
- * the shop declares: a pet taken, one somebody already has, Mrs Peel (pet 3) with no chip, and a pet that is not
- * there. They aim at the newest pets, since arrivals add one every five seconds and the old ones are soon gone.
- * Those are answers, so they are not failures here: `outcome` hands back whichever the endpoint declared, and
- * throws only for something it never declared, which Proofload records as the step failing.
+ * Demo visitors against `PETSHOP_URL` (http://localhost:8080 by default), at `RATE` a second for `DURATION`:
+ * `./gradlew :loadtest:demoTraffic`. Declared refusals are answers, not failures; only an undeclared
+ * response fails a step.
  */
 fun main() {
     val target = System.getenv("PETSHOP_URL") ?: "http://localhost:8080"
@@ -75,7 +69,6 @@ private const val ADOPT_ONE_IN = 4
 /** The arrivals' pace in the demo's application.conf: one pet every five seconds. */
 private const val SECONDS_PER_ARRIVAL = 5
 
-/** How far back from the newest pet visitors look and adopt. */
 private const val RECENT_PETS = 300L
 
 /** One adoption in twenty for a pet that is not there, and one in twenty for Mrs Peel, who has no chip. */

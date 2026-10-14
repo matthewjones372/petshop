@@ -28,15 +28,6 @@ import petshop.registry.lookupChip
 import petshop.registry.noSuchChip
 import petshop.registry.recordKeeper
 
-/**
- * The shop against a registry that is a real HTTP server, with the shop's own client talking to it.
- * Nothing of the shop's is faked: the actor, the generated client, its JSON and its timeout are the
- * ones `main` starts.
- *
- * The stubs are written in the registry's endpoints, not its URLs: `stub(lookupChip, 1L)` is the
- * request the client sends for pet 1, and what it answers is a value the endpoint declares. Change
- * the registry's contract and these stubs move with it, or stop compiling.
- */
 class RegistrySpec {
 
     @JvmField

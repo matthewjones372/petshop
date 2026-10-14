@@ -1,13 +1,11 @@
 plugins {
-    // Writes the client from `registrySpec()`, and checks on every build that the committed one is
-    // still what the descriptions produce.
+    // Checks on every build that the committed client still matches `registrySpec()`.
     id("io.github.matthewjones372.pelican") version "1.0.0"
 }
 
 val pelicanVersion: String = providers.gradleProperty("pelicanVersion").get()
 
-// The generator runs off this module's classpath rather than shipping its own, and nothing the
-// service runs needs it: so it is on the generating task's classpath and nowhere else.
+// Only the generating task needs the generator, so it is on that classpath alone.
 val codegen: Configuration = configurations.create("codegen")
 
 dependencies {
@@ -19,8 +17,7 @@ dependencies {
 
 kotlin.sourceSets.named("main") { kotlin.srcDir("src/main/generated") }
 
-// Pelican's check loads `registrySpec()` in Gradle's own JVM, not this module's toolchain, so the module is
-// compiled for no newer a JDK than Gradle runs on: 25, which pelican itself now asks for.
+// Pelican's check loads `registrySpec()` in Gradle's JVM, so this module targets no newer JDK than 25.
 
 pelican {
     clients {

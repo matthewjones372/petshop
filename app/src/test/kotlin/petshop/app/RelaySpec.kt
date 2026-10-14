@@ -25,11 +25,7 @@ import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
 
-/**
- * An outbox in a list, for a test about what the relay does on each tick rather than about the table:
- * PostgresOutboxSpec is about the table. [claiming] runs before each claim, so a test can make one
- * throw.
- */
+/** [claiming] runs before each claim, so a test can make one throw. */
 private class Recorded(vararg events: ShopEvent, private val claiming: () -> Unit = {}) : Outbox {
 
     private val waiting = events.toMutableList()
@@ -51,7 +47,6 @@ private class Recorded(vararg events: ShopEvent, private val claiming: () -> Uni
     }
 }
 
-/** A bus that keeps what it took, and turns an event away while [refuses] says so. */
 private class Taking(private val refuses: (ShopEvent) -> Boolean = { false }) : EventBus {
 
     private val taken = mutableListOf<Long>()
@@ -79,10 +74,7 @@ private val arrived = PetArrived(seq = 1, pet = nibbles)
 private val adopted = PetAdopted(seq = 2, pet = nibbles.copy(adopted = true), by = "Ada")
 private val returned = PetReturned(seq = 3, pet = nibbles)
 
-/**
- * The relay on a clock the test owns. Each `adjust` returns once every tick due by then has run, so a
- * test says which tick an event went on, where EventsSpec, on the wall clock, can only wait for it.
- */
+/** Each `adjust` returns once every tick due by then has run. */
 class RelaySpec {
 
     private val every = 50.milliseconds

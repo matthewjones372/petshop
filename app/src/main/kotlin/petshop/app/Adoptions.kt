@@ -22,13 +22,7 @@ import petshop.domain.PetReturned
 import petshop.domain.PetShopError
 import petshop.domain.ShopEvent
 
-/**
- * The shop's only writer.
- *
- * Two people adopting the same tortoise at the same moment is the race this exists to lose on
- * purpose: an actor handles one message at a time, so the second one is told it is already adopted
- * rather than both being told yes.
- */
+/** The shop's only writer: one message at a time, so of two racing adopters the second is refused. */
 sealed interface Shop
 
 data class Arrived(val pet: Pet) : Shop
@@ -40,34 +34,17 @@ data class Find(val id: PetId, val reply: Reply<Option<Pet>>) : Shop
 
 data class Adopt(val id: PetId, val by: String, val reply: Reply<Either<PetShopError, Pet>>) : Shop
 
-/**
- * An adoption undone: the actor said yes, and then the registry would not record the new keeper. The
- * pet goes back on the shelf rather than out of the door untraceable.
- */
+/** An adoption undone because the registry would not record the new keeper. */
 data class Returned(val id: PetId) : Shop
 
-/**
- * The event goes into the outbox table before the pet changes, and the pet changes only if it went:
- * there is no moment where the shop has sold a pet and not recorded that it did.
- */
 private class State(val pets: Map<PetId, Pet>, private val outbox: Outbox) {
 
-    /**
-     * The next state, or why the write failed: Postgres down, the pool exhausted. The pet's new state and its event
-     * are one transaction, so the state changes here only once both are durable.
-     */
+    /** The pet's row and its event are one transaction, so the state changes only once both are durable. */
     fun record(pet: Pet, event: (seq: Long) -> ShopEvent): Either<Throwable, State> =
         Either.catch { outbox.record(pet, event) }.map { State(pets + (pet.id to pet), outbox) }
 }
 
-/**
- * A write that fails leaves the actor as it was. Every write is caught where it is made, because a
- * throw out of a step would start the actor again from its opening catalogue: an adopter is told
- * [NotRecorded] and the pet is still on the shelf for the next one, and an arrival or a return nobody
- * is waiting on is logged and dropped.
- *
- * One `when` over the sealed [Shop], so a new message is a compile error here until it is handled.
- */
+/** Every write is caught where it is made: a throw out of a step would restart the actor from its opening catalogue. */
 fun shop(outbox: Outbox, pets: Map<PetId, Pet> = emptyMap()): Behaviour<Shop, *, Nothing> =
     behaviour<Shop, State>(State(pets, outbox)) { _, state, message ->
         when (message) {
@@ -99,10 +76,7 @@ private fun adopt(state: State, asked: Adopt): Next<State> {
     }
 }
 
-/**
- * The adoption was already recorded, and may already be on the bus, so the undo is an event of its own
- * rather than a quiet edit: a consumer that counted the adoption hears it reversed.
- */
+/** The adoption may already be on the bus, so the undo is its own event and consumers hear it reversed. */
 private fun returned(state: State, id: PetId): Next<State> =
     state.pets[id]?.let { pet ->
         val back = pet.copy(adopted = false)

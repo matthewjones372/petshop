@@ -25,18 +25,16 @@ import petshop.outbox.PetRow
 private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 private val barnaby = Pet(PetId(2), "Barnaby", Species.Dog)
 
-/** The outbox and the pool under it, on a schema of its own. No actor, no relay, no bus. */
 private fun onItsOwn(test: (Outbox) -> Unit) =
     testApp(petshop.onAFreshDatabase().subgraph<Outbox>()) { outbox: Outbox -> test(outbox) }
 
-/** Everything still in the outbox, read by a claim that publishes nothing and so takes nothing. */
+/** Read by a claim that publishes nothing, so it takes nothing. */
 private fun Outbox.left(): List<ShopEvent> {
     val seen = mutableListOf<ShopEvent>()
     claim(1_000) { claimed -> seen += claimed; emptyList() }
     return seen
 }
 
-/** The outbox as a table, against a real Postgres: what the relay's claims can and cannot see. */
 class PostgresOutboxSpec {
 
     @Test

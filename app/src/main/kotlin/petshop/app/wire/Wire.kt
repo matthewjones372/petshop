@@ -3,11 +3,9 @@ package petshop.app.wire
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// The shop's events as they are on the wire: Avro records whose schema avro4k derives from these classes.
-// They are the shop's published contract, so they are their own types and not the domain's, and kimney
-// maps between the two. A case is matched to the domain's by its name, so the names here are the domain's.
+// The published Avro contract. kimney maps cases to the domain's by name, so names must match the domain's.
 
-/** One event on the wire. The Avro record wraps the union, so a topic has one schema and not one per case. */
+/** Wraps the union so a topic has one schema, not one per case. */
 @Serializable
 @SerialName("petshop.events.ShopEventRecord")
 data class ShopEventRecord(val event: WireEvent)

@@ -4,11 +4,6 @@ import io.github.matthewjones372.pelican.jsonObj
 import io.github.matthewjones372.pelican.openapi.Docs
 import io.github.matthewjones372.pelican.openapi.docs
 
-/**
- * The shop's two pages over the one document: Swagger UI at `/api-docs`, to try a call, and a Redoc
- * reference at `/reference`, to read, dressed as the shop rather than as Redoc. The look is the page's
- * own; `/openapi.json` is what every client reads, and it is not touched.
- */
 val petshopDocs: Docs = docs {
     docsPath = "/api-docs"
     reference("/reference") {
@@ -24,7 +19,6 @@ val petshopDocs: Docs = docs {
                             put("primary", jsonObj { "main" to TERRACOTTA })
                             put("success", jsonObj { "main" to SAGE })
                             put("text", jsonObj { "primary" to BARK })
-                            // A refusal the shop declared is a 4xx, and reads as one: amber, not alarm red.
                             put("responses", jsonObj {
                                 put("error", jsonObj { "color" to RUST; "backgroundColor" to "#FBEDE7" })
                             })
@@ -61,7 +55,6 @@ private const val SAGE = "#5E8C61"
 private const val BARK = "#3B2A20"
 private const val CREAM = "#FBF6EF"
 
-/** A paw print in the shop's terracotta, small enough to ride in the page as a `data:` URI. */
 private const val PAW =
     "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='96' height='96'%3E" +
         "%3Cg fill='%23C2562B'%3E" +

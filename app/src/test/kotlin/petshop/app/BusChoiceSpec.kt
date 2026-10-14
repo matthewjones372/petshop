@@ -9,11 +9,7 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 
-/**
- * `petshop.bus` picks the bus where the graph is assembled. These look at the nodes that choice leaves
- * and never send anything, so no broker is needed: a producer connects on its first send, not before.
- * EndToEndSpec runs the Kafka branch against a real broker.
- */
+/** No broker needed: these never send, and a Kafka producer connects on its first send. */
 class BusChoiceSpec {
 
     private fun configuredWith(bus: String): Config =

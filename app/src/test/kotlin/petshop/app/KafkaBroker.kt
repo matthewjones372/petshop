@@ -17,16 +17,10 @@ import org.junit.jupiter.api.extension.ExtensionContext
 import org.testcontainers.kafka.KafkaContainer
 import org.testcontainers.utility.DockerImageName
 
-/**
- * One Kafka broker for the whole test run, in a container started the first time a test class asks for it,
- * as [TestPostgres] is. Testcontainers' reaper stops it once the JVM has gone. Each test uses topics and
- * groups of its own, so the classes can share it.
- */
+/** One broker for the whole run. Each test uses topics and groups of its own, so classes can share it. */
 private object TestKafka {
 
-    // The JVM image, not kafka-native: the native one segfaults on about one start in twenty, two threads
-    // racing through musl's getpwuid, and its setup step takes no flag to stop that. It runs KRaft, so there
-    // is no ZooKeeper beside it, and costs about three seconds more, once a run.
+    // The JVM image: kafka-native segfaults on about one start in twenty (two threads racing in musl's getpwuid).
     val container: KafkaContainer by lazy {
         KafkaContainer(DockerImageName.parse("apache/kafka:4.3.1"))
             // A group's first member is not kept waiting for others to join, which is 3s a test by default.
@@ -35,7 +29,6 @@ private object TestKafka {
     }
 }
 
-/** The test run's Kafka broker, for a test class that registers it; [bootstrap] is where it answers. */
 class KafkaBroker : BeforeAllCallback {
 
     val bootstrap: String get() = TestKafka.container.bootstrapServers
@@ -53,7 +46,6 @@ class KafkaBroker : BeforeAllCallback {
             }
     }
 
-    /** The offset the group has committed on the topic's only partition, or null for none. */
     fun committed(group: String, topic: String): Long? =
         Admin.create(mapOf<String, Any>(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrap)).use { admin ->
             admin.listConsumerGroupOffsets(group).partitionsToOffsetAndMetadata()
@@ -61,10 +53,8 @@ class KafkaBroker : BeforeAllCallback {
         }
 
     /**
-     * Every record on [topic] as the broker holds it now, oldest first per partition. Reads up to each
-     * partition's end offset and stops, so it answers at once rather than polling until a timeout, and an
-     * empty topic is an empty list. `assign` with no group: reading changes no offset the service sees.
-     * Lark spec 0117 proposes this for lark-kafka-test; it can move there when that lands.
+     * Reads to each partition's end offset and stops, so it never waits on a timeout. `assign` with no
+     * group, so no offset the service sees changes.
      */
     fun <K, V> records(topic: String, key: Deserializer<K>, value: Deserializer<V>): List<ConsumerRecord<K, V>> =
         KafkaConsumer(mapOf<String, Any>(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrap), key, value).use { reader ->

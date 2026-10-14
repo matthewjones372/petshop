@@ -10,14 +10,9 @@ import io.github.matthewjones372.lark.app.typesafe.config
 import io.micrometer.core.instrument.Metrics
 import javax.sql.DataSource
 
-/** Where the shop's Postgres is. [password] prints as a mask, so the settings can be logged and thrown whole. */
 data class DatabaseSettings(val url: String, val user: String, val password: Secret)
 
-/**
- * The shop's two tables. `pets` is the catalogue as the shop last left it, and `outbox` the events that changed
- * it, written together in one transaction. `seq` is Postgres's to hand out, so it keeps counting across restarts
- * and across every instance writing to the same table, which a counter in the actor could not.
- */
+/** `seq` comes from Postgres so it keeps counting across restarts and instances, which an actor counter could not. */
 private val schema = """
     CREATE TABLE IF NOT EXISTS pets (
         id      BIGINT  PRIMARY KEY,
@@ -36,7 +31,6 @@ private val schema = """
     )
 """.trimIndent()
 
-/** A pool with the table in it: nothing that takes the pool has to ask whether the table exists yet. */
 private fun pool(settings: DatabaseSettings): HikariDataSource {
     val pool = HikariDataSource(
         HikariConfig().apply {
@@ -44,11 +38,9 @@ private fun pool(settings: DatabaseSettings): HikariDataSource {
             username = settings.user
             password = settings.password.reveal()
             poolName = "petshop"
-            // Two seconds, not Hikari's thirty: with Postgres gone an adoption is refused and the readiness check
-            // fails while someone is still watching, instead of half a minute later.
+            // Two seconds, not Hikari's thirty, so a down Postgres fails adoptions and readiness promptly.
             connectionTimeout = 2_000
-            // The pool's own meters (hikaricp_connections_active, _pending, _timeout_total), on Micrometer's
-            // global composite, where /metrics reads them.
+            // The global composite, where /metrics reads the pool's hikaricp_* meters.
             metricRegistry = Metrics.globalRegistry
         },
     )
@@ -62,7 +54,5 @@ val database: Module =
     config<DatabaseSettings>("petshop.database") {
         DatabaseSettings(string("url"), string("user"), secret("password"))
     } +
-        // Released after the actor and the relay, which both depend on it: the pool closes once
-        // nothing is left to borrow from it.
         singleOf({ settings: DatabaseSettings -> pool(settings) }, { pool -> pool.close() })
             .boundTo<DataSource>()

@@ -1,4 +1,3 @@
-# The petshop as Estate shows it: one service in one environment, read from the demo's Prometheus.
 environments:
   - name: demo
     title: The demo, on this machine
@@ -11,9 +10,7 @@ services:
     repository: github:matthewjones372/petshop
     runbook: https://github.com/matthewjones372/petshop/blob/main/demo/README.md
     environments: [ demo ]
-    # Adoptions are what the shop serves, so its load is adoptions: every outcome is a request, and the outcomes that
-    # are the shop's or a dependency's fault are its errors. A refusal it declared (no such pet, already adopted, no
-    # chip) is an answer, not an error. There is no p99: the adoption timer is a summary without percentiles.
+    # A declared refusal is an answer, not an error. No p99: the adoption timer is a summary without percentiles.
     load:
       requests: sum(rate(petshop_adoptions_total[1m]))
       errors: sum(rate(petshop_adoptions_total{outcome=~"registry_down|not_recorded"}[1m])) or vector(0)
@@ -26,7 +23,6 @@ services:
       prometheus: http://localhost:9090/alerts
     # Its lines in Loki, pushed by its logback when it runs with LOKI_URL set.
     logs: { selector: '{app="petshop"}', errors: ERROR }
-    # The JVM the shop runs in, by the names Micrometer's binders give it: heap, GC pauses, threads and CPU.
     stats:
       preset: jvm
       selector: job="petshop"
@@ -40,8 +36,7 @@ services:
         - { title: Waiting for a connection, query: 'max(hikaricp_connections_pending{pool="petshop"})' }
         - { title: Health checks failing, query: 'count(petshop_health_check == 0) or vector(0)' }
 
-# What the shop keeps its state in and sends its events through, each read from its exporter. An alert carrying
-# `store: <name>` is shown on the store; demo/prometheus/rules.yml has PostgresDown and KafkaDown.
+# An alert carrying `store: <name>` is shown on that store.
 stores:
   - name: outbox-db
     category: Shop
@@ -60,14 +55,12 @@ stores:
     engine: kafka
     selector: job="kafka"
     links: { schemas: http://localhost:8081/subjects }
-    # Estate's default calls any growth in lag a concern, and a projection one event behind for a second reads as
-    # growth. A lag climbing by more than one event every ten seconds, for ten minutes, is.
+    # Estate's default calls any lag growth a concern; this tolerates one event per ten seconds.
     attention: { growing: 0.1 }
     extra:
       - { title: Events on the topic, query: 'sum(kafka_topic_partition_current_offset{topic="petshop.events"})' }
       - { title: Projection lag, query: 'sum(kafka_consumergroup_lag{consumergroup="petshop-projection"}) or vector(0)' }
 
-# What each alert means for the people adopting, beside its own `impact` annotation in demo/prometheus/rules.yml.
 alerts:
   ChipRegistryUnreachable: { impact: "Adopters are told to try again later, and the pet stays on the shelf." }
   AdoptionsNotRecorded: { impact: "Every adoption is refused with a 503 until the database answers again." }
@@ -94,10 +87,9 @@ map:
     - { id: bus, title: Kafka, store: events }
   edges:
     - { from: petshop, to: registry, label: chips, rate: 'sum(rate(petshop_adoptions_total{outcome=~"taken|not_chipped|registry_down"}[1m]))', alert: ChipRegistryUnreachable }
-    # Estate draws an edge with no rate, or a rate of nought, as dead, so this one carries the transactions the
-    # shop's database commits: the catalogue and the outbox written together, and the relay's claims.
+    # Estate draws an edge with no rate as dead, so this one carries the database's transaction rate.
     - { from: petshop, to: postgres, label: records, rate: 'sum(rate(pg_stat_database_xact_commit{datname="petshop"}[1m]))', alert: PostgresDown }
     - { from: postgres, to: bus, label: relays, rate: 'sum(rate(petshop_outbox_published_total[1m]))', alert: BusRefusingEvents }
-    # The projection reads the topic back, but drawn from the shop to the bus: an edge back to the shop would close
-    # a loop (shop, Postgres, bus, shop), and Estate lays a map out in columns, which a loop pushes off the canvas.
+    # Drawn from the shop to the bus: an edge back to the shop would form a loop, which Estate's column layout
+    # pushes off the canvas.
     - { from: petshop, to: bus, label: reads back, rate: 'sum(rate(kafka_consumergroup_current_offset_sum{consumergroup="petshop-projection"}[1m]))', alert: ProjectionFallingBehind }

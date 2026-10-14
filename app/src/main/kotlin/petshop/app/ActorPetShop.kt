@@ -39,14 +39,13 @@ import petshop.domain.RegistryError
 import petshop.domain.Species
 import petshop.domain.Unreachable
 
-/** The catalogue the shop opens with, before any arrival. */
 val opening: List<Pet> = listOf(
     Pet(PetId(1), "Nibbles", Species.Tortoise),
     Pet(PetId(2), "Barnaby", Species.Dog),
     Pet(PetId(3), "Mrs Peel", Species.Cat),
 )
 
-/** Reads and writes go to the actor, so there is one writer and no lock anywhere in this file. */
+/** Reads and writes go to the actor, so there is one writer and no lock. */
 class ActorPetShop(
     private val ref: ActorRef<Shop>,
     private val tracer: Tracer,
@@ -58,31 +57,19 @@ class ActorPetShop(
     override fun find(id: PetId): Pet? =
         ref.asked { reply: Reply<Option<Pet>> -> Find(id, reply) }.fold({ null }, { pet -> pet })
 
-    /**
-     * A span whose trace id is on every line written inside it, including the ones a fork writes:
-     * OpenTelemetry's context lives in a `LarkLocal` while `lark-otel` is on the classpath, and a
-     * `ThreadLocal` would not survive the ask.
-     *
-     * The pet and the adopter are annotations rather than words in the message, so a search for one
-     * pet finds every line about it — the refusal included.
-     */
+    /** OpenTelemetry's context lives in a `LarkLocal` here; a `ThreadLocal` would not survive the ask. */
     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> =
         logAnnotated("pet_id" to id.value.toString(), "adopted_by" to by) {
             tracer.tracedSpan("adopt") {
                 logSpan("adopt") {
-                    // Timed around the ask, so a refusal is in the distribution too: the slow calls
-                    // are the ones worth seeing and most of them are the ones that failed.
+                    // Timed around the ask so refusals, often the slow calls, are in the distribution.
                     timed("petshop.adopt.duration") {
                         handOver(id, by).also { answer ->
                             answer.fold(
                                 { no ->
                                     logWarn(no.message)
-                                    // The outcome is a tag and not a name, so one query answers
-                                    // "how many adoptions" and one answers "how many were refused".
-                                    //
-                                    // Every branch tags the same key and only that key: Prometheus
-                                    // requires one set of label names per metric name, and a series
-                                    // registered with a different set is dropped without a word.
+                                    // Every branch tags only "outcome": Prometheus needs one label
+                                    // set per metric name and silently drops a series with another.
                                     metricTagged("outcome" to no.outcome()) {
                                         counter("petshop.adoptions").increment()
                                     }
@@ -101,12 +88,8 @@ class ActorPetShop(
         }
 
     /**
-     * The actor decides who gets the pet, and only then is the registry asked: a race is lost in the
-     * shop without costing the loser a call to somebody else's service, and a pet somebody already has
-     * never reaches the registry at all.
-     *
-     * If the registry cannot record the new keeper, the pet goes back on the shelf. The shop does not
-     * hand over a pet nobody could trace, and it does not keep one it has already refused to sell.
+     * The actor decides first, so a lost race never calls the registry. If the registry cannot record
+     * the new keeper, the pet goes back on the shelf.
      */
     private fun handOver(id: PetId, by: String): Either<PetShopError, Pet> = either {
         val pet = ref.asked { reply -> Adopt(id, by, reply) }.bind()
@@ -127,14 +110,10 @@ private fun RegistryError.refusing(id: PetId): PetShopError = when (this) {
     is Unreachable -> RegistryDown(id.value)
 }
 
-/**
- * The actor's answer, or a throw when it gave none: an actor that stopped or did not answer in time is a
- * fault in the shop, which the endpoint answers as a 500, not a refusal it declared.
- */
+/** Throws when the actor stopped or timed out: that is a fault (a 500), not a declared refusal. */
 private fun <A : Any> ActorRef<Shop>.asked(message: (Reply<A>) -> Shop): A =
     ask(within = 3.seconds, message).getOrElse { failure -> error("the shop did not answer: $failure") }
 
-/** The shape of a refusal as a tag: few values, known before the code runs, which is what a tag is. */
 private fun PetShopError.outcome(): String = when (this) {
     is NoSuchPet -> "no_such_pet"
     is AlreadyAdopted -> "already_adopted"
@@ -144,8 +123,7 @@ private fun PetShopError.outcome(): String = when (this) {
 }
 
 val theShop: Module =
-    // The actors' flock, held open for the graph's life; the shop is an actor in it.
     actors() +
-        // The catalogue comes from the pets table, so a restart opens the shop as it was left.
+        // shelf reads the pets table, so a restart opens the shop as it was left.
         actor<Shop, Outbox>("shop") { outbox -> shop(outbox, outbox.shelf(opening).associateBy { it.id }) } +
         singleOf(::ActorPetShop).boundTo<PetShop>()

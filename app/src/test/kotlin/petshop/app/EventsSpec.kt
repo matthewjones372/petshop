@@ -19,22 +19,14 @@ import petshop.domain.PetShop
 import petshop.domain.Species
 import petshop.domain.Unreachable
 
-/** What a test watches from: the shop to act on, the bus to publish to, the consumer to read. */
 private class Observed(val shop: PetShop, val bus: EventBus, val projection: Projection)
 
-/**
- * The relay is a dependency here so that it runs: nothing else in this subgraph reaches it, and a
- * background job nothing reaches is not started.
- */
+/** The relay is a dependency so that it runs: a background job nothing reaches is not started. */
 private val observed: Module =
     single { shop: PetShop, bus: EventBus, projection: Projection, _: OutboxRelay ->
         Observed(shop, bus, projection)
     }
 
-/**
- * The shop, the outbox table, the relay, the bus and the consumer, with [registry] at the node. No port,
- * no arrivals.
- */
 private fun settledWith(registry: ChipRegistry): Module =
     (petshop.overriding(single<ChipRegistry> { registry }).onAFreshDatabase() + observed)
         .subgraph<Observed>()
@@ -42,10 +34,6 @@ private fun settledWith(registry: ChipRegistry): Module =
 
 private val settled: Module = settledWith(FakeRegistry())
 
-/**
- * The whole path on the service's own backend and clock: shop, outbox, relay, bus, consumer. What the
- * relay does on each tick, refusals included, is RelaySpec's, on a clock the test moves.
- */
 class EventsSpec {
 
     @Test

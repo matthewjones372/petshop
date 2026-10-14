@@ -38,27 +38,7 @@ import petshop.registry.lookupChip
 import petshop.registry.noSuchChip
 import petshop.registry.recordKeeper
 
-/**
- * The whole service, end to end, in about as many lines as it takes to say what it should do.
- *
- * Three things make it short, one from each library:
- *
- * - **Lark** starts the graph `main` starts — server, actor, arrivals, outbox, relay, bus, projection —
- *   and swaps two nodes: where the registry is, and which database the outbox is in. The bus is Kafka
- *   because the configuration it is assembled from says so, as `BUS=kafka` does for `main`. `use` gives everything back when the block returns, so
- *   there is no teardown to write.
- * - **Pelican** stubs the registry in its own endpoints and calls the shop through its own, so there is
- *   no URL, no status code and no JSON in this file. A failure is the value the endpoint declared.
- * - **Testcontainers** gives the outbox a real Postgres schema of its own, and the bus a real Kafka
- *   broker, with Confluent's in-process `mock://` schema registry. The test holds on to
- *   both, so it can look in the table and on the topic as well as at the API.
- *
- * It reads as a story, lark-test's: each step's text is what a
- * failure says, and a step's value is what the next one checks.
- *
- * The port is 0, so the test never fights the demo, or anything else, for 8080. Arrivals are an hour
- * apart, so no new pet lands between reading the table and reading /stats.
- */
+/** Arrivals are an hour apart, so no new pet lands between reading the table and reading /stats. */
 class EndToEndSpec {
 
     companion object {
@@ -81,7 +61,6 @@ class EndToEndSpec {
 
     private val database: DatabaseSettings = TestPostgres.fresh()
 
-    // The bus is chosen as main chooses it, from petshop.bus, with Kafka named in the configuration.
     private val onKafka: Config = ConfigFactory.parseString(
         """
         petshop.bus {
@@ -94,8 +73,7 @@ class EndToEndSpec {
     private val theService: Module =
         petshopFrom(onKafka).overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
             .onDatabase(database)
-            // On top of onKafka rather than of application.conf, which is overridingConfig's own fallback: the graph's
-            // Config is then the document the bus was chosen from, with the three keys changed.
+            // On top of onKafka rather than application.conf, so the graph's Config is the one the bus was chosen from.
             .overridingConfig("petshop.port = 0\npetshop.arrivalsEvery = 1h\npetshop.outboxEvery = 20ms", fallback = onKafka)
 
     @Test

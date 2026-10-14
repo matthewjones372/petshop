@@ -26,15 +26,8 @@ import petshop.domain.RegistryDown
 import petshop.domain.ShopEvent
 import petshop.domain.Unreachable
 
-/**
- * The shop under test, and nothing else: no port bound, no documents served, and no arrivals turning
- * up mid-assertion. `subgraph` is what makes that a line rather than a second wiring.
- */
 class AdoptionSpec {
 
-    // The shop needs a system, an actor, a tracer and a registry. Not a port, not a config file, and —
-    // since the actor stopped pretending to depend on them — not the settings either. The registry is
-    // a fake at the node: this file is about who gets the pet, and RegistrySpec is about the wire.
     private val settled: Module = shopWith(FakeRegistry())
 
     @Test
@@ -106,7 +99,6 @@ class AdoptionSpec {
     }
 }
 
-/** That the file is read at all, which a graph makes easy to assert and easy to forget. */
 class SettingsSpec {
 
     @Test

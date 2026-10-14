@@ -1,5 +1,4 @@
 plugins {
-    // Writes the domain → DTO crossings in Dtos.kt, and refuses to compile one it cannot.
     id("io.github.matthewjones372.kimney") version "0.3.0"
 }
 
@@ -11,7 +10,6 @@ dependencies {
     api("io.github.matthewjones372:pelican-pekko:$pelicanVersion")
     api("io.github.matthewjones372:pelican-jackson:$pelicanVersion")
     api("io.github.matthewjones372:pelican-pekko-docs:$pelicanVersion")
-    // /health/live and /health/ready, in application/health+json, from the checks the app declares.
     api("io.github.matthewjones372:pelican-health:$pelicanVersion")
 
     // Pelican ships no Scala cross-build, so the Pekko that runs is named here.

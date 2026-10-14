@@ -13,20 +13,14 @@ import petshop.outbox.OutboxTable
 import javax.sql.DataSource
 
 /**
- * The outbox as a Postgres table. The SQL is [OutboxTable]'s, in ExoQuery; what is left here is the
- * shop's side of it, which is an event flattened into a row and read back out of one.
- *
- * A claim selects the oldest unpublished rows `FOR UPDATE SKIP LOCKED`, publishes them, and deletes the
- * ones the bus took before it commits. Two relays claiming at once — two instances of the service, or
- * a restarted relay beside one still finishing — never wait for each other and never hand the bus the
- * same row at the same time. If the process dies between publishing and committing, the rows are
- * claimed again, which is the at-least-once the consumer already expects.
+ * Claims use `FOR UPDATE SKIP LOCKED`, so concurrent relays never block each other or publish the same
+ * row at once. A crash between publish and commit publishes the rows again: delivery is at-least-once.
  */
 class PostgresOutbox(dataSource: DataSource) : Outbox {
 
     private val table = OutboxTable(dataSource)
 
-    // Everything in a row but its seq is known before Postgres numbers it.
+    // Postgres assigns the seq, so the row is built with a placeholder of 0.
     override fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent =
         numbered(table.record(pet.row(), numbered(0).row()))
 
