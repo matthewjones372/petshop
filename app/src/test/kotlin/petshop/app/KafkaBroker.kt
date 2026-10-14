@@ -24,9 +24,11 @@ import org.testcontainers.utility.DockerImageName
  */
 private object TestKafka {
 
-    // The native image starts in about a second, and runs KRaft, so there is no ZooKeeper beside it.
+    // The JVM image, not kafka-native: the native one segfaults on about one start in twenty, two threads
+    // racing through musl's getpwuid, and its setup step takes no flag to stop that. It runs KRaft, so there
+    // is no ZooKeeper beside it, and costs about three seconds more, once a run.
     val container: KafkaContainer by lazy {
-        KafkaContainer(DockerImageName.parse("apache/kafka-native:4.3.1"))
+        KafkaContainer(DockerImageName.parse("apache/kafka:4.3.1"))
             // A group's first member is not kept waiting for others to join, which is 3s a test by default.
             .withEnv("KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS", "0")
             .apply { start() }
