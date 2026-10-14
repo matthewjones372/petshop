@@ -102,6 +102,9 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=1h
+      # Tempo's span metrics arrive by remote write, and the front end's own metrics over OTLP.
+      - --web.enable-remote-write-receiver
+      - --enable-feature=otlp-write-receiver
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/rules.yml:/etc/prometheus/rules.yml:ro

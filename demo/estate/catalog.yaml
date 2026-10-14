@@ -36,6 +36,32 @@ services:
         - { title: Waiting for a connection, query: 'max(hikaricp_connections_pending{pool="petshop"})' }
         - { title: Health checks failing, query: 'count(petshop_health_check == 0) or vector(0)' }
 
+  # Its numbers are Tempo's span metrics for the browser's spans, and Effect's OTLP metrics and lines from web/.
+  - name: petshop-web
+    category: Shop
+    description: The front end in web/. Each call to the shop is a span in the browser, and the shop continues its trace
+    repository: github:matthewjones372/petshop
+    runbook: https://github.com/matthewjones372/petshop/blob/main/README.md
+    environments: [ demo ]
+    load:
+      requests: 'sum(rate(traces_spanmetrics_calls_total{service="petshop-web", span_kind="SPAN_KIND_CLIENT"}[1m]))'
+      errors: 'sum(rate(traces_spanmetrics_calls_total{service="petshop-web", span_kind="SPAN_KIND_CLIENT", status_code="STATUS_CODE_ERROR"}[1m])) or vector(0)'
+      p99: 'histogram_quantile(0.99, sum by (le) (rate(traces_spanmetrics_latency_bucket{service="petshop-web", span_kind="SPAN_KIND_CLIENT"}[5m])))'
+    links:
+      app: http://localhost:5173
+      # Grafana's Explore on Tempo, searching for the browser's spans.
+      traces: http://localhost:3000/explore?schemaVersion=1&panes=%7B%22a%22%3A%7B%22datasource%22%3A%22petshop-tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22petshop-tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bresource.service.name%3D%5C%22petshop-web%5C%22%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D
+    # Loki keeps an OTLP line's level as metadata, so the line is prefixed with it for Estate to read.
+    logs: { selector: '{service_name="petshop-web"} | line_format "{{.severity_text}} {{__line__}}"', errors: ERROR }
+    stats:
+      extra:
+        - { title: Adoption click to answer, query: '1000 * sum(rate(traces_spanmetrics_latency_sum{service="petshop-web", span_name="adopt pet"}[5m])) / clamp_min(sum(rate(traces_spanmetrics_latency_count{service="petshop-web", span_name="adopt pet"}[5m])), 1e-9)', unit: ms }
+        - { title: /live reconnects, query: 'sum(rate(traces_spanmetrics_calls_total{service="petshop-web", span_name="live connection", status_code="STATUS_CODE_ERROR"}[5m])) or vector(0)', unit: /s }
+        - { title: Uncaught errors, query: 'sum(rate(traces_spanmetrics_calls_total{service="petshop-web", span_name=~"uncaught error|unhandled rejection"}[5m])) or vector(0)', unit: /s }
+        - { title: Largest Contentful Paint, query: 'max(web_vital_milliseconds{name="LCP"})', unit: ms }
+        - { title: Interaction to Next Paint, query: 'max(web_vital_milliseconds{name="INP"})', unit: ms }
+        - { title: Cumulative Layout Shift, query: 'max(web_vital_ratio{name="CLS"})' }
+
 # An alert carrying `store: <name>` is shown on that store.
 stores:
   - name: outbox-db
@@ -67,6 +93,7 @@ alerts:
   PetshopNotReady: { impact: "The shop says it cannot serve; /health/ready lists what is failing." }
   PostgresDown: { impact: "Every adoption is refused with a 503, arrivals stop, and no events reach the bus." }
   KafkaDown: { impact: "Events stay in the outbox, and /stats stops moving, until the broker is back." }
+  BrowserCallsFailing: { impact: "People in the browser see pets fail to load, or adoptions answered with an error." }
 
 vitals:
   - title: Adoptions
@@ -81,11 +108,14 @@ vitals:
 
 map:
   nodes:
+    - { id: web, service: petshop-web }
     - { id: petshop, service: petshop }
     - { id: registry, title: Chip registry, kind: external }
     - { id: postgres, title: Postgres, store: outbox-db }
     - { id: bus, title: Kafka, store: events }
   edges:
+    # Tempo's service graph: calls whose client span is the browser's and whose server span is the shop's.
+    - { from: web, to: petshop, label: calls, rate: 'sum(rate(traces_service_graph_request_total{client="petshop-web", server="petshop"}[1m]))', alert: BrowserCallsFailing }
     - { from: petshop, to: registry, label: chips, rate: 'sum(rate(petshop_adoptions_total{outcome=~"taken|not_chipped|registry_down"}[1m]))', alert: ChipRegistryUnreachable }
     # Estate draws an edge with no rate as dead, so this one carries the database's transaction rate.
     - { from: petshop, to: postgres, label: records, rate: 'sum(rate(pg_stat_database_xact_commit{datname="petshop"}[1m]))', alert: PostgresDown }

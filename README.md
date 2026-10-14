@@ -27,12 +27,14 @@ bun run --cwd web dev       # http://localhost:5173
 
 The front end traces itself with Effect's own OTLP tracer. Every call to the shop goes through Effect's `HttpClient`,
 so each is a client span that sends `traceparent`, and the shop continues that trace. Adopting a pet is an `adopt pet`
-span, each `/live` connection is a `live connection` span that fails when the connection drops, and uncaught errors
-and Core Web Vitals are short spans of their own. The dev server proxies `/v1/traces` to Tempo on :4318, which sends
+span, each `/live` connection is a `live connection` span that fails when the connection drops, and an uncaught error
+is a short span of its own. The dev server proxies `/v1/traces` to Tempo on :4318, which sends
 no CORS headers (`TEMPO_URL` overrides the target). To see one trace from a click to the shop, run the demo and the
 shop with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, adopt a pet, then open Grafana's Explore at
 <http://localhost:3000/explore>, pick **Tempo** and search for service `petshop-web` and span `adopt pet`: the browser's
-spans sit above the shop's `POST /pets/{petId}/adoption`, its `adopt` and the chip registry calls.
+spans sit above the shop's `POST /pets/{petId}/adoption`, its `adopt` and the chip registry calls. Its log lines go to
+the demo's Loki and its Web Vitals to Prometheus the same way, and Estate shows it as the service `petshop-web`, from
+Tempo's span metrics; `demo/README.md` says what each number is.
 
 `demo/` adds Prometheus, Grafana, Alertmanager and [Estate](https://github.com/matthewjones372/estate) to watch the
 running shop. Grafana is at <http://localhost:3000> and Estate at <http://localhost:8095>; see `demo/README.md`.
