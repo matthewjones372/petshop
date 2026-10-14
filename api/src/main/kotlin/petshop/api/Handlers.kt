@@ -3,14 +3,22 @@ package petshop.api
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.health.Health
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.metrics.otel.openTelemetry
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOrFail
+import io.opentelemetry.api.OpenTelemetry
 import petshop.domain.NoSuchPet
 import petshop.domain.PetId
 import petshop.domain.PetShop
 
-fun petshopApi(shop: PetShop, health: Health, scrape: () -> String, tally: () -> Tally) = api(
+fun petshopApi(
+    shop: PetShop,
+    health: Health,
+    scrape: () -> String,
+    tally: () -> Tally,
+    telemetry: OpenTelemetry = OpenTelemetry.noop(),
+) = api(
     endpoints = listOf(
         listPets handledNow { shop.all().toDto() },
         getPet handledOrFail { id ->
@@ -36,6 +44,7 @@ fun petshopApi(shop: PetShop, health: Health, scrape: () -> String, tally: () ->
 ) {
     title = "Petshop"
     version = "1.0.0"
+    filter(openTelemetry(telemetry))
     description = """
         A small shop of tortoises, dogs, cats and parrots. An adoption records the new keeper with the chip
         registry before the pet leaves the shop, and a pet with no chip on record stays on the shelf.

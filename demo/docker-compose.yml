@@ -34,6 +34,11 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     ports:
       - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
 
   postgres-exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
@@ -46,13 +51,17 @@ services:
   # --kafka.version: Kafka 4 dropped the protocol versions the exporter asks for by default.
   kafka-exporter:
     image: danielqsj/kafka-exporter:v1.10.0
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy
     command: ["--kafka.server=kafka:29092", "--kafka.version=3.9.0"]
     restart: unless-stopped
 
   schema-registry:
     image: confluentinc/cp-schema-registry:8.3.2
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
@@ -79,6 +88,15 @@ services:
     ports:
       - "3100:3100"
 
+  tempo:
+    image: grafana/tempo:2.10.8
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "3200:3200"
+      - "4318:4318"
+
   prometheus:
     image: prom/prometheus:v2.54.1
     command:
@@ -95,7 +113,7 @@ services:
 
   grafana:
     image: grafana/grafana:11.2.0
-    depends_on: [prometheus]
+    depends_on: [prometheus, loki, tempo]
     environment:
       # A demo nobody logs into. Do not copy this into anything that matters.
       GF_AUTH_ANONYMOUS_ENABLED: "true"

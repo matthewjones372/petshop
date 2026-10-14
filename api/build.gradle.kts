@@ -11,6 +11,8 @@ dependencies {
     api("io.github.matthewjones372:pelican-jackson:$pelicanVersion")
     api("io.github.matthewjones372:pelican-pekko-docs:$pelicanVersion")
     api("io.github.matthewjones372:pelican-health:$pelicanVersion")
+    // A span per request, continuing an inbound traceparent.
+    api("io.github.matthewjones372:pelican-metrics-otel:$pelicanVersion")
 
     // Pelican ships no Scala cross-build, so the Pekko that runs is named here.
     api(platform("org.apache.pekko:pekko-bom_2.13:$pekkoVersion"))

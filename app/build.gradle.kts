@@ -42,7 +42,12 @@ dependencies {
         implementation("org.apache.httpcomponents.core5:httpcore5-h2:5.4.3")
     }
     implementation("io.github.matthewjones372:lark-otel:$larkVersion")
-    implementation("io.opentelemetry:opentelemetry-sdk:1.62.0")
+    // One OpenTelemetry version for the API pelican brings and the SDK here: a mixed pair fails at start.
+    implementation(platform("io.opentelemetry:opentelemetry-bom:1.67.0"))
+    implementation("io.opentelemetry:opentelemetry-sdk")
+    // OTEL_EXPORTER_OTLP_ENDPOINT turns span export on; see Wiring.kt.
+    implementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure")
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp")
 
     implementation("petshop:outbox-table")
     implementation("org.postgresql:postgresql:42.7.13")
