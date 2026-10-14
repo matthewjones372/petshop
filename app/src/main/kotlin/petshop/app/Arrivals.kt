@@ -2,7 +2,7 @@ package petshop.app
 
 import io.github.matthewjones372.lark.actor.ActorRef
 import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.counter
 import io.github.matthewjones372.lark.gauge
 import io.github.matthewjones372.lark.increment
@@ -21,20 +21,14 @@ import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.Species
 
-/** The background work every service has one of: new pets keep turning up. */
-class Arrivals internal constructor(val running: Running<Nothing, Long>)
+class Arrivals internal constructor(val running: Running<Nothing, Long>) : AutoCloseable by running
 
 private val names = listOf("Pickle", "Waffle", "Sprocket", "Marmalade", "Biscuit", "Clementine")
 
-/**
- * A stream rather than a scheduled callback, because the failure a feed can end with belongs in the
- * type: `Stream<Nothing, Pet>` says this one cannot fail, and `start` answers an `Exit` rather than a
- * future nobody read, beside the way to stop it when the graph is given back.
- */
 val arrivals: Module =
-    singleOf(
+    closingOf(
         { ref: ActorRef<Shop>, shop: PetShop, config: Settings, streams: StreamBackend ->
-            // On from the highest id the shop holds, so a pet that arrives after a restart gets a new one.
+            // Start after the highest id held, so a pet arriving after a restart gets a new id.
             val next = AtomicLong(shop.all().maxOfOrNull { it.id.value } ?: opening.size.toLong())
             Stream.tick(every = config.arrivalsEvery, element = Unit)
                 .map { _ ->
@@ -42,14 +36,12 @@ val arrivals: Module =
                     Pet(PetId(id), names[(id % names.size).toInt()], Species.entries[(id % 4).toInt()])
                 }
                 .runFold(0L) { arrived, pet ->
-                    // Written on the stream's thread, not a request's: the pair is on the line because
-                    // it is bound here, which is the only way this one could carry it.
+                    // Logged on the stream's thread, so pet_id is only on the line if bound here.
                     logAnnotated("pet_id" to pet.id.value.toString()) {
                         logInfo("${pet.name} the ${pet.species} arrived")
                     }
                     counter("petshop.arrivals").increment()
-                    // The shop's size as a number rather than a rate: the id is the count, since every
-                    // pet that has ever arrived got the next one.
+                    // Ids are handed out in order, so the latest id is the count of pets ever arrived.
                     gauge("petshop.pets.in.shop").set(pet.id.value.toDouble())
                     ref.tell(Arrived(pet))
                     arrived + 1
@@ -57,5 +49,4 @@ val arrivals: Module =
                 .start(streams)
                 .let(::Arrivals)
         },
-        { arrivals -> arrivals.running.close() },
     )

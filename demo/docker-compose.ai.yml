@@ -1,0 +1,12 @@
+# Ask AI in the demo's Estate, on top of docker-compose.yml:
+#
+#   export ANTHROPIC_API_KEY=...        # see demo/README.md
+#   docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d
+#
+# Estate reads estate-ai.yaml in place of estate.yaml, and the key from its environment. Without this file the
+# demo runs as before, and Ask AI is hidden.
+services:
+  estate:
+    environment:
+      ESTATE_SETTINGS: /etc/estate/estate-ai.yaml
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY to try Ask AI}

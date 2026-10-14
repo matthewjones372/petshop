@@ -1,5 +1,8 @@
 package petshop.app
 
+import io.github.matthewjones372.lark.app.Module
+import io.github.matthewjones372.lark.app.liquibase.Migrated
+import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.test.story
@@ -25,18 +28,16 @@ import petshop.outbox.PetRow
 private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 private val barnaby = Pet(PetId(2), "Barnaby", Species.Dog)
 
-/** The outbox and the pool under it, on a schema of its own. No actor, no relay, no bus. */
 private fun onItsOwn(test: (Outbox) -> Unit) =
-    testApp(petshop.onAFreshDatabase().subgraph<Outbox>()) { outbox: Outbox -> test(outbox) }
+    testApp(Petshop.module.onAFreshDatabase().subgraph<Outbox>()) { outbox: Outbox -> test(outbox) }
 
-/** Everything still in the outbox, read by a claim that publishes nothing and so takes nothing. */
+/** Read by a claim that publishes nothing, so it takes nothing. */
 private fun Outbox.left(): List<ShopEvent> {
     val seen = mutableListOf<ShopEvent>()
     claim(1_000) { claimed -> seen += claimed; emptyList() }
     return seen
 }
 
-/** The outbox as a table, against a real Postgres: what the relay's claims can and cannot see. */
 class PostgresOutboxSpec {
 
     @Test
@@ -139,7 +140,7 @@ class PostgresOutboxSpec {
 
     @Test
     fun `a pet's change and its event are one transaction, so an event that fails leaves the pet as it was`() = story {
-        testApp(petshop.onAFreshDatabase().subgraph<DataSource>()) { dataSource: DataSource ->
+        testApp(migrated) { (dataSource): Tables ->
             val table = Given("a pets table with Nibbles on the shelf") {
                 OutboxTable(dataSource).also { it.stock(listOf(PetRow(1, "Nibbles", "Tortoise", adopted = false))) }
             }
@@ -157,3 +158,9 @@ class PostgresOutboxSpec {
         }
     }
 }
+
+/** The pool once the changelog has run, for a test that writes the tables without the outbox in front. */
+private data class Tables(val dataSource: DataSource)
+
+private val migrated: Module =
+    (Petshop.module.onAFreshDatabase() + single { source: DataSource, _: Migrated -> Tables(source) }).subgraph<Tables>()

@@ -1,12 +1,10 @@
 plugins {
     kotlin("jvm") version "2.3.0"
-    // ExoQuery reads each `sql { }` at compile time and writes the SQL then, and it reads the row's
-    // columns through kotlinx.serialization.
     kotlin("plugin.serialization") version "2.3.0"
     id("io.exoquery.exoquery-plugin") version "2.3.0-2.0.4.PL"
 }
 
-// The coordinates the petshop asks for, which Gradle substitutes with this build.
+// Gradle substitutes this build for the petshop:outbox-table dependency.
 group = "petshop"
 
 repositories { mavenCentral() }
@@ -16,3 +14,11 @@ dependencies {
 }
 
 kotlin { jvmToolchain(21) }
+
+// ExoQuery brings net.jpountz lz4 1.3.0, which has open advisories and no fix under those coordinates;
+// at.yawk.lz4:lz4-java is its continuation with the same packages.
+configurations.configureEach {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module("net.jpountz.lz4:lz4")).using(module("at.yawk.lz4:lz4-java:1.11.4"))
+    }
+}

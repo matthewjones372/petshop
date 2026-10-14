@@ -28,15 +28,6 @@ import petshop.registry.lookupChip
 import petshop.registry.noSuchChip
 import petshop.registry.recordKeeper
 
-/**
- * The shop against a registry that is a real HTTP server, with the shop's own client talking to it.
- * Nothing of the shop's is faked: the actor, the generated client, its JSON and its timeout are the
- * ones `main` starts.
- *
- * The stubs are written in the registry's endpoints, not its URLs: `stub(lookupChip, 1L)` is the
- * request the client sends for pet 1, and what it answers is a value the endpoint declares. Change
- * the registry's contract and these stubs move with it, or stop compiling.
- */
 class RegistrySpec {
 
     @JvmField
@@ -104,6 +95,18 @@ class RegistrySpec {
         Given("a registry that answers 500, which its contract never declared") { registry.stub(lookupChip, 1L) breaksWith 500 }
         val answer = When("Ada adopts Nibbles") { testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") } }
         Then("she is told the registry is down") { answer shouldBeLeft RegistryDown(1) }
+    }
+
+    @Test
+    fun `a registry that keeps failing stops being asked`() = story {
+        Given("a registry that answers 500 to every lookup") { registry.stub(lookupChip, 1L) breaksWith 500 }
+        val answers = When("Ada asks for Nibbles six times, each refusal putting her back on the shelf") {
+            testApp(shop) { shop: PetShop -> (1..6).map { shop.adopt(PetId(1), by = "Ada") } }
+        }
+        Then("every time she is told the registry is down") { answers.forEach { it shouldBeLeft RegistryDown(1) } }
+        And("the registry was asked five times: after five failures in a row the breaker answers for it") {
+            registry.calls(lookupChip) shouldBe 5
+        }
     }
 
     @Test

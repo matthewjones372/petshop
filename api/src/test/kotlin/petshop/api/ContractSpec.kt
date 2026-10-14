@@ -3,11 +3,14 @@ package petshop.api
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
+import io.github.matthewjones372.lark.stream.Stream
+import io.github.matthewjones372.lark.stream.empty
 import io.github.matthewjones372.pelican.test.pekko.inMemory
 import io.github.matthewjones372.pelican.test.shouldBeError
 import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
+import io.github.matthewjones372.pelican.health.health
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
@@ -32,19 +35,19 @@ private class OnePet(private var pet: Pet) : PetShop {
     }
 }
 
-/**
- * Two promises, kept apart on purpose: what the shop's own code may call, and what its callers hold.
- * A rename breaks the first at compile time; only the second is allowed to notice a URL.
- */
 class ContractSpec {
 
     private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 
+    // No checks: the probes' paths are Pelican's whatever the app declares.
+    private val probes = health { }
+
     private val app = petshopApi(
         shop = OnePet(nibbles),
-        health = { Healthy(ready = true, failing = emptyList()) },
+        health = probes,
         scrape = { "petshop_adoptions_total 1.0" },
         tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+        watch = { Stream.empty() },
     ).inMemory("petshop-contract")
 
     @Test
@@ -57,9 +60,11 @@ class ContractSpec {
         app.request(getPet, 1L) shouldBuild "GET /pets/1"
         app.request(adoptPet, 1L) shouldBuild "POST /pets/1/adoption"
         app.request(listPets, Unit) shouldBuild "GET /pets"
-        app.request(health, Unit) shouldBuild "GET /health"
+        app.request(probes.live, Unit) shouldBuild "GET /health/live"
+        app.request(probes.ready, Unit) shouldBuild "GET /health/ready"
         app.request(metrics, Unit) shouldBuild "GET /metrics"
         app.request(stats, Unit) shouldBuild "GET /stats"
+        app.request(events, Unit) shouldBuild "GET /events"
     }
 
     @Test
@@ -90,9 +95,10 @@ class ContractSpec {
                 shop = object : PetShop by OnePet(nibbles) {
                     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = refusal.left()
                 },
-                health = { Healthy(ready = true, failing = emptyList()) },
+                health = health { },
                 scrape = { "" },
                 tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+                watch = { Stream.empty() },
             ).inMemory("petshop-refusing-${refusal::class.simpleName}")
 
             refusing.outcome(adoptPet, 1L).shouldBeError() shouldBe declared

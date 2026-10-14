@@ -13,12 +13,6 @@ import org.junit.jupiter.api.Test
 import petshop.domain.PetId
 import petshop.domain.PetShop
 
-/**
- * What the service says about an adoption, and what a line carries besides its words.
- *
- * The annotations are the half worth asserting: a message reads the same either way, and only the
- * pairs reach a field search.
- */
 class AdoptionLogSpec {
 
     private val settled: Module = shopWith(FakeRegistry())

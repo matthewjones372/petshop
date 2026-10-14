@@ -1,0 +1,23 @@
+name: dependency-graph
+
+# GitHub cannot read build.gradle.kts, so this submits the resolved graph for Dependabot.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: gradle/actions/dependency-submission@v6
