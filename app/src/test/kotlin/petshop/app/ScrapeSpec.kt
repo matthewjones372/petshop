@@ -9,20 +9,21 @@ import io.github.matthewjones372.lark.metrics
 import io.github.matthewjones372.lark.micrometer.MicrometerMetrics
 import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.string.shouldContain
+import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.prometheus.PrometheusConfig
 import io.micrometer.prometheus.PrometheusMeterRegistry
+import javax.sql.DataSource
 import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Test
 import petshop.domain.ChipRegistry
 import petshop.domain.PetId
 import petshop.domain.PetShop
-import javax.sql.DataSource
 
 /** A registry of this test's own, not the global one, so tests running together cannot read each other's numbers. */
-private class Scraped(val registry: PrometheusMeterRegistry, val meters: Meters)
+private class Scraped(val registry: PrometheusMeterRegistry)
 
 private val scraped: Module =
-    single { registry: PrometheusMeterRegistry, meters: Meters, _: PetShop, _: DataSource -> Scraped(registry, meters) }
+    single { registry: PrometheusMeterRegistry, _: ReadinessGauges, _: JvmGcMetrics, _: PetShop, _: DataSource -> Scraped(registry) }
 
 class ScrapeSpec {
 

@@ -1,7 +1,9 @@
 package petshop.app
 
+import com.typesafe.config.ConfigFactory
 import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import io.confluent.kafka.schemaregistry.testutil.MockSchemaRegistry
+import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.kafka.DEAD_LETTER_HEADER
 import io.github.matthewjones372.lark.kafka.DecodeError
@@ -39,7 +41,19 @@ class KafkaBusSpec : EventBusContract() {
         val kafka = KafkaBroker()
     }
 
-    override fun bus(name: String): EventBus = kafkaBus(name)
+    override fun bus(name: String): Module = busOn(name)
+
+    override fun service(name: String): Module =
+        petshopFrom(
+            ConfigFactory.parseString(
+                """
+                petshop.bus {
+                  kind = kafka
+                  kafka { bootstrap = "${kafka.bootstrap}", topic = $name, group = projection-$name, registry = "mock://$name" }
+                }
+                """,
+            ).withFallback(ConfigFactory.load()),
+        )
 
     override val remembersReaders = true
 
@@ -47,15 +61,15 @@ class KafkaBusSpec : EventBusContract() {
 
     private fun registry(scope: String): Map<String, Any> = mapOf("schema.registry.url" to "mock://$scope")
 
-    private fun kafkaBus(name: String, deadLetters: ((DecodeError) -> Unit)? = null) =
-        KafkaBus(Topic(name), kafka.bootstrap, group = "projection-$name", registry(name), deadLetters)
+    private fun busOn(name: String, deadLetters: ((DecodeError) -> Unit)? = null): Module =
+        kafkaBus(Topic(name), kafka.bootstrap, group = "projection-$name", registry(name), deadLetters)
 
     @Test
     fun `an event on the wire is the registry's Avro, and reads back as the domain event it was`() = story {
         val nibbles = Given("Ada's adoption of Nibbles, as event 3") {
             PetAdopted(seq = 3, pet = Pet(PetId(1), "Nibbles", Species.Tortoise, adopted = true), by = "Ada")
         }
-        When("the bus publishes it") { kafkaBus("wire").use { it.publish(nibbles) } }
+        When("the bus publishes it") { using(busOn("wire")) { it.publish(nibbles) } }
         val record = Then("one record is on the topic").eventually(30.seconds) {
             kafka.records("wire", LongDeserializer(), ByteArrayDeserializer()).single()
         }
@@ -77,7 +91,7 @@ class KafkaBusSpec : EventBusContract() {
         val dead = ConcurrentLinkedQueue<DecodeError>()
         val seen = ConcurrentLinkedQueue<Any>()
 
-        kafkaBus("mixed", deadLetters = dead::add).use { bus ->
+        using(busOn("mixed", deadLetters = dead::add)) { bus ->
             When("the bus publishes Waffle, and a consumer reads the topic") {
                 bus.publish(waffle)
                 bus.consume { event -> seen.add(event) }.start(Forks())
@@ -100,7 +114,7 @@ class KafkaBusSpec : EventBusContract() {
         val waffle = PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog))
         val seen = ConcurrentLinkedQueue<Any>()
 
-        kafkaBus("lettered").use { bus ->
+        using(busOn("lettered")) { bus ->
             When("the bus publishes Waffle behind it, and a consumer reads the topic") {
                 bus.publish(waffle)
                 bus.consume { event -> seen.add(event) }.start(Forks())

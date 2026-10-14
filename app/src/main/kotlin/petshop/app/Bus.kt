@@ -1,13 +1,16 @@
 package petshop.app
 
 import arrow.core.Either
+import io.github.matthewjones372.lark.app.Module
+import io.github.matthewjones372.lark.app.boundTo
+import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.stream.Hub
 import io.github.matthewjones372.lark.stream.Run
 import io.github.matthewjones372.lark.stream.map
 import io.github.matthewjones372.lark.stream.runFold
 import petshop.domain.ShopEvent
 
-interface EventBus : AutoCloseable {
+interface EventBus {
 
     fun publish(event: ShopEvent): Either<BusRefused, ShopEvent>
 
@@ -19,9 +22,7 @@ interface EventBus : AutoCloseable {
 data class BusRefused(val seq: Long, val why: String)
 
 /** Refuses when a reader's queue is full or after close. Events published before any reader are held for the first. */
-class HubBus(capacity: Int = 256) : EventBus {
-
-    private val hub = Hub<ShopEvent>(capacity)
+class HubBus(private val hub: Hub<ShopEvent>) : EventBus {
 
     override fun publish(event: ShopEvent): Either<BusRefused, ShopEvent> =
         hub.publish(event).mapLeft { refused -> BusRefused(event.seq, "$refused") }
@@ -33,6 +34,8 @@ class HubBus(capacity: Int = 256) : EventBus {
                 1L
             }
             .runFold(0L, Long::plus)
-
-    override fun close() = hub.close()
 }
+
+/** The hub, released by the graph after the bus that publishes to it. */
+fun hubBus(capacity: Int = 256): Module =
+    singleOf({ -> Hub<ShopEvent>(capacity) }, { hub -> hub.close() }) + singleOf(::HubBus).boundTo<EventBus>()

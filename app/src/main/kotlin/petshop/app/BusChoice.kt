@@ -8,6 +8,8 @@ import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.Reading
 import io.github.matthewjones372.lark.app.typesafe.choosing
 import io.github.matthewjones372.lark.kafka.Topic
+import io.github.matthewjones372.lark.stream.Hub
+import petshop.domain.ShopEvent
 
 /** Set by `petshop.bus.kind` in application.conf, overridden by `BUS`. */
 sealed interface BusSettings {
@@ -24,7 +26,7 @@ fun bus(conf: Config): Module =
     conf.choosing("petshop.bus", Reading::busSettings) { chosen ->
         when (chosen) {
             BusSettings.InProcess -> inProcessBus
-            is BusSettings.OnKafka -> kafkaBus(chosen)
+            is BusSettings.OnKafka -> onKafka(chosen)
         }
     }
 
@@ -48,13 +50,13 @@ private fun Reading.kind(): String =
         }
     }
 
+// The hub takes BusSettings, so a section that will not read refuses the start even on a subgraph that only reaches
+// the bus.
 private val inProcessBus: Module =
-    singleOf({ _: BusSettings -> HubBus() }, { bus -> bus.close() }).boundTo<EventBus>()
+    singleOf({ _: BusSettings -> Hub<ShopEvent>(HUB_CAPACITY) }, { hub -> hub.close() }) +
+        singleOf(::HubBus).boundTo<EventBus>()
 
-private fun kafkaBus(on: BusSettings.OnKafka): Module =
-    singleOf(
-        { _: BusSettings ->
-            KafkaBus(Topic(on.topic), on.bootstrap, on.group, mapOf("schema.registry.url" to on.registry))
-        },
-        { bus -> bus.close() },
-    ).boundTo<EventBus>()
+private const val HUB_CAPACITY = 256
+
+private fun onKafka(on: BusSettings.OnKafka): Module =
+    kafkaBus(Topic(on.topic), on.bootstrap, on.group, mapOf("schema.registry.url" to on.registry))
