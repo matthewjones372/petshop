@@ -6,6 +6,7 @@ import Home from "./pages/Home";
 import Pets from "./pages/Pets";
 import PetPage from "./pages/Pet";
 import Stats from "./pages/Stats";
+import Live from "./pages/Live";
 
 render(
   () => (
@@ -14,6 +15,7 @@ render(
       <Route path="/pets" component={Pets} />
       <Route path="/pets/:id" component={PetPage} />
       <Route path="/stats" component={Stats} />
+      <Route path="/live" component={Live} />
     </Router>
   ),
   document.getElementById("root")!,

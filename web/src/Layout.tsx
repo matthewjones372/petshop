@@ -37,6 +37,7 @@ export default function Layout(props: RouteSectionProps) {
           <nav aria-label="Main">
             <ul>
               <li><A href="/pets">Pets</A></li>
+              <li><A href="/live">Live</A></li>
               <li><A href="/stats">Stats</A></li>
               <li><a href="/reference" target="_blank" rel="noreferrer">API</a></li>
             </ul>

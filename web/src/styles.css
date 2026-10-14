@@ -272,6 +272,8 @@ code {
   0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--mint) 60%, transparent); }
   100% { box-shadow: 0 0 0 12px transparent; }
 }
+.live-dot.paused { background: var(--sun); animation: none; }
+.feed-item { animation: pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 .live-dot {
   display: inline-block;
   width: 12px;

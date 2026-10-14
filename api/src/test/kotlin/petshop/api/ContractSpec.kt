@@ -9,6 +9,7 @@ import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
 import io.github.matthewjones372.pelican.health.health
+import org.apache.pekko.stream.javadsl.Source
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
@@ -45,6 +46,7 @@ class ContractSpec {
         health = probes,
         scrape = { "petshop_adoptions_total 1.0" },
         tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+        watch = { Source.empty() },
     ).inMemory("petshop-contract")
 
     @Test
@@ -61,6 +63,7 @@ class ContractSpec {
         app.request(probes.ready, Unit) shouldBuild "GET /health/ready"
         app.request(metrics, Unit) shouldBuild "GET /metrics"
         app.request(stats, Unit) shouldBuild "GET /stats"
+        app.request(events, Unit) shouldBuild "GET /events"
     }
 
     @Test
@@ -94,6 +97,7 @@ class ContractSpec {
                 health = health { },
                 scrape = { "" },
                 tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+                watch = { Source.empty() },
             ).inMemory("petshop-refusing-${refusal::class.simpleName}")
 
             refusing.outcome(adoptPet, 1L).shouldBeError() shouldBe declared

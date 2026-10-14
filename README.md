@@ -15,8 +15,10 @@ docker compose -f demo/docker-compose.yml up -d postgres registry
 ./gradlew loadTest         # 200 requests a second at the real graph; not part of test or build
 ```
 
-`web/` is a SolidJS front end for the shop: browse pets by species, adopt one, and watch `/stats` update. Its dev
-server proxies to the shop on :8080 (`PETSHOP_URL` overrides that).
+`web/` is a SolidJS front end for the shop, in TypeScript: browse pets by species, adopt one, watch `/stats` update,
+and follow arrivals and adoptions live on `/live`, which reads the shop's server-sent events at `/events` as an Effect
+`Stream` and reconnects on an Effect `Schedule`. Its dev server proxies to the shop on :8080 (`PETSHOP_URL` overrides
+that), and Estate's `app` link opens it.
 
 ```bash
 bun install --cwd web
@@ -121,7 +123,8 @@ cannot fail.
 
 Every arrival and every adoption is also recorded as an event, and another part
 of the service reads them: a projection that counts arrivals and adoptions by
-species and serves the result at `/stats`.
+species and serves the result at `/stats`, and passes each event it has not
+seen before to whoever is watching `/events`.
 
 ```
 Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT ─▶ actor changes      both rows, or neither
@@ -131,6 +134,8 @@ Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT �
                           │
                refused ◀──┴──▶ bus ─▶ projection ─▶ /stats
           (stays, next tick)          dedupe by seq, fold
+                                           │
+                                           └──▶ feed ─▶ /events   server-sent, live only
 ```
 
 - **The outbox is a Postgres table, written in one transaction with the
@@ -188,6 +193,11 @@ Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT �
   that holds every `seq` seen, because at-least-once delivery means some
   events arrive twice, and the `Tally` of the rest. `/stats` reports how many
   duplicates it dropped.
+- **The feed** is a second `Hub`, private to it, that the projection offers
+  each first-seen event to; `/events` streams it to each watcher as
+  server-sent events. It is fed from the projection rather than the bus
+  because a Kafka bus would split its partitions between the two consumers.
+  It publishes nothing while nobody watches, and a reconnect starts from now.
 
 The catalogue is the `pets` table. The actor is its only writer and holds it
 in memory. On start it reads the table back, and adds the opening catalogue

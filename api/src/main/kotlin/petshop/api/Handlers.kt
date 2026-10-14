@@ -7,16 +7,22 @@ import io.github.matthewjones372.pelican.metrics.otel.openTelemetry
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOrFail
+import io.github.matthewjones372.pelican.pekko.streamedNow
 import io.opentelemetry.api.OpenTelemetry
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.javadsl.Source
 import petshop.domain.NoSuchPet
 import petshop.domain.PetId
 import petshop.domain.PetShop
+import petshop.domain.ShopEvent
 
 fun petshopApi(
     shop: PetShop,
     health: Health,
     scrape: () -> String,
     tally: () -> Tally,
+    /** A fresh run per caller: each connection is a subscriber of its own. */
+    watch: () -> Source<ShopEvent, NotUsed>,
     telemetry: OpenTelemetry = OpenTelemetry.noop(),
 ) = api(
     endpoints = listOf(
@@ -39,6 +45,7 @@ fun petshopApi(
         },
         metrics handledNow { scrape() },
         stats handledNow { tally() },
+        events streamedNow { watch().map { it.toDto() } },
     ) + health.endpoints,
     codecs = JacksonCodecs,
 ) {

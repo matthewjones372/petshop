@@ -28,7 +28,7 @@ export default function Home() {
           </p>
           <div class="hero-actions">
             <A href="/pets" class="btn btn-primary">Meet the pets →</A>
-            <A href="/stats" class="btn">See the stats</A>
+            <A href="/live" class="btn">Watch it live</A>
           </div>
           <div class="stickers">
             <span class="sticker"><span class="live-dot" style={{ margin: "0 9px" }} /> shop is open</span>

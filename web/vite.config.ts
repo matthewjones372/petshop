@@ -17,6 +17,7 @@ export default defineConfig({
     proxy: {
       "/pets": api,
       "/stats": api,
+      "/events": shop,
       "/reference": shop,
       "/api-docs": shop,
       "/openapi.json": shop,

@@ -25,6 +25,8 @@ dependencies {
     implementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-liquibase:$larkVersion")
     implementation("io.github.matthewjones372:lark-stream-forks:$larkVersion")
+    // The feed's hub, as the Pekko source an SSE endpoint answers with.
+    implementation("io.github.matthewjones372:lark-stream-pekko:$larkVersion")
     implementation("io.github.matthewjones372:lark-kafka:$larkVersion")
     // avro4k's Confluent serde needs Confluent 8.3 or later.
     implementation("com.github.avro-kotlin.avro4k:avro4k-core:2.12.0")

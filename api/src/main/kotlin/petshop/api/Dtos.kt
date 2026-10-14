@@ -6,8 +6,12 @@ import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.NotRecorded
 import petshop.domain.Pet
+import petshop.domain.PetAdopted
+import petshop.domain.PetArrived
+import petshop.domain.PetReturned
 import petshop.domain.PetShopError
 import petshop.domain.RegistryDown
+import petshop.domain.ShopEvent
 
 // Kept apart from the domain so a change to either breaks the build here, not the JSON silently.
 
@@ -30,6 +34,11 @@ sealed interface ProblemDto {
     data class Unavailable(override val id: Long, override val message: String) : ProblemDto
 }
 
+enum class ShopEventKind { Arrived, Adopted, Returned }
+
+/** One shape for every event, so a caller reads `kind` rather than telling subtypes apart by their fields. */
+data class ShopEventDto(val seq: Long, val kind: ShopEventKind, val pet: PetDto)
+
 fun Pet.toDto(): PetDto = transformInto()
 
 fun List<Pet>.toDto(): List<PetDto> = transformInto()
@@ -42,3 +51,9 @@ fun PetShopError.toDto(): ProblemDto = into<_, ProblemDto>()
 fun NoSuchPet.toDto(): ProblemDto.NoSuchPet = transformInto()
 
 fun AlreadyAdopted.toDto(): ProblemDto.AlreadyAdopted = transformInto()
+
+fun ShopEvent.toDto(): ShopEventDto = when (this) {
+    is PetArrived -> ShopEventDto(seq, ShopEventKind.Arrived, pet.toDto())
+    is PetAdopted -> ShopEventDto(seq, ShopEventKind.Adopted, pet.toDto())
+    is PetReturned -> ShopEventDto(seq, ShopEventKind.Returned, pet.toDto())
+}

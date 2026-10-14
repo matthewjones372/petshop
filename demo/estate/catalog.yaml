@@ -15,7 +15,8 @@ services:
       requests: sum(rate(petshop_adoptions_total[1m]))
       errors: sum(rate(petshop_adoptions_total{outcome=~"registry_down|not_recorded"}[1m])) or vector(0)
     links:
-      app: http://localhost:8080/pets
+      # The front end in web/, run with `bun run --cwd web dev`.
+      app: http://localhost:5173
       api: http://localhost:8080/api-docs
       health: http://localhost:8080/health/ready
       metrics: http://localhost:8080/metrics

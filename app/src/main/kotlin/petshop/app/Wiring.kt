@@ -82,8 +82,9 @@ private val http: Module =
 private val streams: Module = single { -> Forks() }.boundTo<StreamBackend>()
 
 private val web: Module =
-    single { shop: PetShop, health: Health, registry: PrometheusMeterRegistry, projection: Projection, sdk: OpenTelemetrySdk ->
-        petshopApi(shop, health, registry::scrape, projection::tally, sdk)
+    single { shop: PetShop, health: Health, registry: PrometheusMeterRegistry, projection: Projection, feed: Feed,
+        sdk: OpenTelemetrySdk ->
+        petshopApi(shop, health, registry::scrape, projection::tally, feed::watch, sdk)
     } +
         single { api: Api, config: Settings, system: TypedSystem<Void>, _: Arrivals, _: OutboxRelay, _: ReadinessGauges,
             _: JvmGcMetrics ->
@@ -99,7 +100,7 @@ private val layers: Layered = layeredConfig()
 
 private val infrastructure: Module = settings + telemetry + database + http + registry
 private val shop: Module = theShop + checks + meters + arrivals
-private val events: Module = streams + outbox + projection + bus
+private val events: Module = streams + outbox + feed + projection + bus
 
 object Petshop : LarkApp<PelicanServer>() {
     override val module: Module = configOf(layers.config) + infrastructure + shop + events + web
