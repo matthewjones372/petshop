@@ -27,9 +27,10 @@ services:
       - "55432:5432"
 
   # The bus, for BUS=kafka: one KRaft node, so there is no ZooKeeper beside it. The shop on the host
-  # reaches it on 9092; the schema registry, in here, on kafka:29092.
+  # reaches it on 9092; the schema registry, in here, on kafka:29092. The JVM image, as the tests use:
+  # kafka-native segfaults on some starts.
   kafka:
-    image: apache/kafka-native:4.3.1
+    image: apache/kafka:4.3.1
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
