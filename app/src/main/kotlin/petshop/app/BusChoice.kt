@@ -1,15 +1,11 @@
 package petshop.app
 
-import com.typesafe.config.Config
 import com.typesafe.config.ConfigException
 import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.boundTo
-import io.github.matthewjones372.lark.app.closingOf
-import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.app.choice
 import io.github.matthewjones372.lark.app.typesafe.Reading
-import io.github.matthewjones372.lark.app.typesafe.choosing
+import io.github.matthewjones372.lark.app.typesafe.config
 import io.github.matthewjones372.lark.kafka.Topic
-import io.github.matthewjones372.lark.stream.Hub
 import petshop.domain.ShopEvent
 
 /** Set by `petshop.bus.kind` in application.conf, overridden by `BUS`. */
@@ -22,14 +18,18 @@ sealed interface BusSettings {
         BusSettings
 }
 
-/** The branch not taken contributes no node, so the in-process bus opens no Kafka producer. */
-fun bus(conf: Config): Module =
-    conf.choosing("petshop.bus", Reading::busSettings) { chosen ->
-        when (chosen) {
-            BusSettings.InProcess -> inProcessBus
-            is BusSettings.OnKafka -> onKafka(chosen)
+/**
+ * The bus `petshop.bus` names. A choice inside the graph: the branch not taken contributes no node, so the in-process
+ * bus opens no Kafka producer, and a section that will not read refuses the start through the BusSettings node.
+ */
+val bus: Module =
+    config<BusSettings>("petshop.bus") { busSettings() } +
+        choice<BusSettings, EventBus> { chosen ->
+            when (chosen) {
+                BusSettings.InProcess -> hubBus()
+                is BusSettings.OnKafka -> onKafka(chosen)
+            }
         }
-    }
 
 private const val IN_PROCESS = "in-process"
 private const val KAFKA = "kafka"
@@ -50,14 +50,6 @@ private fun Reading.kind(): String =
             }
         }
     }
-
-// The hub takes BusSettings, so a section that will not read refuses the start even on a subgraph that only reaches
-// the bus.
-private val inProcessBus: Module =
-    closingOf { _: BusSettings -> Hub<ShopEvent>(HUB_CAPACITY) } +
-        singleOf(::HubBus).boundTo<EventBus>()
-
-private const val HUB_CAPACITY = 256
 
 private fun onKafka(on: BusSettings.OnKafka): Module =
     kafkaBus(Topic(on.topic), on.bootstrap, on.group, mapOf("schema.registry.url" to on.registry))

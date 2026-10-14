@@ -1,7 +1,5 @@
 package petshop.app
 
-import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
@@ -61,20 +59,20 @@ class EndToEndSpec {
 
     private val database: DatabaseSettings = TestPostgres.fresh()
 
-    private val onKafka: Config = ConfigFactory.parseString(
-        """
-        petshop.bus {
-          kind = kafka
-          kafka { bootstrap = "${kafka.bootstrap}", topic = $TOPIC, group = $GROUP, registry = "$SCHEMAS" }
-        }
-        """,
-    ).withFallback(ConfigFactory.load())
-
     private val theService: Module =
-        petshopFrom(onKafka).overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
+        Petshop.module.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
             .onDatabase(database)
-            // On top of onKafka rather than application.conf, so the graph's Config is the one the bus was chosen from.
-            .overridingConfig("petshop.port = 0\npetshop.arrivalsEvery = 1h\npetshop.outboxEvery = 20ms", fallback = onKafka)
+            .overridingConfig(
+                """
+                petshop.bus {
+                  kind = kafka
+                  kafka { bootstrap = "${kafka.bootstrap}", topic = $TOPIC, group = $GROUP, registry = "$SCHEMAS" }
+                }
+                petshop.port = 0
+                petshop.arrivalsEvery = 1h
+                petshop.outboxEvery = 20ms
+                """,
+            )
 
     @Test
     fun `somebody adopts a tortoise, and every part of the service hears about it`() = story {
