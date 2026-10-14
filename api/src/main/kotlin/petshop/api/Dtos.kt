@@ -37,7 +37,7 @@ sealed interface ProblemDto {
 enum class ShopEventKind { Arrived, Adopted, Returned }
 
 /** One shape for every event, so a caller reads `kind` rather than telling subtypes apart by their fields. */
-data class ShopEventDto(val seq: Long, val kind: ShopEventKind, val pet: PetDto)
+data class ShopEventDto(val seq: Long, val kind: ShopEventKind, val pet: PetDto, val traceparent: String? = null)
 
 fun Pet.toDto(): PetDto = transformInto()
 

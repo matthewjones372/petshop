@@ -89,15 +89,33 @@ Arrivals happen on their own, every `petshop.arrivalsEvery`.
 
 ## Traces
 
-Every request is a trace in Tempo: the request's span, the `adopt` span inside it, and inside that the calls to the
-chip registry, which carry `traceparent` to it. Open Grafana's Explore at <http://localhost:3000/explore>, pick
-**Tempo**, and search for service `petshop`.
+An adoption from the front end is one trace in Tempo, from the click to the page that shows it:
+
+```
+adopt pet                         petshop-web   the click
+  POST /pets/{petId}/adoption     petshop-web   the browser's call, which sends traceparent
+    POST /pets/{petId}/adoption   petshop       the shop's request span
+      adopt                       petshop
+        INSERT outbox             petshop       the pet and its event, in one transaction
+          publish                 petshop       the relay, up to outboxEvery later
+            process               petshop       the projection, after Kafka
+              live event          petshop-web   /live showing it
+        GET, POST                 petshop       the calls to the chip registry
+```
+
+The trace crosses the outbox because the write keeps what it was made in (lark's `Carriers.capture()`) in the
+row's `metadata` column, and the relay publishes each event inside it. On Kafka it rides as record headers, and the
+projection handles each record inside them. `/events` hands each event's `traceparent` to the page, which opens
+`live event` under it. An arrival is a trace of its own, `arrival`, that ends the same way.
+
+Open Grafana's Explore at <http://localhost:3000/explore>, pick **Tempo**, and search for service `petshop-web` or
+`petshop`, or run the TraceQL `{ name = "adopt pet" } && { name = "live event" }` for adoptions someone watched
+arrive.
 
 The shop's log lines about an adoption carry its `trace_id`. In Explore with **Loki**, `{app="petshop"} | trace_id != ""`
 lists them, and each line links to its trace.
 
-The front end in `web/` traces itself too, as service `petshop-web`: a browser span for each call to the shop sits
-above the shop's own, so an adoption is one trace from the click. Tempo turns every span into span metrics and a
+The front end in `web/` traces itself as service `petshop-web`. Tempo turns every span into span metrics and a
 service graph, written to Prometheus, and that is how Estate shows `petshop-web`: its calls, errors and p99, the
 adoption's click-to-answer time and `/live`'s reconnects from the span metrics, the edge to the shop from the service
 graph, and the latest Core Web Vitals from the browser's own OTLP metrics. Its lines (errors, vitals, reconnects) go to

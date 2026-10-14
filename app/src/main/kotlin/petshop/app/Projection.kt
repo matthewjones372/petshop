@@ -4,9 +4,11 @@ import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.counter
 import io.github.matthewjones372.lark.increment
+import io.github.matthewjones372.lark.otel.span
 import io.github.matthewjones372.lark.stream.Running
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.lark.stream.start
+import io.opentelemetry.api.trace.Tracer
 import java.util.concurrent.atomic.AtomicReference
 import petshop.api.SpeciesTally
 import petshop.api.Tally
@@ -40,13 +42,15 @@ private val nothingYet = Tally(events = 0, duplicates = 0, bySpecies = Species.e
  */
 val projection: Module =
     closingOf(
-        { bus: EventBus, streams: StreamBackend, feed: Feed ->
+        { bus: EventBus, streams: StreamBackend, feed: Feed, tracer: Tracer ->
             val latest = AtomicReference(Seen(emptySet(), nothingYet))
             // One consumer, so nothing changes `latest` between the check and the update.
             val consuming = bus.consume { event ->
-                val first = event.seq !in latest.get().seqs
-                latest.updateAndGet { it + event }
-                if (first) feed.offer(event)
+                tracer.span("process") {
+                    val first = event.seq !in latest.get().seqs
+                    latest.updateAndGet { it + event }
+                    if (first) feed.offer(event)
+                }
             }
             Projection(latest, consuming.start(streams))
         },

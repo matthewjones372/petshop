@@ -56,6 +56,21 @@ class FeedSpec {
     }
 
     @Test
+    fun `a watcher is told the trace each event was published in`() = story {
+        val pickle = Given("a parrot arriving") { PetArrived(seq = 8, pet = Pet(PetId(9), "Pickle", Species.Parrot)) }
+        testApp(watched) { app: Watched ->
+            val seen = When("someone is watching") {
+                app.feed.watch().map { traceOf(it.traceparent) ?: "none" }.take(1).runCollect().run(app.streams)
+            }
+            Then("the feed has them as a watcher").eventually(5.seconds) { app.feed.watchers shouldBe 1 }
+            When("the arrival is published inside a trace") { inATrace { app.bus.publish(pickle) } }
+            Then("the watcher is given that trace, so a page can continue it") {
+                seen.toCompletableFuture().get(5, TimeUnit.SECONDS) shouldBe Exit.Done(listOf(A_TRACE))
+            }
+        }
+    }
+
+    @Test
     fun `with nobody watching, the feed holds nothing back for the first watcher`() = story {
         testApp(watched) { app: Watched ->
             When("an adoption is delivered before anyone watches") {

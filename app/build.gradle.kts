@@ -50,6 +50,8 @@ dependencies {
     implementation("io.opentelemetry:opentelemetry-exporter-otlp")
 
     implementation("petshop:outbox-table")
+    // The outbox's metadata column, written as JSON.
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("org.postgresql:postgresql:42.7.13")
     implementation("com.zaxxer:HikariCP:7.1.0")
 

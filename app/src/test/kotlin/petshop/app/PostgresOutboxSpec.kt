@@ -34,7 +34,7 @@ private fun onItsOwn(test: (Outbox) -> Unit) =
 /** Read by a claim that publishes nothing, so it takes nothing. */
 private fun Outbox.left(): List<ShopEvent> {
     val seen = mutableListOf<ShopEvent>()
-    claim(1_000) { claimed -> seen += claimed; emptyList() }
+    claim(1_000) { claimed -> seen += claimed.map { it.event }; emptyList() }
     return seen
 }
 
@@ -65,10 +65,25 @@ class PostgresOutboxSpec {
                     outbox.record(nibbles.copy(adopted = true)) { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") }
             }
             val taken = When("a claim's bus takes the adoption and refuses the arrival") {
-                outbox.claim(10) { claimed -> claimed.filter { it.seq == adopted.seq } }
+                outbox.claim(10) { claimed -> claimed.map { it.event }.filter { it.seq == adopted.seq } }
             }
             Then("the claim answers what was taken") { taken shouldBe listOf(adopted) }
             And("only the refused arrival is left for the next claim") { outbox.left() shouldBe listOf(arrived) }
+        }
+    }
+
+    @Test
+    fun `an event keeps the trace it was recorded in, for the relay to publish it in`() = story {
+        onItsOwn { outbox ->
+            Given("Nibbles' arrival, recorded inside a trace") {
+                inATrace { outbox.record(nibbles) { seq -> PetArrived(seq, nibbles) } }
+            }
+            val carried = When("a claim reads it back") {
+                val seen = mutableListOf<Claimed>()
+                outbox.claim(10) { claimed -> seen += claimed; emptyList() }
+                seen.single().carried
+            }
+            Then("it carries that trace") { traceOf(carried["traceparent"]) shouldBe A_TRACE }
         }
     }
 
@@ -100,7 +115,7 @@ class PostgresOutboxSpec {
                     outbox.claim(2) { claimed ->
                         holding.countDown()
                         letGo.await(10, TimeUnit.SECONDS)
-                        claimed
+                        claimed.map { it.event }
                     }
                 }.also { holding.await(10, TimeUnit.SECONDS) shouldBe true }
             }
@@ -109,7 +124,7 @@ class PostgresOutboxSpec {
             // the test rather than hanging it.
             val beside = And("a second claim runs beside it") {
                 CompletableFuture.supplyAsync {
-                    outbox.claim(10) { claimed -> seenBeside += claimed; emptyList() }
+                    outbox.claim(10) { claimed -> seenBeside += claimed.map { it.event }; emptyList() }
                 }.get(5, TimeUnit.SECONDS)
             }
             Then("the second saw only Barnaby's, and nothing waited: FOR UPDATE SKIP LOCKED") {

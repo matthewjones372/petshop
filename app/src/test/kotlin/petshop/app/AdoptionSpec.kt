@@ -71,7 +71,7 @@ class AdoptionSpec {
 
             override fun shelf(opening: List<Pet>): List<Pet> = opening
 
-            override fun claim(limit: Int, publish: (List<ShopEvent>) -> List<ShopEvent>) = emptyList<ShopEvent>()
+            override fun claim(limit: Int, publish: (List<Claimed>) -> List<ShopEvent>) = emptyList<ShopEvent>()
         }
         val unrecorded = Given("an outbox that cannot write, and a registry that counts what it is asked") {
             Petshop.module.overriding(single<ChipRegistry> { counting })

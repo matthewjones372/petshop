@@ -24,3 +24,7 @@ CREATE TABLE outbox (
     adopted    BOOLEAN NOT NULL,
     adopted_by TEXT
 );
+
+--changeset petshop:3-outbox-metadata
+--comment: What the write carried (Carriers.capture()), as JSON: a trace's traceparent, so the relay continues it.
+ALTER TABLE outbox ADD COLUMN metadata TEXT;

@@ -22,6 +22,7 @@ data class OutboxRow(
     val species: String,
     val adopted: Boolean,
     @SerialName("adopted_by") val adoptedBy: String?,
+    val metadata: String? = null,
 )
 
 @Serializable
