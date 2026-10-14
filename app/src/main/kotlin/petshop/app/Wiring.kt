@@ -116,6 +116,9 @@ object Petshop : LarkApp<PelicanServer>() {
     override fun AppScope.run(root: PelicanServer) {
         logInfo(reported())
         logInfo("Petshop on ${root.baseUrl}, docs at ${root.baseUrl}/api-docs, reference at ${root.baseUrl}/reference")
-        root.block()
+        // Until the process is asked to stop, and no longer: the graph's release is what stops the server, the relay
+        // and the pool, and it runs once this returns. `root.block()` would wait for that release, so a SIGTERM
+        // would sit out lark's whole grace period and leave the relay and the Kafka offsets as they were.
+        awaitShutdown()
     }
 }

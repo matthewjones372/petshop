@@ -50,7 +50,8 @@ val meters: Module =
             val asking = Stream.tick(every = 1.seconds, element = Unit)
                 .map { _ -> readiness.failing() }
                 .runFold(Unit) { _, failing ->
-                    gauge("petshop.ready").set(if (failing.isEmpty()) 1.0 else 0.0)
+                    // Ready as /health/ready answers it: a stopped background run is a warning there, not a 503.
+                    gauge("petshop.ready").set(if (failing.none { it in readiness.critical }) 1.0 else 0.0)
                     // One series per check, so an alert can name the one failing.
                     readiness.checks.keys.forEach { check ->
                         gauge("petshop.health.check", "check" to check).set(if (check in failing) 0.0 else 1.0)

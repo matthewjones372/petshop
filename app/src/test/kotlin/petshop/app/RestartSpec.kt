@@ -6,6 +6,7 @@ import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
+import io.github.matthewjones372.lark.test.eventually
 import io.github.matthewjones372.lark.test.story
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
@@ -41,8 +42,8 @@ class RestartSpec {
         val before = When("Ada adopts Nibbles, and the shop runs long enough for pets to arrive") {
             testApp(shop) { app: Running ->
                 app.shop.adopt(PetId(1), by = "Ada").shouldBeRight()
-                Thread.sleep(200)
-                app.shop.all()
+                // Until a pet has arrived on top of the opening three, rather than a sleep that may be too short.
+                eventually(5.seconds) { app.shop.all().also { pets -> (pets.size > opening.size) shouldBe true } }
             }
         }
         testApp(shop) { app: Running ->
