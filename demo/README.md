@@ -103,7 +103,7 @@ docker compose start registry
 
 Stop the database and two alerts fire within about ten seconds, with nobody adopting anything:
 `PostgresDown`, from the exporter's `pg_up`, on the Postgres store and the map's edge to it, and `PetshopNotReady`,
-from the shop's own health check, whose `database` probe stops answering. Stop Kafka and `KafkaDown` fires on the
+from the shop's own health check, whose `database` check stops passing. Stop Kafka and `KafkaDown` fires on the
 Kafka store.
 
 ```bash

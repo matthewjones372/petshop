@@ -13,7 +13,7 @@ they are now.
 
 ```bash
 docker compose -f demo/docker-compose.yml up -d postgres registry
-./gradlew :app:run          # http://127.0.0.1:8080, docs at /api-docs
+./gradlew :app:run          # http://127.0.0.1:8080, docs at /api-docs and /reference
 ./gradlew test             # every test that builds the shop starts its own Postgres and Kafka
 ./gradlew loadTest         # 200 requests a second at the real graph; not part of test or build
 ```
@@ -72,8 +72,9 @@ val adoptPet = endpoint(petId) {
 }
 ```
 
-The route, the OpenAPI document at `/openapi.json` and the Swagger page at
-`/api-docs` are all generated from that. The handler must answer with `ok` or
+The route, the OpenAPI document at `/openapi.json`, the Swagger page at
+`/api-docs` and the Redoc reference at `/reference`, in the shop's own look
+(`api/src/main/kotlin/petshop/api/Docs.kt`), are all generated from that. The handler must answer with `ok` or
 one of the four declared failures. A `when` over the sealed error type is
 exhaustive, and returning a failure the endpoint did not declare does not
 compile.

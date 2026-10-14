@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # 21 for registry and outbox-table's toolchains, installed rather than left to Gradle; 25, listed last, is
+      # 21 for outbox-table's toolchain, installed rather than left to Gradle; 25, listed last, is
       # the shop's toolchain and the JDK Gradle runs on.
       - uses: actions/setup-java@v6
         with:

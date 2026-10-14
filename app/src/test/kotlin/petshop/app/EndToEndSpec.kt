@@ -8,6 +8,7 @@ import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.use
 import io.github.matthewjones372.lark.test.story
+import io.github.matthewjones372.pelican.health.health
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.PelicanServer
@@ -23,7 +24,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import petshop.api.adoptPet
 import petshop.api.getPet
-import petshop.api.health
 import petshop.api.stats
 import petshop.api.toDto
 import petshop.domain.AlreadyAdopted
@@ -104,7 +104,10 @@ class EndToEndSpec {
 
         theService.use { server: PelicanServer ->
             apiClient(server.baseUrl, JacksonCodecs).use { shop ->
-                Given("the whole service, started as main starts it") { shop.call(health, Unit).ready shouldBe true }
+                // The probe's path is Pelican's whatever checks are declared, so an empty `health { }` names it.
+                Given("the whole service, started as main starts it") {
+                    shop.call(health { }.ready, Unit).status shouldBe "pass"
+                }
 
                 val nibbles = When("Ada adopts Nibbles") { shop.outcome(adoptPet, 1L) }
                 Then("Nibbles is hers") { nibbles.shouldBeOk().adopted shouldBe true }
