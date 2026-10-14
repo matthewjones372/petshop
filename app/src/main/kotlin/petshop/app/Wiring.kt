@@ -1,7 +1,5 @@
 package petshop.app
 
-import com.typesafe.config.Config
-import io.github.matthewjones372.lark.app.AppScope
 import io.github.matthewjones372.lark.app.LarkApp
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
@@ -80,46 +78,38 @@ private val http: Module =
     singleOf<ActorSystem>({ ActorSystem.create("petshop") }, { system -> system.terminate() }) +
         single { classic: ActorSystem -> Adapter.toTyped(classic) }.boundTo<TypedSystem<Void>>()
 
-private val events: Module =
-    // The one place that picks the stream backend; a test overrides it to run the relay on its own clock.
-    single { -> Forks() }.boundTo<StreamBackend>() +
-        outbox +
-        projection
+// The one place that picks the stream backend; a test overrides it to run the relay on its own clock.
+private val streams: Module = single { -> Forks() }.boundTo<StreamBackend>()
 
 private val web: Module =
     single { shop: PetShop, health: Health, registry: PrometheusMeterRegistry, projection: Projection, sdk: OpenTelemetrySdk ->
         petshopApi(shop, health, registry::scrape, projection::tally, sdk)
     } +
-        singleOf(
-            { api: Api, config: Settings, system: TypedSystem<Void>, _: Arrivals, _: OutboxRelay, _: ReadinessGauges,
-                _: JvmGcMetrics ->
-                api.startWithDocs(system, port = config.port, host = config.host, docs = petshopDocs)
-            },
-            { server -> server.stop() },
-        )
+        single { api: Api, config: Settings, system: TypedSystem<Void>, _: Arrivals, _: OutboxRelay, _: ReadinessGauges,
+            _: JvmGcMetrics ->
+            install({ api.startWithDocs(system, port = config.port, host = config.host, docs = petshopDocs) }) { server, _ ->
+                server.stop()
+            }.also { server ->
+                onStarted { logInfo("Petshop on ${server.baseUrl}, docs at /api-docs, reference at /reference") }
+            }
+        }
 
-fun petshopFrom(conf: Config): Module =
-    configOf(conf) + settings + telemetry + database + http + registry + theShop + checks + meters + arrivals +
-        events + bus(conf) + web
+/** What the shop reads at start, its layers kept apart so the report can say what each setting overrode. */
+private val layers: Layered = layeredConfig()
+
+private val infrastructure: Module = settings + telemetry + database + http + registry
+private val shop: Module = theShop + checks + meters + arrivals
+private val events: Module = streams + outbox + projection + bus
 
 object Petshop : LarkApp<PelicanServer>() {
-
-    private val layers: Layered = layeredConfig()
-
-    override val module: Module = petshopFrom(layers.config)
-
-    override fun AppScope.run(root: PelicanServer) {
-        logInfo(reported())
-        logInfo("Petshop on ${root.baseUrl}, docs at ${root.baseUrl}/api-docs, reference at ${root.baseUrl}/reference")
-        // Not `root.block()`: it waits for the graph's release, so a SIGTERM would sit out lark's whole grace
-        // period instead of stopping the relay and committing Kafka offsets.
-        awaitShutdown()
-    }
-
-    // DATABASE_URL often carries a password. Each layer is cut to `petshop` so Pekko's reference.conf and the
-    // JVM's properties stay out of the report.
-    private fun reported(): String =
-        layeredConfigOf(*layers.layers.map { it.name to it.config.withOnlyPath("petshop") }.toTypedArray())
-            .origins(Secrets.default.and("petshop.database.url"))
-            .report()
+    override val module: Module = configOf(layers.config) + infrastructure + shop + events + web
 }
+
+/**
+ * The petshop section and where each value came from, for `main` to log before the graph starts. DATABASE_URL often
+ * carries a password. Each layer is cut to `petshop` so Pekko's reference.conf and the JVM's properties stay out.
+ */
+fun configReport(): String =
+    layeredConfigOf(*layers.layers.map { it.name to it.config.withOnlyPath("petshop") }.toTypedArray())
+        .origins(Secrets.default.and("petshop.database.url"))
+        .report()

@@ -34,8 +34,8 @@ abstract class EventBusContract {
     /** The bus and what it holds open; [name] keeps topics and readers apart on a shared broker. */
     abstract fun bus(name: String): Module
 
-    /** The whole service with its events on this bus. */
-    protected open fun service(name: String): Module = Petshop.module.overriding(bus(name))
+    /** The `petshop.bus` section that puts the whole service on this bus. */
+    abstract fun busConfig(name: String): String
 
     /** [block] against the bus, in a graph that closes what the bus holds once it returns. */
     protected fun <A> using(bus: Module, block: (EventBus) -> A): A =
@@ -75,12 +75,9 @@ abstract class EventBusContract {
     @Test
     fun `the whole service runs on it, and an adoption reaches the projection`() = story {
         val service = Given("the whole service with its events on this bus") {
-            (
-                service("service").overriding(single<ChipRegistry> { FakeRegistry() })
-                    .onAFreshDatabase() + served
-                )
+            (Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() }).onAFreshDatabase() + served)
                 .subgraph<Served>()
-                .overridingConfig("petshop.outboxEvery = 50ms")
+                .overridingConfig(busConfig("service") + "\npetshop.outboxEvery = 50ms")
         }
         testApp(service) { app: Served ->
             When("Ada adopts Nibbles") { app.shop.adopt(PetId(1), by = "Ada") }
@@ -105,6 +102,8 @@ abstract class EventBusContract {
 class HubBusSpec : EventBusContract() {
 
     override fun bus(name: String): Module = hubBus()
+
+    override fun busConfig(name: String): String = "petshop.bus.kind = in-process"
 
     @Test
     fun `a closed bus turns an event away, and says so`() = story {

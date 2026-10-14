@@ -1,6 +1,5 @@
 package petshop.app
 
-import com.typesafe.config.ConfigFactory
 import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import io.confluent.kafka.schemaregistry.testutil.MockSchemaRegistry
 import io.github.matthewjones372.lark.app.Module
@@ -43,17 +42,13 @@ class KafkaBusSpec : EventBusContract() {
 
     override fun bus(name: String): Module = busOn(name)
 
-    override fun service(name: String): Module =
-        petshopFrom(
-            ConfigFactory.parseString(
-                """
-                petshop.bus {
-                  kind = kafka
-                  kafka { bootstrap = "${kafka.bootstrap}", topic = $name, group = projection-$name, registry = "mock://$name" }
-                }
-                """,
-            ).withFallback(ConfigFactory.load()),
-        )
+    override fun busConfig(name: String): String =
+        """
+        petshop.bus {
+          kind = kafka
+          kafka { bootstrap = "${kafka.bootstrap}", topic = $name, group = projection-$name, registry = "mock://$name" }
+        }
+        """
 
     override val remembersReaders = true
 
