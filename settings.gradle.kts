@@ -1,8 +1,14 @@
 pluginManagement {
+    val larkVersion = providers.gradleProperty("larkVersion").get()
     repositories {
         mavenCentral()
         gradlePluginPortal()
+        if (larkVersion.endsWith("-SNAPSHOT")) {
+            maven("https://central.sonatype.com/repository/maven-snapshots/")
+            mavenLocal()
+        }
     }
+    plugins { id("io.github.matthewjones372.lark.wiring") version larkVersion }
 }
 
 plugins { id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0" }

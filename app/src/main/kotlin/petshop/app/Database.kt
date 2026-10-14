@@ -4,8 +4,8 @@ import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
+import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.app.liquibase.migrations
-import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.Secret
 import io.github.matthewjones372.lark.app.typesafe.config
 import io.micrometer.core.instrument.Metrics
@@ -31,7 +31,7 @@ val database: Module =
     config<DatabaseSettings>("petshop.database") {
         DatabaseSettings(string("url"), string("user"), secret("password"))
     } +
-        singleOf({ settings: DatabaseSettings -> pool(settings) }, { pool -> pool.close() })
+        closingOf(::pool)
             .boundTo<DataSource>() +
         // Anything that reads the tables takes a Migrated, so it cannot be built before they exist.
         migrations("db/changelog.sql")

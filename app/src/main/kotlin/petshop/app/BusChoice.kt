@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigException
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
+import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.Reading
 import io.github.matthewjones372.lark.app.typesafe.choosing
@@ -53,7 +54,7 @@ private fun Reading.kind(): String =
 // The hub takes BusSettings, so a section that will not read refuses the start even on a subgraph that only reaches
 // the bus.
 private val inProcessBus: Module =
-    singleOf({ _: BusSettings -> Hub<ShopEvent>(HUB_CAPACITY) }, { hub -> hub.close() }) +
+    closingOf { _: BusSettings -> Hub<ShopEvent>(HUB_CAPACITY) } +
         singleOf(::HubBus).boundTo<EventBus>()
 
 private const val HUB_CAPACITY = 256

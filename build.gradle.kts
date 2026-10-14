@@ -11,6 +11,7 @@ subprojects {
         // Confluent's artifacts are not on Maven Central.
         maven("https://packages.confluent.io/maven/") { content { includeGroup("io.confluent") } }
         if (listOf("larkVersion", "pelicanVersion").any { providers.gradleProperty(it).get().endsWith("-SNAPSHOT") }) {
+            maven("https://central.sonatype.com/repository/maven-snapshots/")
             mavenLocal()
         }
     }

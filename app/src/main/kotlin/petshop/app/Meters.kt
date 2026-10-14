@@ -1,7 +1,7 @@
 package petshop.app
 
 import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.gauge
 import io.github.matthewjones372.lark.stream.Running
 import io.github.matthewjones372.lark.stream.Stream
@@ -21,24 +21,23 @@ import kotlin.time.Duration.Companion.seconds
 
 /** The JVM's meters, under the names a JVM dashboard reads. The GC binder is the node: it listens, and needs closing. */
 private val jvmMeters: Module =
-    singleOf(
+    closingOf(
         { registry: PrometheusMeterRegistry ->
             JvmGcMetrics().also { gc ->
                 listOf(JvmMemoryMetrics(), gc, JvmThreadMetrics(), ClassLoaderMetrics(), ProcessorMetrics(), UptimeMetrics())
                     .forEach { it.bindTo(registry) }
             }
         },
-        { gc -> gc.close() },
     )
 
-class ReadinessGauges internal constructor(val running: Running<Nothing, Unit>)
+class ReadinessGauges internal constructor(val running: Running<Nothing, Unit>) : AutoCloseable by running
 
 /**
  * Checks run on their own stream, not in the scrape: a check on a dead database outlasts the scrape timeout,
  * and a timed-out scrape reads as the shop being down.
  */
 private val readinessGauges: Module =
-    singleOf(
+    closingOf(
         { readiness: Readiness, streams: StreamBackend ->
             Stream.tick(every = 1.seconds, element = Unit)
                 .map { _ -> readiness.failing() }
@@ -52,7 +51,6 @@ private val readinessGauges: Module =
                 .start(streams)
                 .let(::ReadinessGauges)
         },
-        { gauges -> gauges.running.close() },
     )
 
 val meters: Module = jvmMeters + readinessGauges

@@ -4,8 +4,8 @@ import arrow.core.Either
 import io.github.matthewjones372.lark.Schedule
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
+import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.counter
 import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.kafka.DecodeError
@@ -85,13 +85,11 @@ fun kafkaBus(
     deadLetters: ((DecodeError) -> Unit)? = null,
 ): Module =
     // Named rather than inferred: Java serializers make the inferred key a platform type that nothing matches.
-    singleOf<Producer<Long, ShopEvent>>(
+    closingOf<Producer<Long, ShopEvent>>(
         { -> Kafka.producer(producing(bootstrap), LongSerializer(), ShopEventSerializer(registry)) },
-        { events -> events.close() },
     ) +
-        singleOf<Producer<ByteArray?, ByteArray?>>(
+        closingOf<Producer<ByteArray?, ByteArray?>>(
             { -> Kafka.producer(producing(bootstrap), ByteArraySerializer(), ByteArraySerializer()) },
-            { letters -> letters.close() },
         ) +
         single { events: Producer<Long, ShopEvent>, letters: Producer<ByteArray?, ByteArray?> ->
             KafkaBus(topic, bootstrap, group, registry, events, letters, deadLetters)
