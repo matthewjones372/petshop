@@ -1,16 +1,18 @@
 package petshop.app
 
 import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory
 import io.github.matthewjones372.lark.app.AppScope
 import io.github.matthewjones372.lark.app.LarkApp
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.app.typesafe.Layered
 import io.github.matthewjones372.lark.app.typesafe.Secrets
 import io.github.matthewjones372.lark.app.typesafe.config
 import io.github.matthewjones372.lark.app.typesafe.configOf
+import io.github.matthewjones372.lark.app.typesafe.layeredConfig
+import io.github.matthewjones372.lark.app.typesafe.layeredConfigOf
 import io.github.matthewjones372.lark.app.typesafe.origins
 import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.stream.Forks
@@ -80,9 +82,9 @@ fun petshopFrom(conf: Config): Module =
 
 object Petshop : LarkApp<PelicanServer>() {
 
-    private val conf: Config = ConfigFactory.load()
+    private val layers: Layered = layeredConfig()
 
-    override val module: Module = petshopFrom(conf)
+    override val module: Module = petshopFrom(layers.config)
 
     override fun AppScope.run(root: PelicanServer) {
         logInfo(reported())
@@ -92,8 +94,10 @@ object Petshop : LarkApp<PelicanServer>() {
         awaitShutdown()
     }
 
-    // DATABASE_URL often carries a password. Not layeredConfig(): lark 0.9.2's origins() throws on
-    // `${?ENV}` pairs (fixed in lark#372).
+    // DATABASE_URL often carries a password. Each layer is cut to `petshop` so Pekko's reference.conf and the
+    // JVM's properties stay out of the report.
     private fun reported(): String =
-        conf.withOnlyPath("petshop").origins(Secrets.default.and("petshop.database.url")).report()
+        layeredConfigOf(*layers.layers.map { it.name to it.config.withOnlyPath("petshop") }.toTypedArray())
+            .origins(Secrets.default.and("petshop.database.url"))
+            .report()
 }

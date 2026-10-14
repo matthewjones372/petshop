@@ -1,7 +1,7 @@
 plugins {
     application
     `java-test-fixtures`
-    id("io.github.matthewjones372.lark.wiring") version "0.9.2"
+    id("io.github.matthewjones372.lark.wiring") version "0.10.0"
     kotlin("plugin.serialization")
     id("io.github.matthewjones372.kimney") version "0.3.0"
 }
