@@ -74,9 +74,9 @@
           }
         },
         "required": [
-          "observedUnit",
-          "observedValue",
           "status",
+          "observedValue",
+          "observedUnit",
           "time"
         ]
       },
@@ -97,8 +97,8 @@
           }
         },
         "required": [
-          "checks",
-          "status"
+          "status",
+          "checks"
         ]
       },
       "ApiError": {

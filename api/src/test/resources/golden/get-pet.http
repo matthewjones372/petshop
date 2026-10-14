@@ -5,6 +5,7 @@ GET /pets/1
 
 200
 Content-Type: application/json
+Content-Length: 62
 
 {
   "id": 1,

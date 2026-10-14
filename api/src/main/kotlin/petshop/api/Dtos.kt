@@ -2,6 +2,8 @@ package petshop.api
 
 import io.github.matthewjones372.kimney.into
 import io.github.matthewjones372.kimney.transformInto
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.NotRecorded
@@ -13,30 +15,47 @@ import petshop.domain.PetShopError
 import petshop.domain.RegistryDown
 import petshop.domain.ShopEvent
 
-// Kept apart from the domain so a change to either breaks the build here, not the JSON silently.
+// Kept apart from the domain so a change to either breaks the build here, not the JSON silently. Each is
+// @Serializable for petshop.codec = kotlinx, and serial-named as Jackson names it so the document is the same.
 
+@Serializable
+@SerialName("SpeciesDto")
 enum class SpeciesDto { Cat, Dog, Parrot, Tortoise }
 
 /** kimney unwraps `PetId`, so `id` is a plain number in the JSON. */
+@Serializable
+@SerialName("PetDto")
 data class PetDto(val id: Long, val name: String, val species: SpeciesDto, val adopted: Boolean)
 
 sealed interface ProblemDto {
     val id: Long
     val message: String
 
+    @Serializable
+    @SerialName("NoSuchPet")
     data class NoSuchPet(override val id: Long, override val message: String) : ProblemDto
 
+    @Serializable
+    @SerialName("AlreadyAdopted")
     data class AlreadyAdopted(override val id: Long, override val message: String) : ProblemDto
 
+    @Serializable
+    @SerialName("NotChipped")
     data class NotChipped(override val id: Long, override val message: String) : ProblemDto
 
     /** Registry down or sale not recorded: one case for both because a status names one response. */
+    @Serializable
+    @SerialName("Unavailable")
     data class Unavailable(override val id: Long, override val message: String) : ProblemDto
 }
 
+@Serializable
+@SerialName("ShopEventKind")
 enum class ShopEventKind { Arrived, Adopted, Returned }
 
 /** One shape for every event, so a caller reads `kind` rather than telling subtypes apart by their fields. */
+@Serializable
+@SerialName("ShopEventDto")
 data class ShopEventDto(val seq: Long, val kind: ShopEventKind, val pet: PetDto, val traceparent: String? = null)
 
 fun Pet.toDto(): PetDto = transformInto()

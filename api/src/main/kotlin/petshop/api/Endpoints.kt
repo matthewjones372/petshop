@@ -8,6 +8,8 @@ import io.github.matthewjones372.pelican.text
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import petshop.domain.Species
 
 val petId = pathParam<Long>("petId", description = "The pet's id")
@@ -49,9 +51,13 @@ val metrics = endpoint {
     text()
 }
 
+@Serializable
+@SerialName("SpeciesTally")
 data class SpeciesTally(val species: Species, val arrived: Int, val adopted: Int)
 
 /** `duplicates` counts events the bus delivered again and the tally counted once. */
+@Serializable
+@SerialName("Tally")
 data class Tally(val events: Int, val duplicates: Int, val bySpecies: List<SpeciesTally>)
 
 val stats = endpoint {

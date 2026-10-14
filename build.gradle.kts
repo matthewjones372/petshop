@@ -33,6 +33,8 @@ subprojects {
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
         // lark and pelican bring jackson 2.22.2, which has open advisories.
         "implementation"(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
+        // Every pelican module at pelicanVersion, so no build file names a pelican version of its own.
+        "implementation"(platform("io.github.matthewjones372:pelican-bom:${providers.gradleProperty("pelicanVersion").get()}"))
     }
 
     tasks.withType<Test> { useJUnitPlatform() }

@@ -1,32 +1,20 @@
 package petshop.api
 
-import io.github.matthewjones372.pelican.Params
+import io.github.matthewjones372.lark.stream.Stream
+import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.health.Health
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.metrics.otel.openTelemetry
 import io.github.matthewjones372.pelican.ok
-import io.github.matthewjones372.pelican.pekko.handledNow
-import io.github.matthewjones372.pelican.pekko.handledOrFail
-import io.github.matthewjones372.pelican.pekko.request
-import io.github.matthewjones372.lark.stream.Stream
-import io.github.matthewjones372.lark.stream.toSource
-import io.github.matthewjones372.pelican.pekko.streamedNow
 import io.opentelemetry.api.OpenTelemetry
-import io.opentelemetry.context.propagation.TextMapGetter
 import petshop.domain.NoSuchPet
 import petshop.domain.PetId
 import petshop.domain.PetShop
 
-/** Without it the filter extracts nothing, and a caller's `traceparent` starts a new trace instead of continuing. */
-private val pekkoHeaders = object : TextMapGetter<Params> {
-    override fun keys(carrier: Params) = carrier.request.headers.map { it.lowercaseName() }
-
-    override fun get(carrier: Params?, key: String): String? =
-        carrier?.request?.getHeader(key)?.map { it.value() }?.orElse(null)
-}
-
+/** [on] is the server's binders and [codecs] what reads and writes every body: petshop.stack and petshop.codec. */
 fun petshopApi(
+    on: Binders,
+    codecs: Codecs,
     shop: PetShop,
     health: Health,
     scrape: () -> String,
@@ -35,33 +23,35 @@ fun petshopApi(
     watch: () -> Stream<Nothing, ShopEventDto>,
     telemetry: OpenTelemetry = OpenTelemetry.noop(),
 ) = api(
-    endpoints = listOf(
-        listPets handledNow { shop.all().toDto() },
-        getPet handledOrFail { id ->
-            shop.find(PetId(id))?.let { pet -> ok(pet.toDto()) } ?: petMissing(NoSuchPet(id).toDto())
-        },
-        adoptPet handledOrFail { id ->
-            shop.adopt(PetId(id), by = "the internet").fold(
-                { failure ->
-                    when (val problem = failure.toDto()) {
-                        is ProblemDto.NoSuchPet -> petMissing(problem)
-                        is ProblemDto.AlreadyAdopted -> petTaken(problem)
-                        is ProblemDto.NotChipped -> petNotChipped(problem)
-                        is ProblemDto.Unavailable -> unavailable(problem)
-                    }
-                },
-                { pet -> ok(pet.toDto()) },
-            )
-        },
-        metrics handledNow { scrape() },
-        stats handledNow { tally() },
-        events streamedNow { watch().toSource() },
-    ) + health.endpoints,
-    codecs = JacksonCodecs,
+    endpoints = with(on) {
+        listOf(
+            listPets handledNow { shop.all().toDto() },
+            getPet handledOrFail { id ->
+                shop.find(PetId(id))?.let { pet -> ok(pet.toDto()) } ?: petMissing(NoSuchPet(id).toDto())
+            },
+            adoptPet handledOrFail { id ->
+                shop.adopt(PetId(id), by = "the internet").fold(
+                    { failure ->
+                        when (val problem = failure.toDto()) {
+                            is ProblemDto.NoSuchPet -> petMissing(problem)
+                            is ProblemDto.AlreadyAdopted -> petTaken(problem)
+                            is ProblemDto.NotChipped -> petNotChipped(problem)
+                            is ProblemDto.Unavailable -> unavailable(problem)
+                        }
+                    },
+                    { pet -> ok(pet.toDto()) },
+                )
+            },
+            metrics handledNow { scrape() },
+            stats handledNow { tally() },
+            events streamedNow { watch() },
+        )
+    } + health.endpoints,
+    codecs = codecs,
 ) {
     title = "Petshop"
     version = "1.0.0"
-    filter(openTelemetry(telemetry, incomingHeaders = pekkoHeaders))
+    filter(openTelemetry(telemetry, incomingHeaders = on.headers))
     description = """
         A small shop of tortoises, dogs, cats and parrots. An adoption records the new keeper with the chip
         registry before the pet leaves the shop, and a pet with no chip on record stays on the shelf.

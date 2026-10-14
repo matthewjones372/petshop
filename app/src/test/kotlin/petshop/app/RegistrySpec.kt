@@ -5,7 +5,7 @@ import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.parMap
 import io.github.matthewjones372.lark.test.story
 import io.github.matthewjones372.pelican.In2
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
 import io.kotest.assertions.arrow.core.shouldBeLeft
@@ -32,7 +32,7 @@ class RegistrySpec {
 
     @JvmField
     @RegisterExtension
-    val registry = PelicanWireMockExtension(JacksonCodecs)
+    val registry = PelicanWireMockExtension(KotlinxCodecs)
 
     private val shop = shopCalling(registry)
 

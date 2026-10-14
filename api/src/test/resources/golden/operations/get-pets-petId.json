@@ -80,10 +80,10 @@
           }
         },
         "required": [
-          "adopted",
           "id",
           "name",
-          "species"
+          "species",
+          "adopted"
         ]
       },
       "NoSuchPet": {
