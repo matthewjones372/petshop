@@ -22,6 +22,7 @@ import io.github.matthewjones372.lark.logWarn
 import io.github.matthewjones372.lark.metricTagged
 import io.github.matthewjones372.lark.otel.tracedSpan
 import io.github.matthewjones372.lark.timed
+import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.Tracer
 import kotlin.time.Duration.Companion.seconds
 import petshop.domain.AlreadyAdopted
@@ -60,26 +61,29 @@ class ActorPetShop(
     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> =
         logAnnotated("pet_id" to id.value.toString(), "adopted_by" to by) {
             tracer.tracedSpan("adopt") {
-                logSpan("adopt") {
-                    // Timed around the ask so refusals, often the slow calls, are in the distribution.
-                    timed("petshop.adopt.duration") {
-                        handOver(id, by).also { answer ->
-                            answer.fold(
-                                { no ->
-                                    logWarn(no.message)
-                                    // Every branch tags only "outcome": Prometheus needs one label
-                                    // set per metric name and silently drops a series with another.
-                                    metricTagged("outcome" to no.outcome()) {
-                                        counter("petshop.adoptions").increment()
-                                    }
-                                },
-                                { pet ->
-                                    logInfo("adopted ${pet.name}")
-                                    metricTagged("outcome" to "taken") {
-                                        counter("petshop.adoptions").increment()
-                                    }
-                                },
-                            )
+                // Every line about this adoption carries its trace, so a log line leads to the trace in Tempo.
+                logAnnotated("trace_id" to Span.current().spanContext.traceId) {
+                    logSpan("adopt") {
+                        // Timed around the ask so refusals, often the slow calls, are in the distribution.
+                        timed("petshop.adopt.duration") {
+                            handOver(id, by).also { answer ->
+                                answer.fold(
+                                    { no ->
+                                        logWarn(no.message)
+                                        // Every branch tags only "outcome": Prometheus needs one label
+                                        // set per metric name and silently drops a series with another.
+                                        metricTagged("outcome" to no.outcome()) {
+                                            counter("petshop.adoptions").increment()
+                                        }
+                                    },
+                                    { pet ->
+                                        logInfo("adopted ${pet.name}")
+                                        metricTagged("outcome" to "taken") {
+                                            counter("petshop.adoptions").increment()
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 }

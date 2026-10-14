@@ -28,6 +28,7 @@ import io.micrometer.prometheus.PrometheusConfig
 import io.micrometer.prometheus.PrometheusMeterRegistry
 import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.sdk.OpenTelemetrySdk
+import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk
 import kotlin.time.Duration
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.typed.ActorSystem as TypedSystem
@@ -50,9 +51,29 @@ private val telemetry: Module =
         { PrometheusMeterRegistry(PrometheusConfig.DEFAULT).also(MicrometerRegistries::addRegistry) },
         { registry -> MicrometerRegistries.removeRegistry(registry); registry.close() },
     ) +
-    closingOf<OpenTelemetrySdk> { OpenTelemetrySdk.builder().build() } +
+    closingOf<OpenTelemetrySdk> { tracing() } +
         // boundTo because `getTracer` returns the platform type `Tracer!`, which no key matches.
         single { sdk: OpenTelemetrySdk -> sdk.getTracer("petshop") }.boundTo<Tracer>()
+
+/**
+ * Spans go out over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` names a collector, and nowhere otherwise, which is every
+ * test. The rest of `OTEL_*` is read as OpenTelemetry documents it.
+ */
+private fun tracing(): OpenTelemetrySdk =
+    AutoConfiguredOpenTelemetrySdk.builder()
+        .addPropertiesSupplier {
+            val exporting = System.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != null
+            mapOf(
+                "otel.service.name" to "petshop",
+                "otel.traces.exporter" to if (exporting) "otlp" else "none",
+                // OTLP over HTTP, on 4318: the SDK's default is gRPC, on 4317.
+                "otel.exporter.otlp.protocol" to "http/protobuf",
+                "otel.metrics.exporter" to "none",
+                "otel.logs.exporter" to "none",
+            )
+        }
+        .build()
+        .openTelemetrySdk
 
 /** Pekko is for HTTP only; the shop's actor and every stream run on Lark. */
 private val http: Module =
@@ -66,8 +87,8 @@ private val events: Module =
         projection
 
 private val web: Module =
-    single { shop: PetShop, health: Health, registry: PrometheusMeterRegistry, projection: Projection ->
-        petshopApi(shop, health, registry::scrape, projection::tally)
+    single { shop: PetShop, health: Health, registry: PrometheusMeterRegistry, projection: Projection, sdk: OpenTelemetrySdk ->
+        petshopApi(shop, health, registry::scrape, projection::tally, sdk)
     } +
         singleOf(
             { api: Api, config: Settings, system: TypedSystem<Void>, _: Arrivals, _: OutboxRelay, _: ReadinessGauges,

@@ -1,24 +1,34 @@
 # Watching the numbers
 
 Two terminals. The application runs on the host. Everything else runs in
-Docker: Prometheus, Grafana, Alertmanager, Estate, Loki, a traffic generator, the Postgres the outbox is in,
+Docker: Prometheus, Grafana, Alertmanager, Estate, Loki, Tempo, a traffic generator, the Postgres the outbox is in,
 Kafka and its schema registry, an exporter for each of those two, and a stand-in
 chip registry. Compose goes first,
-because the application will not start without its database.
+because the application will not start without its database. The first `up` builds the traffic generator's image,
+which takes a few minutes.
 
 ```bash
 cd demo && docker compose up -d
 ```
 
+From the repository root:
+
 ```bash
-BUS=kafka LOKI_URL=http://localhost:3100 HOST=0.0.0.0 ./gradlew :app:run
+BUS=kafka LOKI_URL=http://localhost:3100 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 HOST=0.0.0.0 ./gradlew :app:run
+```
+
+The demo's Postgres keeps its data between runs, so pets and adoptions pile up. To start from an empty shop:
+
+```bash
+docker compose down -v && docker compose up -d
 ```
 
 `BUS=kafka` puts the shop's events on the demo's Kafka, which is what gives Estate's
 Kafka store and the projection's lag something to show. Without it the events stay
 in the process. `LOKI_URL` sends the shop's log lines to the demo's Loki as well as the
 console, under `app="petshop"`, which is where Estate's logs panel reads them; without it
-the shop logs to the console only.
+the shop logs to the console only. `OTEL_EXPORTER_OTLP_ENDPOINT` sends the shop's traces to the demo's Tempo; without
+it no span leaves the process.
 
 `HOST=0.0.0.0` is for Linux. There, `host.docker.internal` is the Docker bridge
 (`host-gateway`, usually 172.17.0.1) rather than the host's loopback. The app
@@ -48,19 +58,31 @@ Grafana show refusals as well as sales. `RATE`, `DURATION` (`10m`) and
 `PETSHOP_URL` change how many, for how long, and where. Proofload's report is
 written to `loadtest/build/reports/proofload/demo-traffic.html`.
 
-Or make something happen by hand:
+Or make something happen by hand. Stop the traffic first, or it may adopt the pet you picked, and pick a pet that
+`curl localhost:8080/pets` shows with `"adopted": false`:
 
 ```bash
-curl -X POST localhost:8080/pets/1/adoption   # taken
-curl -X POST localhost:8080/pets/1/adoption   # already_adopted
-curl -X POST localhost:8080/pets/999/adoption # no_such_pet
-curl -X POST localhost:8080/pets/3/adoption   # not_chipped: the registry has no chip for Mrs Peel
+docker compose stop traffic
+PET=15                                                 # a pet nobody has adopted yet
+curl -X POST localhost:8080/pets/$PET/adoption         # taken
+curl -X POST localhost:8080/pets/$PET/adoption         # already_adopted
+curl -X POST localhost:8080/pets/999999999/adoption    # no_such_pet
+curl -X POST localhost:8080/pets/3/adoption            # not_chipped: the registry has no chip for Mrs Peel
 docker compose stop registry
-curl -X POST localhost:8080/pets/2/adoption   # registry_down, and Barnaby stays in the shop
-docker compose start registry
+curl -X POST localhost:8080/pets/16/adoption           # registry_down, and pet 16 stays in the shop
+docker compose start registry traffic
 ```
 
 Arrivals happen on their own, every `petshop.arrivalsEvery`.
+
+## Traces
+
+Every request is a trace in Tempo: the request's span, the `adopt` span inside it, and inside that the calls to the
+chip registry, which carry `traceparent` to it. Open Grafana's Explore at <http://localhost:3000/explore>, pick
+**Tempo**, and search for service `petshop`.
+
+The shop's log lines about an adoption carry its `trace_id`. In Explore with **Loki**, `{app="petshop"} | trace_id != ""`
+lists them, and each line links to its trace.
 
 ## On Kafka
 
@@ -97,7 +119,7 @@ resolves once the registry is back:
 
 ```bash
 docker compose stop registry
-curl -X POST localhost:8080/pets/2/adoption   # registry_down
+curl -X POST localhost:8080/pets/16/adoption   # registry_down: any pet nobody has adopted
 docker compose start registry
 ```
 
@@ -130,10 +152,11 @@ here is a process on your machine. There is no p99 either: the adoption timer is
 
 | | |
 |---|---|
-| `docker-compose.yml` | Prometheus, Alertmanager, Grafana, Estate, Loki, Proofload's visitors (`traffic/Dockerfile`), the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
+| `docker-compose.yml` | Prometheus, Alertmanager, Grafana, Estate, Loki, Tempo, Proofload's visitors (`traffic/Dockerfile`), the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
+| `tempo/tempo.yaml` | Tempo, receiving OTLP over HTTP on 4318 |
 | `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
 | `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds, which on Linux needs the app started with `HOST=0.0.0.0`, and the Postgres and Kafka exporters |
-| `grafana/provisioning/` | the datasource and the dashboard provider |
+| `grafana/provisioning/` | the Prometheus, Tempo and Loki datasources, Loki's lines linking to Tempo by `trace_id`, and the dashboard provider |
 | `grafana/dashboards/petshop.json` | the dashboard itself |
 
 `extra_hosts: host.docker.internal:host-gateway` is there for Linux, where that

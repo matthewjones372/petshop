@@ -24,6 +24,7 @@
       thread = %thread
       pet_id = %mdc{pet_id}
       adopted_by = %mdc{adopted_by}
+      trace_id = %mdc{trace_id}
     </structuredMetadata>
     <message>
       <pattern>%-5level %logger{36} -- %msg%n%ex</pattern>

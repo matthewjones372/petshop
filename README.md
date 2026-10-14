@@ -44,7 +44,7 @@ What they run on, and what the tests use:
 | WireMock | the chip registry in tests and the demo, stubbed through Pelican's `pelican-test-wiremock` |
 | Kotest assertions on JUnit 6 | every test; the end-to-end and app tests are written as stories (below) |
 | Arrow | `Either` and `Raise` for declared failures, from the domain up |
-| OpenTelemetry, Micrometer, Prometheus, Grafana | traces through the graph, metrics at `/metrics`, and the demo's dashboard |
+| OpenTelemetry, Micrometer, Prometheus, Grafana, Tempo | a span per request, adoption and chip-registry call, exported over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; metrics at `/metrics`; the demo's dashboard and traces |
 | Logback | where Lark's log lines end up, through `lark-slf4j`, and Pekko's |
 | Apache Kafka, avro4k, Confluent's schema registry client | the bus on a broker: events as Avro in the schema registry's wire format, written by avro4k's Confluent serde; tests run the broker in a container and Confluent's in-process `mock://` registry |
 
