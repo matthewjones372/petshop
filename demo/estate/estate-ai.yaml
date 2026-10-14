@@ -5,8 +5,7 @@ port: 8080
 catalog: /etc/estate/catalog.yaml
 
 auth:
-  # Only for a demo on a laptop: a session secret anyone can read, and every visitor an operator, so silences and
-  # notes work without signing in.
+  # Demo only: a public session secret, and every visitor an operator.
   sessionSecret: the-petshop-demo-runs-on-a-laptop-only
   roles:
     viewer: [ developers ]
@@ -19,7 +18,5 @@ sources:
     alertmanager: { url: http://alertmanager:9093 }
     loki: { url: http://loki:3100 }
 
-# Ask AI on an alert's card: the alert's brief, and Estate's read tools for what it does not say, sent to Claude.
-# Haiku is the cheapest Claude and answers "why is this firing" well enough for a demo; the budget caps a day's spend.
-# At most one answer per alert a minute, within the day's budget.
-ai: { provider: anthropic, apiKey: "${ANTHROPIC_API_KEY}", model: claude-haiku-4-5-20251001, budget: { tokensPerDay: 150000 } }
+# Haiku is the cheapest Claude and good enough for "why is this firing"; the budget caps a day's spend.
+ai: { provider: anthropic, apiKey: "${ANTHROPIC_API_KEY}", model: claude-haiku-5-5, budget: { tokensPerDay: 150000 } }

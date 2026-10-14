@@ -158,32 +158,6 @@ The shop's page carries its JVM (heap, GC pauses, threads, CPU), its connection 
 are failing. The Postgres store shows connections, transactions, size and the events waiting in the outbox. The
 Kafka store shows the topic's offsets and the projection's lag.
 
-### Ask AI, and breaking things to ask it about
-
-Estate's Ask AI reads an alert's brief (the alert, the shop's stats, its logs in Loki, what is around it) and asks
-Claude for the likely cause and what to do. It needs an Anthropic API key, from <https://console.anthropic.com>, in
-the shell that starts Compose; `read -s` keeps it out of your shell history:
-
-```bash
-read -rs ANTHROPIC_API_KEY && export ANTHROPIC_API_KEY
-docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d
-```
-
-`docker-compose.ai.yml` points Estate at `estate/estate-ai.yaml`, which is `estate.yaml` with `ai:` added. Without
-the override the demo runs as before, and Ask AI is hidden.
-
-`chaos.sh` breaks one thing at a time, says which alert to open, and what a useful answer would name. It leaves it
-broken until `./chaos.sh restore`, and the rate-based alerts keep firing for five minutes after, so there is time to
-read the page and ask:
-
-```bash
-./chaos.sh registry-down    # the chip registry stops
-./chaos.sh registry-slow    # it answers, but after the shop's 2s timeout: the same alert, a subtler cause
-./chaos.sh postgres-down    # the database stops
-./chaos.sh kafka-down       # the broker stops; the outbox fills
-./chaos.sh restore
-```
-
 The demo has no Kubernetes, Flux or CI, and Estate says so at the top of the page rather than leaving those parts
 blank. For the same reason it shows the shop as "not running": it reads that from a cluster or ECS, and the shop
 here is a process on your machine. There is no p99 either: the adoption timer is a summary without percentiles.
@@ -194,12 +168,44 @@ here is a process on your machine. There is no p99 either: the adoption timer is
 | `estate/estate.yaml` | Estate's settings: no sign-in (every visitor is an operator), and the demo's Prometheus and Alertmanager as its sources |
 | `prometheus/rules.yml` | the alerts: the shop's keep `job="petshop"`, which is how Estate knows an alert is the petshop's, the front end's keep `service="petshop-web"`, and the stores' carry `store:` naming theirs |
 | `alertmanager/alertmanager.yml` | routes every alert nowhere: Estate reads them, and keeps its silences there |
+| `estate/estate-ai.yaml` | `estate.yaml` with Ask AI turned on, read when Compose is started with `docker-compose.ai.yml` |
+
+## Ask AI, and breaking things to ask it about
+
+Estate's Ask AI reads an alert's brief (the alert, the shop's stats, its logs in Loki, what is around it) and asks
+Claude for the likely cause and what to do. It needs an Anthropic API key, from <https://console.anthropic.com>, in
+the shell that starts Compose; `read -s` keeps it out of your shell history:
+
+```bash
+read -rs ANTHROPIC_API_KEY && export ANTHROPIC_API_KEY
+docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d
+```
+
+`docker-compose.ai.yml` points Estate at `estate/estate-ai.yaml`, which is `estate.yaml` with `ai:` added: Claude
+Haiku, capped at 150,000 tokens a day. Without the override the demo runs as before, and Ask AI is hidden. Estate
+refuses to start when the key is unset, which is why `estate.yaml` does not name it.
+
+`chaos.sh` breaks one thing at a time, says which alert to open, and what a useful answer would name. Run it from
+`demo/` with the shop running and the traffic on, since most of the alerts need adoptions to fail. It leaves the
+fault in place until `./chaos.sh restore`, or for a number of seconds if one is given (`./chaos.sh registry-slow 120`).
+`ChipRegistryUnreachable`, `AdoptionsNotRecorded` and `BusRefusingEvents` keep firing for five minutes after their
+cause stops, so there is time to read the page and ask:
+
+```bash
+./chaos.sh registry-down    # the chip registry stops
+./chaos.sh registry-slow    # it answers, but after the shop's 2s timeout: the same alert, a subtler cause
+./chaos.sh postgres-down    # the database stops
+./chaos.sh kafka-down       # the broker stops; the outbox fills
+./chaos.sh restore
+```
 
 ## What is where
 
 | | |
 |---|---|
 | `docker-compose.yml` | the front end, Prometheus, Alertmanager, Grafana, Estate, Loki, Tempo, Proofload's visitors (`traffic/Dockerfile`), a headless browser visiting the front end (`browser/Dockerfile`), the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
+| `docker-compose.ai.yml` | an override that turns on Estate's Ask AI and passes `ANTHROPIC_API_KEY` through |
+| `chaos.sh` | breaks the registry, Postgres or Kafka, one at a time, and says which alert to look at |
 | `web/Dockerfile` | the front end in `web/`, built with bun and served by `vite preview` through the same proxies as `bun run dev` |
 | `tempo/tempo.yaml` | Tempo, receiving OTLP over HTTP on 4318, and writing span metrics and the service graph to Prometheus |
 | `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
