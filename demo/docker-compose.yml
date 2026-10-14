@@ -96,6 +96,17 @@ services:
     ports:
       - "${WEB_PORT:-5173}:5173"
 
+  # Headless Chromium visiting the front end, so petshop-web has numbers with nobody at the keyboard. RATE is visits a minute.
+  browser:
+    build:
+      context: ..
+      dockerfile: demo/browser/Dockerfile
+    depends_on: [web]
+    environment:
+      WEB_URL: http://web:5173
+      RATE: "4"
+    restart: unless-stopped
+
   # Receives the shop's lines when it runs with LOKI_URL=http://localhost:3100.
   loki:
     image: grafana/loki:3.6.3

@@ -30,4 +30,6 @@ export default defineConfig({
       "/api/v1/otlp": prometheus,
     },
   },
+  // The demo's headless browser reaches compose's `web` service by that name, which vite refuses unless listed.
+  preview: { allowedHosts: ["web"] },
 });
