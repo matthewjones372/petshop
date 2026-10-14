@@ -5,12 +5,13 @@ import com.zaxxer.hikari.HikariDataSource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.app.typesafe.Secret
 import io.github.matthewjones372.lark.app.typesafe.config
 import io.micrometer.core.instrument.Metrics
 import javax.sql.DataSource
 
-/** Where the shop's Postgres is. */
-data class DatabaseSettings(val url: String, val user: String, val password: String)
+/** Where the shop's Postgres is. [password] prints as a mask, so the settings can be logged and thrown whole. */
+data class DatabaseSettings(val url: String, val user: String, val password: Secret)
 
 /**
  * The shop's two tables. `pets` is the catalogue as the shop last left it, and `outbox` the events that changed
@@ -41,7 +42,7 @@ private fun pool(settings: DatabaseSettings): HikariDataSource {
         HikariConfig().apply {
             jdbcUrl = settings.url
             username = settings.user
-            password = settings.password
+            password = settings.password.reveal()
             poolName = "petshop"
             // Two seconds, not Hikari's thirty: with Postgres gone an adoption is refused and the readiness check
             // fails while someone is still watching, instead of half a minute later.
@@ -59,7 +60,7 @@ private fun pool(settings: DatabaseSettings): HikariDataSource {
 
 val database: Module =
     config<DatabaseSettings>("petshop.database") {
-        DatabaseSettings(string("url"), string("user"), string("password"))
+        DatabaseSettings(string("url"), string("user"), secret("password"))
     } +
         // Released after the actor and the relay, which both depend on it: the pool closes once
         // nothing is left to borrow from it.

@@ -17,7 +17,19 @@ import petshop.domain.PetShop
  * every one, and [Meters] exports each as its own series, so the probe and the scrape cannot disagree on
  * what is checked.
  */
-class Readiness(val checks: Map<String, Check>)
+class Readiness(val checks: Map<String, Check>) {
+
+    /** The checks failing now. A throw is a failure and a warning is not, as `/health/ready` counts them. */
+    fun failing(): Set<String> = checks.filterValues { check -> !passes(check) }.keys
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun passes(check: Check): Boolean =
+        try {
+            check.check() !is Status.Fail
+        } catch (_: Exception) {
+            false
+        }
+}
 
 val checks: Module =
     single { pool: DataSource, shop: PetShop ->

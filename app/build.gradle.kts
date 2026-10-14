@@ -86,6 +86,8 @@ dependencies {
     // A real Postgres for every test that builds the shop, and for the load test, which builds all of it.
     testFixturesApi("org.testcontainers:testcontainers-postgresql:2.0.5")
     testFixturesImplementation("io.github.matthewjones372:lark-app:$larkVersion")
+    // The password a container hands out is a Secret in DatabaseSettings, as the configured one is.
+    testFixturesImplementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
     testFixturesImplementation("org.postgresql:postgresql:42.7.13")
     testFixturesImplementation(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
 

@@ -94,7 +94,9 @@ class EndToEndSpec {
     private val theService: Module =
         petshopFrom(onKafka).overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
             .onDatabase(database)
-            .overridingConfig("petshop.port = 0\npetshop.arrivalsEvery = 1h\npetshop.outboxEvery = 20ms")
+            // On top of onKafka rather than of application.conf, which is overridingConfig's own fallback: the graph's
+            // Config is then the document the bus was chosen from, with the three keys changed.
+            .overridingConfig("petshop.port = 0\npetshop.arrivalsEvery = 1h\npetshop.outboxEvery = 20ms", fallback = onKafka)
 
     @Test
     fun `somebody adopts a tortoise, and every part of the service hears about it`() = story {

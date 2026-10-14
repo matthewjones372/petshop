@@ -3,9 +3,10 @@ package petshop.app
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
-import org.testcontainers.postgresql.PostgreSQLContainer
+import io.github.matthewjones372.lark.app.typesafe.Secret
 import java.sql.DriverManager
 import java.util.concurrent.atomic.AtomicInteger
+import org.testcontainers.postgresql.PostgreSQLContainer
 
 /**
  * One Postgres for the whole test run, started the first time a test asks for it. Testcontainers'
@@ -29,7 +30,7 @@ object TestPostgres {
             connection.createStatement().use { it.execute("CREATE SCHEMA $schema") }
         }
         val url = container.jdbcUrl + (if ('?' in container.jdbcUrl) "&" else "?") + "currentSchema=$schema"
-        return DatabaseSettings(url, container.username, container.password)
+        return DatabaseSettings(url, container.username, Secret(container.password))
     }
 }
 
@@ -50,7 +51,7 @@ fun DatabaseSettings.recorded(): Long =
 fun DatabaseSettings.unsent(): Long = asking("SELECT count(*) FROM outbox")
 
 private fun DatabaseSettings.asking(query: String): Long =
-    DriverManager.getConnection(url, user, password).use { connection ->
+    DriverManager.getConnection(url, user, password.reveal()).use { connection ->
         connection.createStatement().use { statement ->
             statement.executeQuery(query).use { rows -> rows.next(); rows.getLong(1) }
         }

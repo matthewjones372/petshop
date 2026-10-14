@@ -21,9 +21,7 @@ class BusChoiceSpec {
 
     @Test
     fun `left as application conf has it, the bus is in the process`() = story {
-        val graph = Given("the service assembled from application.conf as it ships") {
-            petshopFrom(ConfigFactory.load())
-        }
+        val graph = Given("the service assembled from application.conf as it ships") { petshop }
         Then("its bus is the in-process hub") { testNode(graph) { bus: EventBus -> bus.shouldBeInstanceOf<HubBus>() } }
     }
 
