@@ -73,6 +73,21 @@ abstract class EventBusContract {
     }
 
     @Test
+    fun `a reader handles an event inside the trace it was published in`() = story {
+        using(bus("traced")) { bus ->
+            val traces = ConcurrentLinkedQueue<String>()
+            Given("a reader noting the trace it handles each event in") {
+                bus.consume { traces.add(currentTrace) }.start(Forks())
+            }.use { _ ->
+                When("Waffle's arrival is published inside a trace") {
+                    inATrace { bus.publish(arrival(1, "Waffle")).shouldBeRight() }
+                }
+                Then("the reader handled it in that trace").eventually(30.seconds) { traces.toList() shouldBe listOf(A_TRACE) }
+            }
+        }
+    }
+
+    @Test
     fun `the whole service runs on it, and an adoption reaches the projection`() = story {
         val service = Given("the whole service with its events on this bus") {
             (Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() }).onAFreshDatabase() + served)
@@ -107,7 +122,7 @@ class HubBusSpec : EventBusContract() {
 
     @Test
     fun `a closed bus turns an event away, and says so`() = story {
-        val bus = Given("a bus whose hub has closed") { HubBus(Hub<ShopEvent>(1).apply { close() }) }
+        val bus = Given("a bus whose hub has closed") { HubBus(Hub<Claimed>(1).apply { close() }) }
         val answer = When("an arrival is published to it") { bus.publish(PetArrived(1, Pet(PetId(9), "Waffle", Species.Dog))) }
         Then("it is refused, so the outbox keeps it") { answer.isLeft() shouldBe true }
     }

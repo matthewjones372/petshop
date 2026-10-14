@@ -1,6 +1,7 @@
 package petshop.app
 
 import arrow.core.Either
+import io.github.matthewjones372.lark.Carriers
 import io.github.matthewjones372.lark.Schedule
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
@@ -13,6 +14,7 @@ import io.github.matthewjones372.lark.kafka.Decoder
 import io.github.matthewjones372.lark.kafka.Kafka
 import io.github.matthewjones372.lark.kafka.Producer
 import io.github.matthewjones372.lark.kafka.Topic
+import io.github.matthewjones372.lark.kafka.carrying
 import io.github.matthewjones372.lark.kafka.consume
 import io.github.matthewjones372.lark.kafka.deadLetters
 import io.github.matthewjones372.lark.kafka.divertLefts
@@ -20,6 +22,7 @@ import io.github.matthewjones372.lark.kafka.mapRecord
 import io.github.matthewjones372.lark.kafka.producer
 import io.github.matthewjones372.lark.kafka.record
 import io.github.matthewjones372.lark.kafka.runCommitting
+import io.github.matthewjones372.lark.kafka.within
 import io.github.matthewjones372.lark.logWarn
 import io.github.matthewjones372.lark.stream.Run
 import io.github.matthewjones372.lark.stream.restartOnDefect
@@ -56,7 +59,7 @@ class KafkaBus(
         deadLetters ?: letters.deadLetters(Topic("${topic.name}.dead-letters")).counted()
 
     override fun publish(event: ShopEvent): Either<BusRefused, ShopEvent> =
-        events.publish(topic.record(event.seq, event))
+        events.publish(topic.record(event.seq, event).carrying(Carriers.capture()))
             .mapLeft { failed -> BusRefused(event.seq, "${failed.cause}") }
             .map { event }
 
@@ -69,7 +72,7 @@ class KafkaBus(
             value = Decoder(ShopEventDeserializer(registry), transient = ::registryDown),
         )
             .divertLefts(deadLetters)
-            .mapRecord { record -> each(record.value()) }
+            .mapRecord { record -> record.within { each(record.value()) } }
             // A schema registry outage pauses the projection rather than ending it: restart from the last commit.
             .restartOnDefect(Schedule.exponential<Throwable>(100.milliseconds).delayed { _, wait -> minOf(wait, 30.seconds) })
             .runCommitting()

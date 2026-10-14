@@ -27,12 +27,14 @@ bun run --cwd web dev       # http://localhost:5173
 
 The front end traces itself with Effect's own OTLP tracer. Every call to the shop goes through Effect's `HttpClient`,
 so each is a client span that sends `traceparent`, and the shop continues that trace. Adopting a pet is an `adopt pet`
-span, each `/live` connection is a `live connection` span that fails when the connection drops, and an uncaught error
-is a short span of its own. The dev server proxies `/v1/traces` to Tempo on :4318, which sends
+span, each `/live` connection is a `live connection` span that fails when the connection drops, each event `/live`
+shows is a `live event` span in the trace the event was made in, and an uncaught error is a short span of its own. The dev server proxies `/v1/traces` to Tempo on :4318, which sends
 no CORS headers (`TEMPO_URL` overrides the target). To see one trace from a click to the shop, run the demo and the
 shop with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, adopt a pet, then open Grafana's Explore at
 <http://localhost:3000/explore>, pick **Tempo** and search for service `petshop-web` and span `adopt pet`: the browser's
-spans sit above the shop's `POST /pets/{petId}/adoption`, its `adopt` and the chip registry calls. Its log lines go to
+spans sit above the shop's `POST /pets/{petId}/adoption`, its `adopt` and the chip registry calls, and, if `/live` is
+open, the outbox write, the relay's `publish`, the projection's `process` and the page's `live event` follow in the
+same trace (see `demo/README.md`). Its log lines go to
 the demo's Loki and its Web Vitals to Prometheus the same way, and Estate shows it as the service `petshop-web`, from
 Tempo's span metrics; `demo/README.md` says what each number is.
 
@@ -65,7 +67,7 @@ What they run on, and what the tests use:
 | WireMock | the chip registry in tests and the demo, stubbed through Pelican's `pelican-test-wiremock` |
 | Kotest assertions on JUnit 6 | every test; the end-to-end and app tests are written as stories (below) |
 | Arrow | `Either` and `Raise` for declared failures, from the domain up |
-| OpenTelemetry, Micrometer, Prometheus, Grafana, Tempo | a span per request, adoption and chip-registry call, exported over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; metrics at `/metrics`; the demo's dashboard and traces |
+| OpenTelemetry, Micrometer, Prometheus, Grafana, Tempo | a span per request, adoption, chip-registry call, outbox write, publish and projection, one trace from the browser through Kafka and back, exported over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; metrics at `/metrics`; the demo's dashboard and traces |
 | Logback | where Lark's log lines end up, through `lark-slf4j`, and Pekko's |
 | Apache Kafka, avro4k, Confluent's schema registry client | the bus on a broker: events as Avro in the schema registry's wire format, written by avro4k's Confluent serde; tests run the broker in a container and Confluent's in-process `mock://` registry |
 

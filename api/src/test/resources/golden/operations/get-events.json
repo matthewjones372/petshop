@@ -81,6 +81,12 @@
           },
           "pet": {
             "$ref": "#/components/schemas/PetDto"
+          },
+          "traceparent": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [

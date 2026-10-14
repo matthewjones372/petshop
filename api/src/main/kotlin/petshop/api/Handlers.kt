@@ -10,7 +10,6 @@ import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOrFail
 import io.github.matthewjones372.pelican.pekko.request
 import io.github.matthewjones372.lark.stream.Stream
-import io.github.matthewjones372.lark.stream.map
 import io.github.matthewjones372.lark.stream.toSource
 import io.github.matthewjones372.pelican.pekko.streamedNow
 import io.opentelemetry.api.OpenTelemetry
@@ -18,7 +17,6 @@ import io.opentelemetry.context.propagation.TextMapGetter
 import petshop.domain.NoSuchPet
 import petshop.domain.PetId
 import petshop.domain.PetShop
-import petshop.domain.ShopEvent
 
 /** Without it the filter extracts nothing, and a caller's `traceparent` starts a new trace instead of continuing. */
 private val pekkoHeaders = object : TextMapGetter<Params> {
@@ -34,7 +32,7 @@ fun petshopApi(
     scrape: () -> String,
     tally: () -> Tally,
     /** A fresh run per caller: each connection is a subscriber of its own. */
-    watch: () -> Stream<Nothing, ShopEvent>,
+    watch: () -> Stream<Nothing, ShopEventDto>,
     telemetry: OpenTelemetry = OpenTelemetry.noop(),
 ) = api(
     endpoints = listOf(
@@ -57,7 +55,7 @@ fun petshopApi(
         },
         metrics handledNow { scrape() },
         stats handledNow { tally() },
-        events streamedNow { watch().map { it.toDto() }.toSource() },
+        events streamedNow { watch().toSource() },
     ) + health.endpoints,
     codecs = JacksonCodecs,
 ) {

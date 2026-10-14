@@ -1,15 +1,32 @@
-import { Effect, Schedule, Schema, Stream } from "effect";
+import { Effect, Option, Schedule, Schema, Stream } from "effect";
 import { Sse } from "effect/encoding";
-import { HttpClient, HttpClientResponse } from "effect/http";
+import { Headers, HttpClient, HttpClientResponse, HttpTraceContext } from "effect/http";
 import { Pet } from "./api";
 
 export const ShopEvent = Schema.Struct({
   seq: Schema.Number,
   kind: Schema.Literals(["Arrived", "Adopted", "Returned"]),
   pet: Pet,
+  // The trace the shop handled the event in: the adoption's, or the arrival's.
+  traceparent: Schema.optional(Schema.NullOr(Schema.String)),
 });
 
 export type ShopEvent = typeof ShopEvent.Type;
+
+/**
+ * [show] inside a `live event` span that continues the event's trace, so an adoption's trace ends where the page
+ * shows it. An event without one starts a trace of its own.
+ */
+export const shown = <A>(event: ShopEvent, show: () => A) => {
+  const parent = event.traceparent ? HttpTraceContext.w3c(Headers.fromInput({ traceparent: event.traceparent })) : Option.none();
+  return Effect.sync(show).pipe(
+    Effect.withSpan("live event", {
+      kind: "consumer",
+      parent: Option.getOrUndefined(parent),
+      attributes: { "event.seq": event.seq, "event.kind": event.kind, "pet.id": event.pet.id },
+    }),
+  );
+};
 
 export type Status = "connecting" | "live" | "reconnecting";
 
