@@ -582,7 +582,7 @@ loads on the project's Kotlin, or for a project with many more queries.
 
 ## Versions
 
-Pelican `1.0.0`, Lark `0.9.2` (its Gradle wiring plugin `0.9.2`), Proofload
+Pelican `1.0.0`, Lark `0.10.0` (its Gradle wiring plugin `0.10.0`), Proofload
 `0.1.0-rc4`, ExoQuery `2.0.4.PL`, kimney `0.3.0`. Pekko `1.2.1`, Pekko HTTP
 `1.3.0`, Arrow `2.1.2`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`,
 HikariCP `7.1.0`, OpenTelemetry SDK `1.62.0`, Micrometer's Prometheus registry
