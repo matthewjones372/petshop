@@ -24,7 +24,7 @@ import javax.sql.DataSource
  * The registry is this test's own rather than the graph's global one, so two tests running together
  * cannot read each other's numbers.
  */
-/** The graph's registry and its meters, with the shop and the pool started so their probes have something to ask. */
+/** The graph's registry and its meters, with the shop and the pool started so their checks have something to ask. */
 private class Scraped(val registry: PrometheusMeterRegistry, val meters: Meters)
 
 private val scraped: Module =
@@ -68,7 +68,7 @@ class ScrapeSpec {
                 scrape shouldContain "process_cpu_usage"
             }
             And("so is the pool") { scrape shouldContain """hikaricp_connections_active{pool="petshop",""" }
-            // The probes are asked on their own thread, once a second, so the first answer is a moment behind.
+            // The checks are asked on their own thread, once a second, so the first answer is a moment behind.
             And("the shop is ready, and each check answers").eventually(10.seconds) {
                 val now = app.registry.scrape()
                 now shouldContain "petshop_ready 1.0"

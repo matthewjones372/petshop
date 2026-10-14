@@ -25,15 +25,6 @@ val petNotChipped = errorJson<ProblemDto.NotChipped>(422, "The registry has no c
 
 val unavailable = errorJson<ProblemDto.Unavailable>(503, "The adoption could not be finished just now; try again")
 
-/** What the shop says when asked whether it can serve. */
-data class Healthy(val ready: Boolean, val failing: List<String>)
-
-val health = endpoint {
-    get("health")
-    summary = "Whether the shop can serve"
-    json<Healthy>()
-}
-
 val listPets = endpoint {
     get("pets")
     summary = "Every pet in the shop"

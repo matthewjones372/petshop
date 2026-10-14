@@ -10,8 +10,10 @@ subprojects {
         mavenCentral()
         // Confluent's Avro serializer and schema-registry client, which are not on Maven Central.
         maven("https://packages.confluent.io/maven/") { content { includeGroup("io.confluent") } }
-        // A lark change is tried here before it is released by installing it locally as a snapshot.
-        if (providers.gradleProperty("larkVersion").get().endsWith("-SNAPSHOT")) mavenLocal()
+        // A lark or pelican change is tried here before it is released by installing it locally as a snapshot.
+        if (listOf("larkVersion", "pelicanVersion").any { providers.gradleProperty(it).get().endsWith("-SNAPSHOT") }) {
+            mavenLocal()
+        }
     }
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {

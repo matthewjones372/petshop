@@ -8,6 +8,7 @@ import io.github.matthewjones372.pelican.test.shouldBeError
 import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
+import io.github.matthewjones372.pelican.health.health
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
@@ -40,9 +41,12 @@ class ContractSpec {
 
     private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 
+    // No checks: the probes' paths are Pelican's, and are pinned below whatever the app declares.
+    private val probes = health { }
+
     private val app = petshopApi(
         shop = OnePet(nibbles),
-        health = { Healthy(ready = true, failing = emptyList()) },
+        health = probes,
         scrape = { "petshop_adoptions_total 1.0" },
         tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
     ).inMemory("petshop-contract")
@@ -57,7 +61,8 @@ class ContractSpec {
         app.request(getPet, 1L) shouldBuild "GET /pets/1"
         app.request(adoptPet, 1L) shouldBuild "POST /pets/1/adoption"
         app.request(listPets, Unit) shouldBuild "GET /pets"
-        app.request(health, Unit) shouldBuild "GET /health"
+        app.request(probes.live, Unit) shouldBuild "GET /health/live"
+        app.request(probes.ready, Unit) shouldBuild "GET /health/ready"
         app.request(metrics, Unit) shouldBuild "GET /metrics"
         app.request(stats, Unit) shouldBuild "GET /stats"
     }
@@ -90,7 +95,7 @@ class ContractSpec {
                 shop = object : PetShop by OnePet(nibbles) {
                     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = refusal.left()
                 },
-                health = { Healthy(ready = true, failing = emptyList()) },
+                health = health { },
                 scrape = { "" },
                 tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
             ).inMemory("petshop-refusing-${refusal::class.simpleName}")
