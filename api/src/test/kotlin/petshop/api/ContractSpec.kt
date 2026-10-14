@@ -3,6 +3,8 @@ package petshop.api
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
+import io.github.matthewjones372.lark.stream.Stream
+import io.github.matthewjones372.lark.stream.empty
 import io.github.matthewjones372.pelican.test.pekko.inMemory
 import io.github.matthewjones372.pelican.test.shouldBeError
 import io.github.matthewjones372.pelican.test.shouldBeOk
@@ -34,21 +36,19 @@ private class OnePet(private var pet: Pet) : PetShop {
     }
 }
 
-/**
- * Two promises, kept apart on purpose: what the shop's own code may call, and what its callers hold.
- * A rename breaks the first at compile time; only the second is allowed to notice a URL.
- */
 class ContractSpec {
 
     private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 
-    private val probes = health { live("always") { Status.Pass } }
+    // No checks: the probes' paths are Pelican's whatever the app declares.
+    private val probes = health { }
 
     private val app = petshopApi(
         shop = OnePet(nibbles),
         health = probes,
         scrape = { "petshop_adoptions_total 1.0" },
         tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+        watch = { Stream.empty() },
     ).inMemory("petshop-contract")
 
     @Test
@@ -65,6 +65,7 @@ class ContractSpec {
         app.request(probes.ready, Unit) shouldBuild "GET /health/ready"
         app.request(metrics, Unit) shouldBuild "GET /metrics"
         app.request(stats, Unit) shouldBuild "GET /stats"
+        app.request(events, Unit) shouldBuild "GET /events"
     }
 
     @Test
@@ -95,15 +96,15 @@ class ContractSpec {
                 shop = object : PetShop by OnePet(nibbles) {
                     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = refusal.left()
                 },
-                health = health { live("always") { Status.Pass } },
+                health = health { },
                 scrape = { "" },
                 tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+                watch = { Stream.empty() },
             ).inMemory("petshop-refusing-${refusal::class.simpleName}")
 
             refusing.outcome(adoptPet, 1L).shouldBeError() shouldBe declared
         }
     }
-
 
     @Test
     fun `the probes answer in health+json, and a failing check takes the shop out of rotation`() {
@@ -115,6 +116,7 @@ class ContractSpec {
             health = failing,
             scrape = { "" },
             tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+            watch = { Stream.empty() },
         ).inMemory("petshop-contract-down")
 
         // A failing probe is pelican-health's declared failure (Pelican spec 0070), so the report comes back as a value.

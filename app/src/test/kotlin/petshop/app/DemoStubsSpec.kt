@@ -14,14 +14,7 @@ import petshop.registry.lookupChip
 import petshop.registry.noSuchChip
 import petshop.registry.recordKeeper
 
-/**
- * The demo's registry is a WireMock reading `demo/registry/mappings`, and its stubs are written here, in the
- * registry's endpoints, rather than by hand. So the demo answers what the contract says: a contract change that
- * moves an answer fails this test until the file is rewritten with `-Dpelican.golden.update=true`.
- *
- * Recording a keeper answers with the keeper from the request body, which the example lets Pelican find and
- * template (Pelican spec 0067).
- */
+/** Rewrite the demo's WireMock mappings after a contract change with `-Dpelican.golden.update=true`. */
 class DemoStubsSpec {
 
     @Test

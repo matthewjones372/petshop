@@ -6,6 +6,7 @@ import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
+import io.github.matthewjones372.lark.test.eventually
 import io.github.matthewjones372.lark.test.story
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
@@ -18,21 +19,16 @@ import petshop.domain.ChipRegistry
 import petshop.domain.PetId
 import petshop.domain.PetShop
 
-/** What a test of a restart holds of each run of the shop: the shop, and the arrivals so they run. */
 private class Running(val shop: PetShop)
 
 private val running: Module = single { shop: PetShop, _: Arrivals -> Running(shop) }
 
-/**
- * The shop stopped and started again on the same database, as a deploy or a crash does. The catalogue is a
- * table written in the same transaction as each event, so a restart opens the shop as it was left.
- */
 class RestartSpec {
 
     private val database = TestPostgres.fresh()
 
     private val shop: Module =
-        (petshop.overriding(single<ChipRegistry> { FakeRegistry() }).onDatabase(database) + running)
+        (Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() }).onDatabase(database) + running)
             .subgraph<Running>()
             .overridingConfig("petshop.arrivalsEvery = 50ms")
 
@@ -41,8 +37,7 @@ class RestartSpec {
         val before = When("Ada adopts Nibbles, and the shop runs long enough for pets to arrive") {
             testApp(shop) { app: Running ->
                 app.shop.adopt(PetId(1), by = "Ada").shouldBeRight()
-                Thread.sleep(200)
-                app.shop.all()
+                eventually(5.seconds) { app.shop.all().also { pets -> (pets.size > opening.size) shouldBe true } }
             }
         }
         testApp(shop) { app: Running ->

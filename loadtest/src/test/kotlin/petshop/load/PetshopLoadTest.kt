@@ -40,27 +40,15 @@ import petshop.app.RegistrySettings
 import petshop.app.TestPostgres
 import petshop.app.onAFreshDatabase
 import petshop.app.onDatabase
-import petshop.app.petshop
+import petshop.app.Petshop
 import petshop.app.recorded
 import petshop.app.unsent
 import petshop.registry.ChipRecord
 import petshop.registry.lookupChip
 import petshop.registry.recordKeeper
 
-/**
- * The whole application under load, started by its own graph in this process: the actor, the arrivals
- * stream and the endpoints, exactly as `main` starts them. Nothing of the shop's is stubbed, and the
- * graph is given back when the block returns. The chip registry is somebody else's service, so it is
- * a WireMock server that knows every chip, and the outbox is in a Postgres the test starts — the two
- * nodes that differ from `main`.
- *
- * The load runs through Pelican's own typed client, so no URL appears in this file at all: a step
- * names the endpoint it calls, and what it expects back is the failure the endpoint declared rather
- * than a status code. A renamed route or a changed error moves the load with it, at compile time.
- */
 class PetshopLoadTest {
 
-    /** Every pet has a chip and every keeper is recorded: the registry is not what this measures. */
     @JvmField
     @RegisterExtension
     val registry = PelicanWireMockExtension(JacksonCodecs).apply {
@@ -68,9 +56,8 @@ class PetshopLoadTest {
         stub(recordKeeper) { (number, keeper) -> ok(ChipRecord(number, keeper.keeper)) }
     }
 
-    /** The shop as `main` starts it, but for the registry: the database is each test's to choose. */
     private val calling: Module =
-        petshop.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
+        Petshop.module.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
 
     private val theShop: Module = calling.onAFreshDatabase()
 
@@ -90,10 +77,8 @@ class PetshopLoadTest {
                     }
                 }
 
-                // Two seconds of the same load first, recorded nowhere. A cold JVM, connection pool and
-                // JIT put every one of a cold run's twenty slowest requests in its first second — p99
-                // 453 ms there, 5 to 18 ms in each second after — so without it the p99 below was
-                // measuring start-up rather than the shop.
+                // Two seconds of unrecorded warm-up: a cold JVM, pool and JIT put a cold run's p99 at 453 ms,
+                // against 5 to 18 ms in each second after.
                 proofload.run(shopping.at(200.perSecond, over = 10.seconds).warmingUp(2.seconds))
             }
         }
@@ -102,16 +87,10 @@ class PetshopLoadTest {
 
         result.writeHtmlReport(Path.of("build/reports/proofload/browsing.html"))
         result.failed shouldBe 0L
-        // Service time, the shop's own: response time also holds however far the generator fell behind its
-        // schedule, which is the machine's, and on a busy laptop that alone was twice the budget.
+        // Service time: response time also counts how far the generator fell behind its schedule.
         result[browse].serviceTime.p99 shouldBeLessThan 100.milliseconds
     }
 
-    /**
-     * The claim the actor exists for, checked under load rather than in a unit test: a pet is sold
-     * once. The step expects the declared `AlreadyAdopted`, so a single Ok — two people told they got
-     * the same tortoise — fails the run, and so does anything the endpoint never declared.
-     */
     @LoadTest
     fun `a pet already adopted is never sold again`(proofload: Proofload) {
         val outcome = theShop.use { server: PelicanServer ->
@@ -143,17 +122,7 @@ class PetshopLoadTest {
 
     private val browseEither = step("browse either instance")
 
-    /**
-     * Two instances of the service on one outbox table: two actors writing it and two relays claiming
-     * from it `FOR UPDATE SKIP LOCKED`, while two hundred a second browse the two of them.
-     *
-     * Arrivals are asked for every five milliseconds on each rather than every five seconds, so the table
-     * is written the whole time and both relays always have something to claim: some seven hundred
-     * events over the ten seconds when this was written, split roughly evenly between the two relays. Each instance publishes to
-     * a bus of its own, and each bus has a projection of its own, so an event claimed by both relays
-     * would be counted once by each projection: the two tallies add up to more than was recorded.
-     * They must add up to exactly what was recorded, with the table empty.
-     */
+    /** An event claimed by both relays would be counted twice, so the tallies must add up to what was recorded. */
     @LoadTest
     fun `two relays on one outbox publish every event once between them`(proofload: Proofload) {
         val database = TestPostgres.fresh()
@@ -189,7 +158,6 @@ class PetshopLoadTest {
             }
         }
 
-        // Each instance answers whether it started, so there are two to unwrap.
         val (result, drained, served) = outcome.shouldBeRight().shouldBeRight()
         result.writeHtmlReport(Path.of("build/reports/proofload/two-relays.html"))
         result.failed shouldBe 0L
@@ -211,7 +179,6 @@ class PetshopLoadTest {
         }
     }
 
-    /** One instance of the whole service, on [port], with its outbox in [database]. */
     private fun instance(database: DatabaseSettings, port: Int): Module =
         (calling.onDatabase(database) + single { server: PelicanServer, arrivals: Arrivals, projection: Projection ->
             Instance(server.baseUrl, arrivals, projection)
@@ -219,19 +186,13 @@ class PetshopLoadTest {
             .overridingConfig("petshop.port = $port\npetshop.arrivalsEvery = 5ms\npetshop.outboxEvery = 20ms")
 }
 
-/** What a test of two instances holds of each: where it answers, its arrivals, and its read of its bus. */
 private class Instance(val baseUrl: String, val arrivals: Arrivals, val projection: Projection)
 
-/** The outbox once both relays had nothing left to claim, and what each instance's projection read. */
 private data class Drained(val recorded: Long, val unsent: Long, val first: Long, val second: Long) {
     val published: Long get() = first + second
 }
 
-/**
- * Waits until the table is empty and the projections have caught up with it, or five seconds pass, and
- * leaves the verdict to the assertions. A projection is a tick and a hop behind its relay, so "empty"
- * alone is not "done".
- */
+/** A projection is a tick and a hop behind its relay, so an empty table alone is not done. */
 private fun drains(database: DatabaseSettings, published: () -> Int) {
     val deadline = System.nanoTime() + 5_000_000_000L
     while (!(database.unsent() == 0L && published() >= database.recorded()) && System.nanoTime() < deadline) {

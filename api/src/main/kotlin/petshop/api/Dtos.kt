@@ -4,18 +4,19 @@ import io.github.matthewjones372.kimney.transformInto
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.Pet
+import petshop.domain.PetAdopted
+import petshop.domain.PetArrived
+import petshop.domain.PetReturned
 import petshop.domain.PetShopError
+import petshop.domain.ShopEvent
 
-/**
- * What the wire holds, kept apart from the domain so a change to either is a compile error at the
- * crossing rather than a silent change to the JSON. kimney writes each crossing; none is by hand.
- */
+// Kept apart from the domain so a change to either breaks the build here, not the JSON silently.
+
 enum class SpeciesDto { Cat, Dog, Parrot, Tortoise }
 
-/** `id` is the `Long` inside `PetId`: kimney unwraps the value class, so the JSON is a plain number. */
+/** kimney unwraps `PetId`, so `id` is a plain number in the JSON. */
 data class PetDto(val id: Long, val name: String, val species: SpeciesDto, val adopted: Boolean)
 
-/** The declared failures: a case per domain failure, by name. */
 sealed interface ProblemDto {
     val id: Long
     val message: String
@@ -33,6 +34,11 @@ sealed interface ProblemDto {
     data class NotRecorded(override val id: Long, override val message: String) : ProblemDto
 }
 
+enum class ShopEventKind { Arrived, Adopted, Returned }
+
+/** One shape for every event, so a caller reads `kind` rather than telling subtypes apart by their fields. */
+data class ShopEventDto(val seq: Long, val kind: ShopEventKind, val pet: PetDto)
+
 fun Pet.toDto(): PetDto = transformInto()
 
 fun List<Pet>.toDto(): List<PetDto> = transformInto()
@@ -43,3 +49,9 @@ fun PetShopError.toDto(): ProblemDto = transformInto()
 fun NoSuchPet.toDto(): ProblemDto.NoSuchPet = transformInto()
 
 fun AlreadyAdopted.toDto(): ProblemDto.AlreadyAdopted = transformInto()
+
+fun ShopEvent.toDto(): ShopEventDto = when (this) {
+    is PetArrived -> ShopEventDto(seq, ShopEventKind.Arrived, pet.toDto())
+    is PetAdopted -> ShopEventDto(seq, ShopEventKind.Adopted, pet.toDto())
+    is PetReturned -> ShopEventDto(seq, ShopEventKind.Returned, pet.toDto())
+}

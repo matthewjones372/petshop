@@ -4,6 +4,9 @@
       "get": {
         "summary": "What the shop's events add up to, as a consumer of them sees it",
         "operationId": "getStats",
+        "tags": [
+          "shop"
+        ],
         "responses": {
           "200": {
             "description": "Success.",

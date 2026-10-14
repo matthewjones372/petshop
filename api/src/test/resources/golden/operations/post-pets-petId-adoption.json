@@ -4,6 +4,9 @@
       "post": {
         "summary": "Take a pet home",
         "operationId": "postPetsByPetIdAdoption",
+        "tags": [
+          "pets"
+        ],
         "parameters": [
           {
             "name": "petId",

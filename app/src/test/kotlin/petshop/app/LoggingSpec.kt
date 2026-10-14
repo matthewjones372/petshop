@@ -18,18 +18,11 @@ import org.slf4j.LoggerFactory
 import petshop.domain.PetId
 import petshop.domain.PetShop
 
-/**
- * That this service's own lines end up where its libraries' lines already do, with the pairs still
- * on them.
- *
- * `main` binds nothing. `lark-slf4j` is on the classpath and registers itself, and this is the test
- * that says so — a dependency that quietly stopped being one would otherwise look like silence.
- */
+/** `main` binds nothing: lark-slf4j registers itself from the classpath, and this fails if it stops. */
 class LoggingSpec {
 
-    // Logback reads an event's MDC when something first asks for it, and the pairs are gone from the MDC
-    // once the call that logged has returned. A list read after the fact has to take it while appending,
-    // as any appender that holds events does.
+    // Logback reads an event's MDC lazily and the pairs leave the MDC once the logging call returns, so
+    // take it while appending.
     private val appender = object : ListAppender<ILoggingEvent>() {
         override fun append(event: ILoggingEvent) {
             event.prepareForDeferredProcessing()
@@ -37,7 +30,7 @@ class LoggingSpec {
         }
     }
 
-    private val backend = (LoggerFactory.getILoggerFactory() as LoggerContext).getLogger("lark")
+    private val backend = (LoggerFactory.getILoggerFactory() as LoggerContext).getLogger("petshop")
 
     private val settled: Module = shopWith(FakeRegistry())
 

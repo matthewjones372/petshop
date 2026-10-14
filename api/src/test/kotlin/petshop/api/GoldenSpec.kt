@@ -2,9 +2,10 @@ package petshop.api
 
 import arrow.core.Either
 import arrow.core.left
+import io.github.matthewjones372.lark.stream.Stream
+import io.github.matthewjones372.lark.stream.empty
 import io.github.matthewjones372.pelican.test.golden.Golden
 import io.github.matthewjones372.pelican.test.pekko.inMemory
-import io.github.matthewjones372.pelican.health.Status
 import io.github.matthewjones372.pelican.health.health
 import org.junit.jupiter.api.Test
 import petshop.domain.NoSuchPet
@@ -14,13 +15,7 @@ import petshop.domain.PetShop
 import petshop.domain.PetShopError
 import petshop.domain.Species
 
-/**
- * What the shop's callers were promised, recorded under `src/test/resources/golden`.
- *
- * A change that would break somebody already calling — a removed status, a new required field, a
- * renamed path — fails here and says so. A change that costs them nothing rewrites the file and
- * passes, and the rewritten file is in the diff for a reviewer to read.
- */
+/** A change that breaks a caller fails; one that does not rewrites the golden file, so it shows in the diff. */
 class GoldenSpec {
 
     private val golden = Golden()
@@ -37,9 +32,10 @@ class GoldenSpec {
 
     private val api = petshopApi(
         shop,
-        health = health { live("always") { Status.Pass } },
+        health = health { },
         scrape = { "" },
         tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+        watch = { Stream.empty() },
     )
 
     @Test

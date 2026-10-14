@@ -1,5 +1,5 @@
-# What the demo alerts on, for Estate to show beside the service. Every rule keeps the `job` label, which is how
-# Estate knows an alert is petshop's: its catalog names a service `petshop`, and the scrape job is called that.
+# Every rule keeps the `job` label: that is how Estate knows an alert is petshop's.
+# keep_firing_for holds a rate-based alert for five minutes after its cause stops, long enough to Ask AI about it.
 groups:
   - name: petshop
     rules:
@@ -13,6 +13,7 @@ groups:
 
       - alert: ChipRegistryUnreachable
         expr: sum by (job) (rate(petshop_adoptions_total{outcome="registry_down"}[1m])) > 0
+        keep_firing_for: 5m
         labels: { severity: warning }
         annotations:
           summary: Adoptions are failing because the chip registry cannot be reached.
@@ -20,6 +21,7 @@ groups:
 
       - alert: AdoptionsNotRecorded
         expr: sum by (job) (rate(petshop_adoptions_total{outcome="not_recorded"}[1m])) > 0
+        keep_firing_for: 5m
         labels: { severity: critical }
         annotations:
           summary: The shop cannot write to Postgres, so it refuses adoptions it could not record.
@@ -36,13 +38,13 @@ groups:
       - alert: BusRefusingEvents
         expr: sum by (job) (rate(petshop_outbox_refused_total[1m])) > 0
         for: 30s
+        keep_firing_for: 5m
         labels: { severity: warning }
         annotations:
           summary: The bus is turning events away; they stay in the outbox and go again.
           impact: /stats falls behind until the bus takes them.
 
-      # The shop's own view of itself: its probes, each exported as petshop_health_check. Fires whatever
-      # the shop is doing, so a database that dies while nobody adopts is still seen.
+      # Fires whatever the shop is doing, so a database that dies while nobody adopts is still seen.
       - alert: PetshopNotReady
         expr: max by (job) (petshop_ready) == 0
         for: 10s
@@ -51,8 +53,20 @@ groups:
           summary: "The shop's health check is failing: {{ with query \"petshop_health_check == 0\" }}{{ range . }}{{ .Labels.check }} {{ end }}{{ end }}"
           impact: The shop says it cannot serve; /health/ready lists what is failing.
 
-  # The stores the shop depends on. Each keeps a `store` label naming its catalog entry, which is how Estate puts
-  # the alert on the store, and the edge from the shop turns red by the alert's name.
+  # Tempo's span metrics for the front end; the `service` label is how Estate knows the alert is petshop-web's.
+  - name: petshop-web
+    rules:
+      - alert: BrowserCallsFailing
+        expr: |
+          sum by (service) (rate(traces_spanmetrics_calls_total{service="petshop-web", span_kind="SPAN_KIND_CLIENT", status_code="STATUS_CODE_ERROR"}[1m]))
+            / sum by (service) (rate(traces_spanmetrics_calls_total{service="petshop-web", span_kind="SPAN_KIND_CLIENT"}[1m])) > 0.1
+        for: 30s
+        labels: { severity: warning }
+        annotations:
+          summary: More than one in ten of the browser's calls to the shop are failing.
+          impact: People in the browser see pets fail to load, or adoptions answered with an error.
+
+  # Each keeps a `store` label naming its catalog entry, which is how Estate puts the alert on the store.
   - name: stores
     rules:
       - alert: PostgresDown
