@@ -3,6 +3,7 @@ package petshop.load
 import io.github.matthewjones372.lark.Schedule
 import io.github.matthewjones372.lark.retry
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.proofload.at
 import io.github.matthewjones372.proofload.engine.Proofload
@@ -35,7 +36,7 @@ fun main() {
         // The shop runs on the host and may start after this container: wait for it rather than exit.
         println("Waiting for the shop at $target")
         // The newest pet now, asked once; after that the newest grows by one each arrival.
-        val newestAtStart = Schedule.spaced<Throwable>(2.seconds).retry { client.call(listPets, Unit) }.maxOf { it.id }
+        val newestAtStart = newestPet(client)
         val started = TimeSource.Monotonic.markNow()
         fun recentPet(): Long {
             val newest = newestAtStart + started.elapsedNow().inWholeSeconds / SECONDS_PER_ARRIVAL
@@ -63,6 +64,13 @@ fun main() {
         println("Done: ${result.failed} failed. Report at build/reports/proofload/demo-traffic.html")
     }
 }
+
+/**
+ * The newest pet's id. Its own function, not inline in `main`: the shop has no call for one pet, so this reads every
+ * pet, and an inlined read leaves the whole list in a slot of the frame that runs for the day.
+ */
+private fun newestPet(client: ApiClient): Long =
+    Schedule.spaced<Throwable>(2.seconds).retry { client.call(listPets, Unit) }.maxOf { it.id }
 
 private const val DEFAULT_RATE = 5
 private const val ADOPT_ONE_IN = 4

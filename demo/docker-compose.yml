@@ -76,6 +76,7 @@ services:
     environment:
       PETSHOP_URL: http://host.docker.internal:8080
       RATE: "5"
+      # A day a run, then restarted: Proofload keeps a run in a fixed number of slots, so a day holds about 7 MiB.
       DURATION: 24h
     extra_hosts:
       - "host.docker.internal:host-gateway"

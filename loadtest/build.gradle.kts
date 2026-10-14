@@ -1,4 +1,5 @@
-val proofloadVersion = "0.1.0-rc4"
+// A snapshot until a release carries spec 0143, so a day of demo traffic holds what an hour does.
+val proofloadVersion = "0.1.1-SNAPSHOT"
 val larkVersion: String = providers.gradleProperty("larkVersion").get()
 val pelicanVersion: String = providers.gradleProperty("pelicanVersion").get()
 
