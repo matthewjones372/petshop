@@ -1,7 +1,7 @@
 plugins {
     // Writes the client from `registrySpec()`, and checks on every build that the committed one is
     // still what the descriptions produce.
-    id("io.github.matthewjones372.pelican") version "1.0.0-RC3"
+    id("io.github.matthewjones372.pelican") version "1.0.0"
 }
 
 val pelicanVersion: String = providers.gradleProperty("pelicanVersion").get()
