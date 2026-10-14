@@ -49,6 +49,19 @@ groups:
           summary: "The shop's health check is failing: {{ with query \"petshop_health_check == 0\" }}{{ range . }}{{ .Labels.check }} {{ end }}{{ end }}"
           impact: The shop says it cannot serve; /health/ready lists what is failing.
 
+  # Tempo's span metrics for the front end; the `service` label is how Estate knows the alert is petshop-web's.
+  - name: petshop-web
+    rules:
+      - alert: BrowserCallsFailing
+        expr: |
+          sum by (service) (rate(traces_spanmetrics_calls_total{service="petshop-web", span_kind="SPAN_KIND_CLIENT", status_code="STATUS_CODE_ERROR"}[1m]))
+            / sum by (service) (rate(traces_spanmetrics_calls_total{service="petshop-web", span_kind="SPAN_KIND_CLIENT"}[1m])) > 0.1
+        for: 30s
+        labels: { severity: warning }
+        annotations:
+          summary: More than one in ten of the browser's calls to the shop are failing.
+          impact: People in the browser see pets fail to load, or adoptions answered with an error.
+
   # Each keeps a `store` label naming its catalog entry, which is how Estate puts the alert on the store.
   - name: stores
     rules:

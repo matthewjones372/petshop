@@ -81,6 +81,21 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
+  # The front end in web/, built and served at http://localhost:5173; WEB_PORT moves it, say while `bun run dev` holds 5173.
+  web:
+    build:
+      context: ..
+      dockerfile: demo/web/Dockerfile
+    environment:
+      PETSHOP_URL: http://host.docker.internal:8080
+      TEMPO_URL: http://tempo:4318
+      LOKI_URL: http://loki:3100
+      PROMETHEUS_URL: http://prometheus:9090
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+
   # Receives the shop's lines when it runs with LOKI_URL=http://localhost:3100.
   loki:
     image: grafana/loki:3.6.3
@@ -102,6 +117,9 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=1h
+      # Tempo's span metrics arrive by remote write, and the front end's own metrics over OTLP.
+      - --web.enable-remote-write-receiver
+      - --enable-feature=otlp-write-receiver
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/rules.yml:/etc/prometheus/rules.yml:ro

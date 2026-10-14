@@ -40,9 +40,15 @@ private val nothingYet = Tally(events = 0, duplicates = 0, bySpecies = Species.e
  */
 val projection: Module =
     closingOf(
-        { bus: EventBus, streams: StreamBackend ->
+        { bus: EventBus, streams: StreamBackend, feed: Feed ->
             val latest = AtomicReference(Seen(emptySet(), nothingYet))
-            Projection(latest, bus.consume { event -> latest.updateAndGet { it + event } }.start(streams))
+            // One consumer, so nothing changes `latest` between the check and the update.
+            val consuming = bus.consume { event ->
+                val first = event.seq !in latest.get().seqs
+                latest.updateAndGet { it + event }
+                if (first) feed.offer(event)
+            }
+            Projection(latest, consuming.start(streams))
         },
     )
 

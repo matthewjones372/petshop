@@ -1,5 +1,6 @@
 package petshop.api
 
+import io.github.matthewjones372.pelican.Params
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.health.Health
 import io.github.matthewjones372.pelican.jackson.JacksonCodecs
@@ -7,16 +8,32 @@ import io.github.matthewjones372.pelican.metrics.otel.openTelemetry
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOrFail
+import io.github.matthewjones372.pelican.pekko.request
+import io.github.matthewjones372.pelican.pekko.streamedNow
 import io.opentelemetry.api.OpenTelemetry
+import io.opentelemetry.context.propagation.TextMapGetter
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.javadsl.Source
 import petshop.domain.NoSuchPet
 import petshop.domain.PetId
 import petshop.domain.PetShop
+import petshop.domain.ShopEvent
+
+/** Without it the filter extracts nothing, and a caller's `traceparent` starts a new trace instead of continuing. */
+private val pekkoHeaders = object : TextMapGetter<Params> {
+    override fun keys(carrier: Params) = carrier.request.headers.map { it.lowercaseName() }
+
+    override fun get(carrier: Params?, key: String): String? =
+        carrier?.request?.getHeader(key)?.map { it.value() }?.orElse(null)
+}
 
 fun petshopApi(
     shop: PetShop,
     health: Health,
     scrape: () -> String,
     tally: () -> Tally,
+    /** A fresh run per caller: each connection is a subscriber of its own. */
+    watch: () -> Source<ShopEvent, NotUsed>,
     telemetry: OpenTelemetry = OpenTelemetry.noop(),
 ) = api(
     endpoints = listOf(
@@ -39,12 +56,13 @@ fun petshopApi(
         },
         metrics handledNow { scrape() },
         stats handledNow { tally() },
+        events streamedNow { watch().map { it.toDto() } },
     ) + health.endpoints,
     codecs = JacksonCodecs,
 ) {
     title = "Petshop"
     version = "1.0.0"
-    filter(openTelemetry(telemetry))
+    filter(openTelemetry(telemetry, incomingHeaders = pekkoHeaders))
     description = """
         A small shop of tortoises, dogs, cats and parrots. An adoption records the new keeper with the chip
         registry before the pet leaves the shop, and a pet with no chip on record stays on the shelf.

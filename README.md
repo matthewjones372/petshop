@@ -15,6 +15,27 @@ docker compose -f demo/docker-compose.yml up -d postgres registry
 ./gradlew loadTest         # 200 requests a second at the real graph; not part of test or build
 ```
 
+`web/` is a SolidJS front end for the shop, in TypeScript: browse pets by species, adopt one, watch `/stats` update,
+and follow arrivals and adoptions live on `/live`, which reads the shop's server-sent events at `/events` as an Effect
+`Stream` and reconnects on an Effect `Schedule`. Its dev server proxies to the shop on :8080 (`PETSHOP_URL` overrides
+that), and Estate's `app` link opens it. The demo's compose also builds and serves it on the same port.
+
+```bash
+bun install --cwd web
+bun run --cwd web dev       # http://localhost:5173
+```
+
+The front end traces itself with Effect's own OTLP tracer. Every call to the shop goes through Effect's `HttpClient`,
+so each is a client span that sends `traceparent`, and the shop continues that trace. Adopting a pet is an `adopt pet`
+span, each `/live` connection is a `live connection` span that fails when the connection drops, and an uncaught error
+is a short span of its own. The dev server proxies `/v1/traces` to Tempo on :4318, which sends
+no CORS headers (`TEMPO_URL` overrides the target). To see one trace from a click to the shop, run the demo and the
+shop with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, adopt a pet, then open Grafana's Explore at
+<http://localhost:3000/explore>, pick **Tempo** and search for service `petshop-web` and span `adopt pet`: the browser's
+spans sit above the shop's `POST /pets/{petId}/adoption`, its `adopt` and the chip registry calls. Its log lines go to
+the demo's Loki and its Web Vitals to Prometheus the same way, and Estate shows it as the service `petshop-web`, from
+Tempo's span metrics; `demo/README.md` says what each number is.
+
 `demo/` adds Prometheus, Grafana, Alertmanager and [Estate](https://github.com/matthewjones372/estate) to watch the
 running shop. Grafana is at <http://localhost:3000> and Estate at <http://localhost:8095>; see `demo/README.md`.
 
@@ -113,7 +134,8 @@ cannot fail.
 
 Every arrival and every adoption is also recorded as an event, and another part
 of the service reads them: a projection that counts arrivals and adoptions by
-species and serves the result at `/stats`.
+species and serves the result at `/stats`, and passes each event it has not
+seen before to whoever is watching `/events`.
 
 ```
 Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT ─▶ actor changes      both rows, or neither
@@ -123,6 +145,8 @@ Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT �
                           │
                refused ◀──┴──▶ bus ─▶ projection ─▶ /stats
           (stays, next tick)          dedupe by seq, fold
+                                           │
+                                           └──▶ feed ─▶ /events   server-sent, live only
 ```
 
 - **The outbox is a Postgres table, written in one transaction with the
@@ -180,6 +204,11 @@ Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT �
   that holds every `seq` seen, because at-least-once delivery means some
   events arrive twice, and the `Tally` of the rest. `/stats` reports how many
   duplicates it dropped.
+- **The feed** is a second `Hub`, private to it, that the projection offers
+  each first-seen event to; `/events` streams it to each watcher as
+  server-sent events. It is fed from the projection rather than the bus
+  because a Kafka bus would split its partitions between the two consumers.
+  It publishes nothing while nobody watches, and a reconnect starts from now.
 
 The catalogue is the `pets` table. The actor is its only writer and holds it
 in memory. On start it reads the table back, and adds the opening catalogue

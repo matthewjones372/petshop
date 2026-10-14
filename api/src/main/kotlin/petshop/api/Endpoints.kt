@@ -7,6 +7,7 @@ import io.github.matthewjones372.pelican.json
 import io.github.matthewjones372.pelican.text
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
+import kotlin.time.Duration.Companion.seconds
 import petshop.domain.Species
 
 val petId = pathParam<Long>("petId", description = "The pet's id")
@@ -58,4 +59,13 @@ val stats = endpoint {
     tag("shop")
     summary = "What the shop's events add up to, as a consumer of them sees it"
     json<Tally>()
+}
+
+/** Live only: a reconnect starts from now, so `id` lets a caller drop what it has already shown, not resume. */
+val events = endpoint {
+    get("events")
+    tag("shop")
+    summary = "Arrivals, adoptions and returns, as the shop's events reach it"
+    // keepAlive so a proxy does not close a quiet stream. No `retry`: Effect's SSE decoder ends the stream on one.
+    sse<ShopEventDto>(eventName = "shop", id = { it.seq.toString() }, keepAlive = 15.seconds)
 }
