@@ -1,16 +1,12 @@
 import { Effect, Schedule, Schema, Stream } from "effect";
 import { Sse } from "effect/encoding";
-import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http";
+import { HttpClient, HttpClientResponse } from "effect/http";
+import { Pet } from "./api";
 
 export const ShopEvent = Schema.Struct({
   seq: Schema.Number,
   kind: Schema.Literals(["Arrived", "Adopted", "Returned"]),
-  pet: Schema.Struct({
-    id: Schema.Number,
-    name: Schema.String,
-    species: Schema.Literals(["Cat", "Dog", "Parrot", "Tortoise"]),
-    adopted: Schema.Boolean,
-  }),
+  pet: Pet,
 });
 
 export type ShopEvent = typeof ShopEvent.Type;
@@ -25,7 +21,10 @@ const reconnect = Schedule.min([Schedule.exponential("500 millis"), Schedule.spa
   Schedule.jittered,
 );
 
-/** `GET /events`, decoded, reconnecting for as long as it runs. Live only: a reconnect starts from now. */
+/**
+ * `GET /events`, decoded, reconnecting for as long as it runs. Live only: a reconnect starts from now.
+ * Each connection is a `live connection` span, failed by the drop that ends it.
+ */
 export const shopEvents = (onStatus: (status: Status) => void) =>
   Stream.unwrap(
     Effect.gen(function* () {
@@ -37,8 +36,13 @@ export const shopEvents = (onStatus: (status: Status) => void) =>
         Stream.pipeThroughChannel(Sse.decodeDataSchema(ShopEvent)),
         Stream.map((frame) => frame.data),
         Stream.concat(Stream.fail(new Disconnected())),
-        Stream.tapError(() => Effect.sync(() => onStatus("reconnecting"))),
+        Stream.tapError(() =>
+          Effect.logWarning("live connection dropped, reconnecting").pipe(
+            Effect.andThen(Effect.sync(() => onStatus("reconnecting"))),
+          ),
+        ),
+        Stream.withSpan("live connection"),
         Stream.retry(reconnect),
       );
     }),
-  ).pipe(Stream.provide(FetchHttpClient.layer));
+  );

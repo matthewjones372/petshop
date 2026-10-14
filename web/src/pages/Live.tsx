@@ -2,6 +2,7 @@ import { A } from "@solidjs/router";
 import { Effect, Fiber, Stream } from "effect";
 import { For, Show, createSignal, onCleanup } from "solid-js";
 import { look } from "../api";
+import { runtime } from "../telemetry";
 import { shopEvents, type ShopEvent, type Status } from "../feed";
 
 const kept = 60;
@@ -23,7 +24,7 @@ export default function Live() {
   const [events, setEvents] = createSignal<ShopEvent[]>([]);
   const [counts, setCounts] = createSignal({ Arrived: 0, Adopted: 0, Returned: 0 });
 
-  const fiber = Effect.runFork(
+  const fiber = runtime.runFork(
     shopEvents(setStatus).pipe(
       Stream.runForEach((event) =>
         Effect.sync(() => {
@@ -33,7 +34,7 @@ export default function Live() {
       ),
     ),
   );
-  onCleanup(() => Effect.runFork(Fiber.interrupt(fiber)));
+  onCleanup(() => runtime.runFork(Fiber.interrupt(fiber)));
 
   return (
     <div style={{ "max-width": "52rem" }}>

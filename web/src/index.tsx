@@ -7,6 +7,9 @@ import Pets from "./pages/Pets";
 import PetPage from "./pages/Pet";
 import Stats from "./pages/Stats";
 import Live from "./pages/Live";
+import { watchPage } from "./telemetry";
+
+watchPage();
 
 render(
   () => (

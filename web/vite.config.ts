@@ -3,6 +3,8 @@ import solid from "vite-plugin-solid";
 
 // The shop serves no CORS headers, so the dev server proxies to it. PETSHOP_URL overrides the target.
 const shop = process.env.PETSHOP_URL ?? "http://127.0.0.1:8080";
+// Tempo sends no CORS headers either, so the browser's spans reach it the same way. TEMPO_URL overrides the target.
+const tempo = process.env.TEMPO_URL ?? "http://127.0.0.1:4318";
 
 // /pets and /stats are also page routes: a browser asking for HTML gets the app, fetch gets the shop.
 const api: ProxyOptions = {
@@ -21,6 +23,7 @@ export default defineConfig({
       "/reference": shop,
       "/api-docs": shop,
       "/openapi.json": shop,
+      "/v1/traces": tempo,
     },
   },
 });
