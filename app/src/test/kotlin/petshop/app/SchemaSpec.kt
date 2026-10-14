@@ -6,7 +6,6 @@ import org.apache.avro.Schema
 import org.apache.avro.SchemaCompatibility
 import org.junit.jupiter.api.Test
 
-/** The topic's contract: a change a reader of the old schema could not follow fails here. */
 class SchemaSpec {
 
     private val golden: Schema =

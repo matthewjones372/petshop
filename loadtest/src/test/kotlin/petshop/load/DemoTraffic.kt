@@ -18,11 +18,7 @@ import petshop.api.listPets
 import petshop.api.getPet
 import petshop.api.stats
 
-/**
- * Demo visitors against `PETSHOP_URL` (http://localhost:8080 by default), at `RATE` a second for `DURATION`:
- * `./gradlew :loadtest:demoTraffic`. Declared refusals are answers, not failures; only an undeclared
- * response fails a step.
- */
+/** Declared refusals are answers, not failures: only an undeclared response fails a step. */
 fun main() {
     val target = System.getenv("PETSHOP_URL") ?: "http://localhost:8080"
     val rate = System.getenv("RATE")?.toInt() ?: DEFAULT_RATE

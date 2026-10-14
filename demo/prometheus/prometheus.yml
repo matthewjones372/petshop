@@ -18,7 +18,6 @@ scrape_configs:
       # On Linux this is the Docker bridge, so the app must listen on it: HOST=0.0.0.0 ./gradlew :app:run.
       - targets: ["host.docker.internal:8080"]
 
-  # pg_up is 0 when the database does not answer.
   - job_name: postgres
     static_configs:
       - targets: ["postgres-exporter:9187"]

@@ -65,7 +65,6 @@ internal fun relay(
             published + 1
         }
 
-/** A refused event stays in the outbox for the next tick. */
 private fun published(claimed: List<ShopEvent>, bus: EventBus): List<ShopEvent> {
     gauge("petshop.outbox.claimed").set(claimed.size.toDouble())
     return claimed.mapNotNull { event ->

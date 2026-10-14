@@ -24,14 +24,11 @@ class FakeRegistry(private val refusing: RegistryError? = null) : ChipRegistry {
         refusing?.left() ?: chip.copy(keeper = to).right()
 }
 
-/**
- * Overriding before cutting, so the registry's settings go too. `overriding` rather than `plus`: it
- * refuses a key the graph does not hold, so a fake under the wrong type fails here.
- */
+/** `overriding`, not `plus`: it refuses a key the graph does not hold, so a fake under the wrong type fails here. */
 fun shopWith(registry: ChipRegistry = FakeRegistry()): Module =
-    petshop.overriding(single<ChipRegistry> { registry }).onAFreshDatabase().subgraph<PetShop>()
+    Petshop.module.overriding(single<ChipRegistry> { registry }).onAFreshDatabase().subgraph<PetShop>()
 
 fun shopCalling(registry: PelicanWireMock, timeout: Duration = 2.seconds): Module =
-    petshop.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, timeout) })
+    Petshop.module.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, timeout) })
         .onAFreshDatabase()
         .subgraph<PetShop>()

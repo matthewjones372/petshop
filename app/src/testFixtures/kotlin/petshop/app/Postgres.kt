@@ -32,7 +32,6 @@ fun Module.onAFreshDatabase(): Module = overriding(single<DatabaseSettings> { Te
 /** Two graphs on the same [database] are two instances writing one table, each running a relay. */
 fun Module.onDatabase(database: DatabaseSettings): Module = overriding(single<DatabaseSettings> { database })
 
-/** How many events have ever been written to the outbox: the last `seq` Postgres handed out. */
 fun DatabaseSettings.recorded(): Long =
     asking("SELECT coalesce(pg_sequence_last_value(pg_get_serial_sequence('outbox', 'seq')::regclass), 0)")
 

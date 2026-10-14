@@ -21,7 +21,6 @@ services:
       metrics: http://localhost:8080/metrics
       dashboard: http://localhost:3000
       prometheus: http://localhost:9090/alerts
-    # Its lines in Loki, pushed by its logback when it runs with LOKI_URL set.
     logs: { selector: '{app="petshop"}', errors: ERROR }
     stats:
       preset: jvm

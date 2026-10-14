@@ -34,7 +34,6 @@ data class Find(val id: PetId, val reply: Reply<Option<Pet>>) : Shop
 
 data class Adopt(val id: PetId, val by: String, val reply: Reply<Either<PetShopError, Pet>>) : Shop
 
-/** An adoption undone because the registry would not record the new keeper. */
 data class Returned(val id: PetId) : Shop
 
 private class State(val pets: Map<PetId, Pet>, private val outbox: Outbox) {
