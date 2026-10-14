@@ -2,10 +2,11 @@ package petshop.api
 
 import arrow.core.Either
 import arrow.core.left
+import io.github.matthewjones372.lark.stream.Stream
+import io.github.matthewjones372.lark.stream.empty
 import io.github.matthewjones372.pelican.test.golden.Golden
 import io.github.matthewjones372.pelican.test.pekko.inMemory
 import io.github.matthewjones372.pelican.health.health
-import org.apache.pekko.stream.javadsl.Source
 import org.junit.jupiter.api.Test
 import petshop.domain.NoSuchPet
 import petshop.domain.Pet
@@ -34,7 +35,7 @@ class GoldenSpec {
         health = health { },
         scrape = { "" },
         tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
-        watch = { Source.empty() },
+        watch = { Stream.empty() },
     )
 
     @Test

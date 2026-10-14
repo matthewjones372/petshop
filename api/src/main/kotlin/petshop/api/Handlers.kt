@@ -9,11 +9,12 @@ import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.pekko.handledNow
 import io.github.matthewjones372.pelican.pekko.handledOrFail
 import io.github.matthewjones372.pelican.pekko.request
+import io.github.matthewjones372.lark.stream.Stream
+import io.github.matthewjones372.lark.stream.map
+import io.github.matthewjones372.lark.stream.toSource
 import io.github.matthewjones372.pelican.pekko.streamedNow
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.context.propagation.TextMapGetter
-import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.javadsl.Source
 import petshop.domain.NoSuchPet
 import petshop.domain.PetId
 import petshop.domain.PetShop
@@ -33,7 +34,7 @@ fun petshopApi(
     scrape: () -> String,
     tally: () -> Tally,
     /** A fresh run per caller: each connection is a subscriber of its own. */
-    watch: () -> Source<ShopEvent, NotUsed>,
+    watch: () -> Stream<Nothing, ShopEvent>,
     telemetry: OpenTelemetry = OpenTelemetry.noop(),
 ) = api(
     endpoints = listOf(
@@ -56,7 +57,7 @@ fun petshopApi(
         },
         metrics handledNow { scrape() },
         stats handledNow { tally() },
-        events streamedNow { watch().map { it.toDto() } },
+        events streamedNow { watch().map { it.toDto() }.toSource() },
     ) + health.endpoints,
     codecs = JacksonCodecs,
 ) {

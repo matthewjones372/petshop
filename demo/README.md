@@ -1,7 +1,7 @@
 # Watching the numbers
 
 Two terminals. The application runs on the host. Everything else runs in
-Docker: the front end, Prometheus, Grafana, Alertmanager, Estate, Loki, Tempo, a traffic generator, the Postgres the outbox is in,
+Docker: the front end, Prometheus, Grafana, Alertmanager, Estate, Loki, Tempo, a traffic generator, a headless browser visiting the front end, the Postgres the outbox is in,
 Kafka and its schema registry, an exporter for each of those two, and a stand-in
 chip registry. Compose goes first,
 because the application will not start without its database. The first `up` builds the traffic generator's image
@@ -63,6 +63,13 @@ Grafana show refusals as well as sales. `RATE`, `DURATION` (`10m`) and
 `PETSHOP_URL` change how many, for how long, and where. Proofload's report is
 written to `loadtest/build/reports/proofload/demo-traffic.html`.
 
+Those visitors call the API, so the front end hears nothing of them. Compose's `browser` service is the front end's
+traffic: headless Chromium (Playwright's image, `browser/Dockerfile`) opening <http://web:5173> four times a
+minute. Each visitor loads `/pets`, opens a pet, adopts it one time in four, then watches `/live` and `/stats` for
+a few seconds before leaving. Every visit is a fresh page load, so it reports its own Web Vitals, and Estate's
+`petshop-web` and the map's edge to the shop move with nobody at the keyboard. `RATE` sets visits a minute, and
+`docker compose stop browser` quiets it.
+
 Or make something happen by hand. Stop the traffic first, or it may adopt the pet you picked, and pick a pet that
 `curl localhost:8080/pets` shows with `"adopted": false`:
 
@@ -95,9 +102,8 @@ service graph, written to Prometheus, and that is how Estate shows `petshop-web`
 adoption's click-to-answer time and `/live`'s reconnects from the span metrics, the edge to the shop from the service
 graph, and the latest Core Web Vitals from the browser's own OTLP metrics. Its lines (errors, vitals, reconnects) go to
 Loki as `{service_name="petshop-web"}`. With the shop running as above, click about the front end at
-<http://localhost:5173> and the numbers appear on Estate within a minute. The traffic generator calls the API
-directly, so `petshop-web` is quiet while nobody has the front end open; its `/stats` page asks every three seconds,
-which is enough to keep it moving.
+<http://localhost:5173> and the numbers appear on Estate within a minute. Compose's `browser` service does the
+clicking when nobody else is: see the traffic above.
 
 ## On Kafka
 
@@ -167,7 +173,7 @@ here is a process on your machine. There is no p99 either: the adoption timer is
 
 | | |
 |---|---|
-| `docker-compose.yml` | the front end, Prometheus, Alertmanager, Grafana, Estate, Loki, Tempo, Proofload's visitors (`traffic/Dockerfile`), the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
+| `docker-compose.yml` | the front end, Prometheus, Alertmanager, Grafana, Estate, Loki, Tempo, Proofload's visitors (`traffic/Dockerfile`), a headless browser visiting the front end (`browser/Dockerfile`), the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
 | `web/Dockerfile` | the front end in `web/`, built with bun and served by `vite preview` through the same proxies as `bun run dev` |
 | `tempo/tempo.yaml` | Tempo, receiving OTLP over HTTP on 4318, and writing span metrics and the service graph to Prometheus |
 | `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
