@@ -10,8 +10,8 @@ import io.github.matthewjones372.lark.micrometer.MicrometerMetrics
 import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.string.shouldContain
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
-import io.micrometer.prometheus.PrometheusConfig
-import io.micrometer.prometheus.PrometheusMeterRegistry
+import io.micrometer.prometheusmetrics.PrometheusConfig
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import javax.sql.DataSource
 import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Test
@@ -62,15 +62,15 @@ class ScrapeSpec {
                 scrape shouldContain "jvm_threads_live_threads"
                 scrape shouldContain "process_cpu_usage"
             }
-            And("so is the pool") { scrape shouldContain """hikaricp_connections_active{pool="petshop",""" }
+            And("so is the pool") { scrape shouldContain """hikaricp_connections_active{pool="petshop"""" }
             // The checks are asked on their own thread, once a second, so the first answer is a moment behind.
             And("the shop is ready, and each check answers").eventually(10.seconds) {
                 val now = app.registry.scrape()
                 now shouldContain "petshop_ready 1.0"
-                now shouldContain """petshop_health_check{check="database",} 1.0"""
-                now shouldContain """petshop_health_check{check="shop",} 1.0"""
+                now shouldContain """petshop_health_check{check="database"} 1.0"""
+                now shouldContain """petshop_health_check{check="shop"} 1.0"""
                 listOf("relay", "projection", "arrivals").forEach { run ->
-                    now shouldContain """petshop_health_check{check="$run",} 1.0"""
+                    now shouldContain """petshop_health_check{check="$run"} 1.0"""
                 }
             }
         }

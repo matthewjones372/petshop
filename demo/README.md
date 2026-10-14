@@ -189,9 +189,10 @@ label names per metric name, and a series registered with a different set is
 dropped silently. That is how the first version of this lost every refusal while
 appearing to work.
 
-**The durations are milliseconds.** `timed` records in milliseconds and
-Prometheus convention is seconds, so `petshop_adopt_duration_sum` is not a
-`_seconds_sum`. The panels say `ms` for that reason.
+**The durations are seconds.** `timed` records in seconds, Prometheus's
+convention, though the name has no `_seconds` suffix:
+`petshop_adopt_duration_sum` is seconds. The panels say `s`, and Estate's
+mean adoption multiplies by 1000 to show milliseconds.
 
 ## Anonymous admin
 
