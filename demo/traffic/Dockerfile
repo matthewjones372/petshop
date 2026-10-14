@@ -1,4 +1,4 @@
-# The demo's visitors (loadtest's DemoTraffic). Built from the repository root: see docker-compose.yml.
+# Built from the repository root: see docker-compose.yml.
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /src
 COPY . .

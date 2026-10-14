@@ -24,7 +24,6 @@ import petshop.domain.PetShop
 import petshop.domain.ShopEvent
 import petshop.domain.Species
 
-/** The relay is a dependency so that it runs. */
 private class Served(val shop: PetShop, val projection: Projection)
 
 private val served: Module =
@@ -32,7 +31,7 @@ private val served: Module =
 
 abstract class EventBusContract {
 
-    /** A new, empty bus. [name] keeps topics and readers apart on a shared broker. */
+    /** [name] keeps topics and readers apart on a shared broker. */
     abstract fun bus(name: String): EventBus
 
     protected open val remembersReaders: Boolean = false
@@ -70,7 +69,7 @@ abstract class EventBusContract {
     fun `the whole service runs on it, and an adoption reaches the projection`() = story {
         val service = Given("the whole service with its events on this bus") {
             (
-                petshop.overriding(single<ChipRegistry> { FakeRegistry() })
+                Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() })
                     .overriding(singleOf<EventBus>({ bus("service") }, { bus -> bus.close() }))
                     .onAFreshDatabase() + served
                 )

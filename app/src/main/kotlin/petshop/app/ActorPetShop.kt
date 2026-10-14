@@ -45,7 +45,6 @@ val opening: List<Pet> = listOf(
     Pet(PetId(3), "Mrs Peel", Species.Cat),
 )
 
-/** Reads and writes go to the actor, so there is one writer and no lock. */
 class ActorPetShop(
     private val ref: ActorRef<Shop>,
     private val tracer: Tracer,
@@ -87,10 +86,7 @@ class ActorPetShop(
             }
         }
 
-    /**
-     * The actor decides first, so a lost race never calls the registry. If the registry cannot record
-     * the new keeper, the pet goes back on the shelf.
-     */
+    /** The actor decides first, so a lost race never calls the registry. */
     private fun handOver(id: PetId, by: String): Either<PetShopError, Pet> = either {
         val pet = ref.asked { reply -> Adopt(id, by, reply) }.bind()
         registry.lookup(id)

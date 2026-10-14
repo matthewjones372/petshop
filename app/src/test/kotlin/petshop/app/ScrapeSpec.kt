@@ -52,7 +52,7 @@ class ScrapeSpec {
     @Test
     fun `the scrape says how the JVM, the pool and every health check are`() = story {
         val service = Given("the shop on a fresh database") {
-            (petshop.overriding(single<ChipRegistry> { FakeRegistry() }).onAFreshDatabase() + scraped).subgraph<Scraped>()
+            (Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() }).onAFreshDatabase() + scraped).subgraph<Scraped>()
         }
         testApp(service) { app: Scraped ->
             val scrape = When("Prometheus scrapes it") { app.registry.scrape() }

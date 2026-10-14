@@ -26,7 +26,7 @@ private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 private val barnaby = Pet(PetId(2), "Barnaby", Species.Dog)
 
 private fun onItsOwn(test: (Outbox) -> Unit) =
-    testApp(petshop.onAFreshDatabase().subgraph<Outbox>()) { outbox: Outbox -> test(outbox) }
+    testApp(Petshop.module.onAFreshDatabase().subgraph<Outbox>()) { outbox: Outbox -> test(outbox) }
 
 /** Read by a claim that publishes nothing, so it takes nothing. */
 private fun Outbox.left(): List<ShopEvent> {
@@ -137,7 +137,7 @@ class PostgresOutboxSpec {
 
     @Test
     fun `a pet's change and its event are one transaction, so an event that fails leaves the pet as it was`() = story {
-        testApp(petshop.onAFreshDatabase().subgraph<DataSource>()) { dataSource: DataSource ->
+        testApp(Petshop.module.onAFreshDatabase().subgraph<DataSource>()) { dataSource: DataSource ->
             val table = Given("a pets table with Nibbles on the shelf") {
                 OutboxTable(dataSource).also { it.stock(listOf(PetRow(1, "Nibbles", "Tortoise", adopted = false))) }
             }

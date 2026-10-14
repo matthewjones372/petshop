@@ -40,7 +40,7 @@ import petshop.app.RegistrySettings
 import petshop.app.TestPostgres
 import petshop.app.onAFreshDatabase
 import petshop.app.onDatabase
-import petshop.app.petshop
+import petshop.app.Petshop
 import petshop.app.recorded
 import petshop.app.unsent
 import petshop.registry.ChipRecord
@@ -57,7 +57,7 @@ class PetshopLoadTest {
     }
 
     private val calling: Module =
-        petshop.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
+        Petshop.module.overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
 
     private val theShop: Module = calling.onAFreshDatabase()
 
@@ -91,7 +91,6 @@ class PetshopLoadTest {
         result[browse].serviceTime.p99 shouldBeLessThan 100.milliseconds
     }
 
-    /** A pet is sold once: a second Ok fails the run. */
     @LoadTest
     fun `a pet already adopted is never sold again`(proofload: Proofload) {
         val outcome = theShop.use { server: PelicanServer ->
@@ -123,10 +122,7 @@ class PetshopLoadTest {
 
     private val browseEither = step("browse either instance")
 
-    /**
-     * Two instances on one outbox. An event claimed by both relays would be counted by both projections,
-     * so the tallies must add up to exactly what was recorded.
-     */
+    /** An event claimed by both relays would be counted twice, so the tallies must add up to what was recorded. */
     @LoadTest
     fun `two relays on one outbox publish every event once between them`(proofload: Proofload) {
         val database = TestPostgres.fresh()

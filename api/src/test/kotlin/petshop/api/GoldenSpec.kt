@@ -13,10 +13,7 @@ import petshop.domain.PetShop
 import petshop.domain.PetShopError
 import petshop.domain.Species
 
-/**
- * Recorded under `src/test/resources/golden`. A change that breaks a caller fails; one that does not
- * rewrites the file, so the change shows in the diff.
- */
+/** A change that breaks a caller fails; one that does not rewrites the golden file, so it shows in the diff. */
 class GoldenSpec {
 
     private val golden = Golden()

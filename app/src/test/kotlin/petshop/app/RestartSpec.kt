@@ -23,13 +23,12 @@ private class Running(val shop: PetShop)
 
 private val running: Module = single { shop: PetShop, _: Arrivals -> Running(shop) }
 
-/** The catalogue is written in the same transaction as each event, so a restart opens the shop as it was left. */
 class RestartSpec {
 
     private val database = TestPostgres.fresh()
 
     private val shop: Module =
-        (petshop.overriding(single<ChipRegistry> { FakeRegistry() }).onDatabase(database) + running)
+        (Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() }).onDatabase(database) + running)
             .subgraph<Running>()
             .overridingConfig("petshop.arrivalsEvery = 50ms")
 
@@ -38,7 +37,6 @@ class RestartSpec {
         val before = When("Ada adopts Nibbles, and the shop runs long enough for pets to arrive") {
             testApp(shop) { app: Running ->
                 app.shop.adopt(PetId(1), by = "Ada").shouldBeRight()
-                // Until a fourth pet has arrived, rather than a sleep that may be too short.
                 eventually(5.seconds) { app.shop.all().also { pets -> (pets.size > opening.size) shouldBe true } }
             }
         }

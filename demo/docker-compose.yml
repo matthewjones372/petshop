@@ -1,6 +1,4 @@
-# Monitoring and dependencies for a petshop running on the host with `./gradlew :app:run`.
 services:
-  # WireMock standing in for the chip registry. application.conf points at it by default.
   registry:
     image: wiremock/wiremock:3.13.1
     volumes:
@@ -8,7 +6,6 @@ services:
     ports:
       - "8089:8080"
 
-  # The outbox's database. The petshop creates the table itself on start.
   postgres:
     image: postgres:17-alpine
     environment:
@@ -19,8 +16,7 @@ services:
       # 55432 on the host, since a local Postgres usually holds 5432.
       - "55432:5432"
 
-  # For BUS=kafka. The host reaches it on 9092, the schema registry on kafka:29092. The JVM image:
-  # kafka-native segfaults on some starts.
+  # The JVM image: kafka-native segfaults on some starts.
   kafka:
     image: apache/kafka:4.3.1
     environment:
@@ -39,7 +35,6 @@ services:
     ports:
       - "9092:9092"
 
-  # Estate's postgres store reads these metrics.
   postgres-exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
     depends_on: [postgres]
@@ -48,15 +43,13 @@ services:
       DATA_SOURCE_USER: petshop
       DATA_SOURCE_PASS: petshop
 
-  # Estate's kafka store reads these. The broker speaks Kafka 4, which dropped the protocol versions the
-  # exporter asks for unless it is told which version it is talking to.
+  # --kafka.version: Kafka 4 dropped the protocol versions the exporter asks for by default.
   kafka-exporter:
     image: danielqsj/kafka-exporter:v1.10.0
     depends_on: [kafka]
     command: ["--kafka.server=kafka:29092", "--kafka.version=3.9.0"]
     restart: unless-stopped
 
-  # application.conf points at it when BUS=kafka.
   schema-registry:
     image: confluentinc/cp-schema-registry:8.3.2
     depends_on: [kafka]
@@ -67,8 +60,6 @@ services:
     ports:
       - "8081:8081"
 
-  # Demo visitors. Restarted when it ends or the shop is not up yet. `docker compose stop traffic` for a
-  # quiet shop.
   traffic:
     build:
       context: ..
@@ -117,7 +108,6 @@ services:
     ports:
       - "3000:3000"
 
-  # Sends alerts nowhere: Estate reads them and keeps its silences here.
   alertmanager:
     image: prom/alertmanager:v0.27.0
     command:
@@ -127,7 +117,6 @@ services:
     ports:
       - "9093:9093"
 
-  # Estate, on http://localhost:8095. Its catalog is estate/catalog.yaml.
   estate:
     image: ghcr.io/matthewjones372/estate:main
     depends_on: [prometheus, alertmanager]

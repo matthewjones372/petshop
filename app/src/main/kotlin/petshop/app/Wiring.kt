@@ -71,22 +71,14 @@ private val web: Module =
     )
 
 fun petshopFrom(conf: Config): Module =
-    configOf(conf) + settings + telemetry + database + http + registry + theShop + checks + meters + arrivals + events + bus(conf) + web
-
-private val read: Config = ConfigFactory.load()
-
-val petshop: Module = petshopFrom(read)
-
-/**
- * The database URL is masked too, because `DATABASE_URL` often carries a password. Not `layeredConfig()`:
- * in lark 0.9.2 its `origins()` throws on the `key = default` then `key = ${?ENV}` pairs in application.conf.
- */
-private fun reported(): String =
-    read.withOnlyPath("petshop").origins(Secrets.default.and("petshop.database.url")).report()
+    configOf(conf) + settings + telemetry + database + http + registry + theShop + checks + meters + arrivals +
+        events + bus(conf) + web
 
 object Petshop : LarkApp<PelicanServer>() {
 
-    override val module: Module = petshop
+    private val conf: Config = ConfigFactory.load()
+
+    override val module: Module = petshopFrom(conf)
 
     override fun AppScope.run(root: PelicanServer) {
         logInfo(reported())
@@ -95,4 +87,9 @@ object Petshop : LarkApp<PelicanServer>() {
         // period instead of stopping the relay and committing Kafka offsets.
         awaitShutdown()
     }
+
+    // DATABASE_URL often carries a password. Not layeredConfig(): lark 0.9.2's origins() throws on
+    // `${?ENV}` pairs (fixed in lark#372).
+    private fun reported(): String =
+        conf.withOnlyPath("petshop").origins(Secrets.default.and("petshop.database.url")).report()
 }

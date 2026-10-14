@@ -28,7 +28,7 @@ private val observed: Module =
     }
 
 private fun settledWith(registry: ChipRegistry): Module =
-    (petshop.overriding(single<ChipRegistry> { registry }).onAFreshDatabase() + observed)
+    (Petshop.module.overriding(single<ChipRegistry> { registry }).onAFreshDatabase() + observed)
         .subgraph<Observed>()
         .overridingConfig("petshop.outboxEvery = 50ms")
 

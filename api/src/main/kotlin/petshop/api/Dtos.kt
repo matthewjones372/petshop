@@ -34,7 +34,6 @@ fun Pet.toDto(): PetDto = transformInto()
 
 fun List<Pet>.toDto(): List<PetDto> = transformInto()
 
-/** A new domain failure without a case or rename here fails the build. */
 fun PetShopError.toDto(): ProblemDto = into<_, ProblemDto>()
     .withSealedCaseRenamed(RegistryDown::class, ProblemDto.Unavailable::class)
     .withSealedCaseRenamed(NotRecorded::class, ProblemDto.Unavailable::class)
