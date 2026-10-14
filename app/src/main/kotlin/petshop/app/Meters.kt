@@ -19,28 +19,28 @@ import io.micrometer.core.instrument.binder.system.UptimeMetrics
 import io.micrometer.prometheus.PrometheusMeterRegistry
 import kotlin.time.Duration.Companion.seconds
 
-class Meters internal constructor(private val gc: JvmGcMetrics, private val asking: Running<Nothing, Unit>) :
-    AutoCloseable {
+/** The JVM's meters, under the names a JVM dashboard reads. The GC binder is the node: it listens, and needs closing. */
+private val jvmMeters: Module =
+    singleOf(
+        { registry: PrometheusMeterRegistry ->
+            JvmGcMetrics().also { gc ->
+                listOf(JvmMemoryMetrics(), gc, JvmThreadMetrics(), ClassLoaderMetrics(), ProcessorMetrics(), UptimeMetrics())
+                    .forEach { it.bindTo(registry) }
+            }
+        },
+        { gc -> gc.close() },
+    )
 
-    override fun close() {
-        asking.close()
-        gc.close()
-    }
-}
+class ReadinessGauges internal constructor(val running: Running<Nothing, Unit>)
 
 /**
  * Checks run on their own stream, not in the scrape: a check on a dead database outlasts the scrape timeout,
  * and a timed-out scrape reads as the shop being down.
  */
-val meters: Module =
+private val readinessGauges: Module =
     singleOf(
-        { registry: PrometheusMeterRegistry, readiness: Readiness, streams: StreamBackend ->
-            // The only binder that needs closing: it listens for GC notifications.
-            val gc = JvmGcMetrics()
-            listOf(JvmMemoryMetrics(), gc, JvmThreadMetrics(), ClassLoaderMetrics(), ProcessorMetrics(), UptimeMetrics())
-                .forEach { it.bindTo(registry) }
-
-            val asking = Stream.tick(every = 1.seconds, element = Unit)
+        { readiness: Readiness, streams: StreamBackend ->
+            Stream.tick(every = 1.seconds, element = Unit)
                 .map { _ -> readiness.failing() }
                 .runFold(Unit) { _, failing ->
                     // Ready as /health/ready answers it: a stopped background run is a warning there, not a 503.
@@ -50,7 +50,9 @@ val meters: Module =
                     }
                 }
                 .start(streams)
-            Meters(gc, asking)
+                .let(::ReadinessGauges)
         },
-        { meters -> meters.close() },
+        { gauges -> gauges.running.close() },
     )
+
+val meters: Module = jvmMeters + readinessGauges

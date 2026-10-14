@@ -15,10 +15,12 @@ import io.github.matthewjones372.lark.app.typesafe.origins
 import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.StreamBackend
+import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.health.Health
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.micrometer.core.instrument.Metrics as MicrometerRegistries
+import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.prometheus.PrometheusConfig
 import io.micrometer.prometheus.PrometheusMeterRegistry
 import io.opentelemetry.api.trace.Tracer
@@ -61,14 +63,16 @@ private val events: Module =
         projection
 
 private val web: Module =
-    singleOf(
-        { shop: PetShop, config: Settings, system: TypedSystem<Void>, health: Health,
-            registry: PrometheusMeterRegistry, projection: Projection, _: Arrivals, _: OutboxRelay, _: Meters ->
-            petshopApi(shop, health, registry::scrape, projection::tally)
-                .startWithDocs(system, port = config.port, host = config.host, docs = petshopDocs)
-        },
-        { server -> server.stop() },
-    )
+    single { shop: PetShop, health: Health, registry: PrometheusMeterRegistry, projection: Projection ->
+        petshopApi(shop, health, registry::scrape, projection::tally)
+    } +
+        singleOf(
+            { api: Api, config: Settings, system: TypedSystem<Void>, _: Arrivals, _: OutboxRelay, _: ReadinessGauges,
+                _: JvmGcMetrics ->
+                api.startWithDocs(system, port = config.port, host = config.host, docs = petshopDocs)
+            },
+            { server -> server.stop() },
+        )
 
 fun petshopFrom(conf: Config): Module =
     configOf(conf) + settings + telemetry + database + http + registry + theShop + checks + meters + arrivals +
