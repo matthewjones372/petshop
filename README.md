@@ -15,6 +15,14 @@ docker compose -f demo/docker-compose.yml up -d postgres registry
 ./gradlew loadTest         # 200 requests a second at the real graph; not part of test or build
 ```
 
+`web/` is a SolidJS front end for the shop: browse pets by species, adopt one, and watch `/stats` update. Its dev
+server proxies to the shop on :8080 (`PETSHOP_URL` overrides that).
+
+```bash
+npm --prefix web install
+npm --prefix web run dev    # http://localhost:5173
+```
+
 `demo/` adds Prometheus, Grafana, Alertmanager and [Estate](https://github.com/matthewjones372/estate) to watch the
 running shop. Grafana is at <http://localhost:3000> and Estate at <http://localhost:8095>; see `demo/README.md`.
 
