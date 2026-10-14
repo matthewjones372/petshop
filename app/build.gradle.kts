@@ -59,9 +59,8 @@ dependencies {
     implementation("io.github.matthewjones372:lark-slf4j:$larkVersion")
     implementation("io.github.matthewjones372:lark-micrometer:$larkVersion")
 
-    // The simpleclient build keeps the 1.12 metric names Estate queries; 1.12's micrometer-core has an
-    // open advisory.
-    implementation("io.micrometer:micrometer-registry-prometheus-simpleclient:1.16.6")
+    // On the Prometheus Java client 1.x; the simpleclient build it replaces is deprecated.
+    implementation("io.micrometer:micrometer-registry-prometheus:1.16.6")
 
     // Without a backend, SLF4J is a no-op and a failure in a handler reaches no terminal.
     runtimeOnly("ch.qos.logback:logback-classic:1.5.34")

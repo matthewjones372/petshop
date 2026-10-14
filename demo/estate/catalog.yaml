@@ -27,7 +27,7 @@ services:
       selector: job="petshop"
       extra:
         - { title: Pets in the shop, query: max(petshop_pets_in_shop) }
-        - { title: Mean adoption, query: 'sum(petshop_adopt_duration_sum) / clamp_min(sum(petshop_adopt_duration_count), 1)', unit: ms }
+        - { title: Mean adoption, query: '1000 * sum(petshop_adopt_duration_sum) / clamp_min(sum(petshop_adopt_duration_count), 1)', unit: ms }
         - { title: Events published, query: 'sum(rate(petshop_outbox_published_total[1m]))', unit: /s }
         - { title: Claimed per tick, query: max(petshop_outbox_claimed) }
         - { title: Refused by the bus, query: 'sum(rate(petshop_outbox_refused_total[1m])) or vector(0)', unit: /s }
