@@ -48,7 +48,6 @@ export default function Layout(props: RouteSectionProps) {
       <footer class="footer">
         <div class="footer-inner">
           <span>petshop · Pelican, Lark and friends, one small shop</span>
-          <span>Look and feel after <a href="https://eezo.io">eezo.io</a></span>
         </div>
       </footer>
     </>
