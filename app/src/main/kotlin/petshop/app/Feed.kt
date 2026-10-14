@@ -5,9 +5,7 @@ import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.counter
 import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.stream.Hub
-import io.github.matthewjones372.lark.stream.toSource
-import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.javadsl.Source
+import io.github.matthewjones372.lark.stream.Stream
 import petshop.domain.ShopEvent
 
 /**
@@ -26,7 +24,7 @@ class Feed internal constructor(private val hub: Hub<ShopEvent>) : AutoCloseable
 
     val watchers: Int get() = hub.subscribers
 
-    fun watch(): Source<ShopEvent, NotUsed> = hub.subscribe().toSource()
+    fun watch(): Stream<Nothing, ShopEvent> = hub.subscribe()
 }
 
 val feed: Module = closingOf { -> Feed(Hub(capacity = 256)) }
