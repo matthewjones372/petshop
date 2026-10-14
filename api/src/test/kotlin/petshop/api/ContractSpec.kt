@@ -3,14 +3,17 @@ package petshop.api
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
+import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.empty
-import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.lark.stream.of
+import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.github.matthewjones372.pelican.test.shouldBeError
 import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
 import io.github.matthewjones372.pelican.health.health
+import io.github.matthewjones372.pelican.jetty.Handlers
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
@@ -22,6 +25,9 @@ import petshop.domain.PetShop
 import petshop.domain.PetShopError
 import petshop.domain.RegistryDown
 import petshop.domain.Species
+
+/** The default stack's binders, which every test here serves through. */
+internal val onJetty: Binders = JettyBinders(Forks())
 
 private class OnePet(private var pet: Pet) : PetShop {
     override fun all(): List<Pet> = listOf(pet)
@@ -43,12 +49,14 @@ class ContractSpec {
     private val probes = health { }
 
     private val app = petshopApi(
+        on = onJetty,
+        codecs = KotlinxShopCodecs,
         shop = OnePet(nibbles),
         health = probes,
         scrape = { "petshop_adoptions_total 1.0" },
         tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
         watch = { Stream.empty() },
-    ).inMemory("petshop-contract")
+    ).inMemory(Handlers.onVirtualThreads)
 
     @Test
     fun `a test names the endpoint, not the URL`() {
@@ -92,6 +100,8 @@ class ContractSpec {
             NotRecorded(1) to ProblemDto.Unavailable(1, NotRecorded(1).message),
         ).forEach { (refusal, declared) ->
             val refusing = petshopApi(
+                on = onJetty,
+                codecs = KotlinxShopCodecs,
                 shop = object : PetShop by OnePet(nibbles) {
                     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = refusal.left()
                 },
@@ -99,10 +109,26 @@ class ContractSpec {
                 scrape = { "" },
                 tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
                 watch = { Stream.empty() },
-            ).inMemory("petshop-refusing-${refusal::class.simpleName}")
+            ).inMemory(Handlers.onVirtualThreads)
 
             refusing.outcome(adoptPet, 1L).shouldBeError() shouldBe declared
         }
     }
 
+    @Test
+    fun `the events endpoint streams each event the feed hands it, then ends with the feed`() {
+        val arrived = ShopEventDto(1, ShopEventKind.Arrived, nibbles.toDto())
+        val adopted = ShopEventDto(2, ShopEventKind.Adopted, nibbles.copy(adopted = true).toDto())
+        val watched = petshopApi(
+            on = onJetty,
+            codecs = KotlinxShopCodecs,
+            shop = OnePet(nibbles),
+            health = probes,
+            scrape = { "" },
+            tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+            watch = { Stream.of(arrived, adopted) },
+        ).inMemory(Handlers.onVirtualThreads)
+
+        watched.collect(events, Unit) shouldBe listOf(arrived, adopted)
+    }
 }

@@ -58,10 +58,10 @@
           }
         },
         "required": [
-          "adopted",
           "id",
           "name",
-          "species"
+          "species",
+          "adopted"
         ]
       },
       "ShopEventDto": {
@@ -90,9 +90,9 @@
           }
         },
         "required": [
+          "seq",
           "kind",
-          "pet",
-          "seq"
+          "pet"
         ]
       },
       "ApiError": {

@@ -14,7 +14,6 @@ tasks.named<JavaExec>("run") {
 }
 
 val larkVersion: String = providers.gradleProperty("larkVersion").get()
-val pelicanVersion: String = providers.gradleProperty("pelicanVersion").get()
 
 dependencies {
     api(project(":api"))
@@ -55,7 +54,8 @@ dependencies {
     implementation("org.postgresql:postgresql:42.7.13")
     implementation("com.zaxxer:HikariCP:7.1.0")
 
-    implementation("io.github.matthewjones372:pelican-client-pekko:$pelicanVersion")
+    implementation("io.github.matthewjones372:pelican-client-pekko")
+    implementation("io.github.matthewjones372:pelican-client-jetty")
 
     // Each registers itself through ServiceLoader, so being on the classpath is enough.
     implementation("io.github.matthewjones372:lark-slf4j:$larkVersion")
@@ -82,8 +82,8 @@ dependencies {
 
     testImplementation("org.testcontainers:testcontainers-kafka:2.0.5")
 
-    testImplementation("io.github.matthewjones372:pelican-test-wiremock:$pelicanVersion")
+    testImplementation("io.github.matthewjones372:pelican-test-wiremock")
     testImplementation(project(":registry"))
 
-    testImplementation("io.github.matthewjones372:pelican-test:$pelicanVersion")
+    testImplementation("io.github.matthewjones372:pelican-test")
 }

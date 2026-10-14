@@ -2,7 +2,6 @@ package petshop.load
 
 import io.github.matthewjones372.lark.Schedule
 import io.github.matthewjones372.lark.retry
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.proofload.at
@@ -17,6 +16,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
+import petshop.api.KotlinxShopCodecs
 import petshop.api.adoptPet
 import petshop.api.getPet
 import petshop.api.listPets
@@ -32,7 +32,7 @@ fun main() {
     val adopt = step("try to adopt one")
     val readTheStats = step("read the stats")
 
-    apiClient(target, JacksonCodecs).use { client ->
+    apiClient(target, KotlinxShopCodecs).use { client ->
         // The shop runs on the host and may start after this container: wait for it rather than exit.
         println("Waiting for the shop at $target")
         // The newest pet now, asked once; after that the newest grows by one each arrival.

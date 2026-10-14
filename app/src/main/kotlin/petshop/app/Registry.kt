@@ -13,14 +13,12 @@ import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.config
 import io.github.matthewjones372.lark.guarded
 import io.github.matthewjones372.lark.policy
-import io.github.matthewjones372.pelican.client.pekko.PekkoHttpTransport
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.metrics.otel.traced
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
-import org.apache.pekko.actor.ActorSystem
 import petshop.domain.Chip
 import petshop.domain.ChipRegistry
 import petshop.domain.NotRegistered
@@ -34,13 +32,14 @@ import petshop.registry.client.RegistryClient
 
 data class RegistrySettings(val baseUrl: String, val timeout: Duration)
 
-class HttpChipRegistry(settings: RegistrySettings, system: ActorSystem, telemetry: OpenTelemetrySdk) : ChipRegistry {
+class HttpChipRegistry(settings: RegistrySettings, engine: Engine, codecs: Codecs, telemetry: OpenTelemetrySdk) :
+    ChipRegistry {
 
     private val client = RegistryClient(
         baseUrl = settings.baseUrl,
-        codecs = JacksonCodecs,
+        codecs = codecs,
         // A client span per call, sending traceparent so the registry continues the adoption's trace.
-        transport = PekkoHttpTransport(system).traced(telemetry),
+        transport = engine.transport.traced(telemetry),
         timeout = settings.timeout.toJavaDuration(),
     )
 

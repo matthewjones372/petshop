@@ -1,7 +1,6 @@
 // A snapshot until a release carries spec 0143, so a day of demo traffic holds what an hour does.
 val proofloadVersion = "0.1.1-SNAPSHOT"
 val larkVersion: String = providers.gradleProperty("larkVersion").get()
-val pelicanVersion: String = providers.gradleProperty("pelicanVersion").get()
 
 dependencies {
     testImplementation(project(":app"))
@@ -9,9 +8,9 @@ dependencies {
     testImplementation("io.github.matthewjones372:lark-app:$larkVersion")
     testImplementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
     testImplementation("io.github.matthewjones372:lark-stream:$larkVersion")
-    testImplementation("io.github.matthewjones372:pelican-test-wiremock:$pelicanVersion")
+    testImplementation("io.github.matthewjones372:pelican-test-wiremock")
     testImplementation(project(":registry"))
-    testImplementation("io.github.matthewjones372:pelican-test:$pelicanVersion")
+    testImplementation("io.github.matthewjones372:pelican-test")
     testImplementation("io.github.matthewjones372:proofload-junit5:$proofloadVersion")
     testImplementation("io.github.matthewjones372:proofload-report-html:$proofloadVersion")
 }
@@ -26,6 +25,10 @@ tasks.register<Test>("loadTest") {
     classpath = sourceSets.test.get().runtimeClasspath
     // A cached pass says nothing about this machine now.
     outputs.upToDateWhen { false }
+    // -Ppetshop.stack=pekko -Ppetshop.codec=jackson, or STACK and CODEC in the environment, pick what is measured.
+    listOf("petshop.stack", "petshop.codec").forEach { key ->
+        providers.gradleProperty(key).orNull?.let { systemProperty(key, it) }
+    }
 }
 
 // Against a running shop; PETSHOP_URL, RATE (visitors a second) and DURATION configure it.

@@ -2,11 +2,13 @@ package petshop.api
 
 import arrow.core.Either
 import arrow.core.left
+import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.empty
 import io.github.matthewjones372.pelican.test.golden.Golden
-import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.github.matthewjones372.pelican.health.health
+import io.github.matthewjones372.pelican.jetty.Handlers
 import org.junit.jupiter.api.Test
 import petshop.domain.NoSuchPet
 import petshop.domain.Pet
@@ -31,6 +33,8 @@ class GoldenSpec {
     }
 
     private val api = petshopApi(
+        onJetty,
+        KotlinxShopCodecs,
         shop,
         health = health { },
         scrape = { "" },
@@ -45,7 +49,7 @@ class GoldenSpec {
 
     @Test
     fun `a pet, and a refusal, look on the wire the way they did`() {
-        val client = api.inMemory("petshop-golden")
+        val client = api.inMemory(Handlers.onVirtualThreads)
 
         golden.exchange("get-pet", client, getPet, 1L)
         golden.exchange("adopt-missing-pet", client, adoptPet, 404L)

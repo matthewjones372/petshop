@@ -56,9 +56,9 @@
           }
         },
         "required": [
-          "adopted",
+          "species",
           "arrived",
-          "species"
+          "adopted"
         ]
       },
       "Tally": {
@@ -80,9 +80,9 @@
           }
         },
         "required": [
-          "bySpecies",
+          "events",
           "duplicates",
-          "events"
+          "bySpecies"
         ]
       },
       "ApiError": {
