@@ -19,8 +19,8 @@ docker compose -f demo/docker-compose.yml up -d postgres registry
 server proxies to the shop on :8080 (`PETSHOP_URL` overrides that).
 
 ```bash
-npm --prefix web install
-npm --prefix web run dev    # http://localhost:5173
+bun install --cwd web
+bun run --cwd web dev       # http://localhost:5173
 ```
 
 `demo/` adds Prometheus, Grafana, Alertmanager and [Estate](https://github.com/matthewjones372/estate) to watch the
