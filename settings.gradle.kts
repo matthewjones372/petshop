@@ -1,7 +1,5 @@
 pluginManagement {
     repositories {
-        // The wiring plugin ships from the same build as the library, and from
-        // the same place.
         mavenCentral()
         gradlePluginPortal()
     }
@@ -17,5 +15,5 @@ include("api")
 include("app")
 include("loadtest")
 
-// The outbox's SQL, on the Kotlin its ExoQuery plugin is built for: see its settings.gradle.kts.
+// A separate build for ExoQuery's Kotlin version: see its settings.gradle.kts.
 includeBuild("outbox-table")

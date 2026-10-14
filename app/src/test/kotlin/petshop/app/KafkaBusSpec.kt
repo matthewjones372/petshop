@@ -30,13 +30,7 @@ import petshop.domain.PetArrived
 import petshop.domain.PetId
 import petshop.domain.Species
 
-/** What a test watches from: the shop to act on, the bus to publish to, the consumer to read. */
-/**
- * The shop's events on Kafka, as Avro in the schema registry's wire format, read back by lark-kafka's
- * consumer loop. What every bus promises is [EventBusContract]'s; what is here is Kafka's own. The registry
- * is Confluent's in-process mock, `mock://`: the serializers and the wire format are the real ones, and no
- * registry server runs.
- */
+/** The registry is Confluent's in-process `mock://`: real serializers and wire format, no server. */
 class KafkaBusSpec : EventBusContract() {
 
     companion object {

@@ -7,32 +7,18 @@ import io.github.matthewjones372.lark.stream.map
 import io.github.matthewjones372.lark.stream.runFold
 import petshop.domain.ShopEvent
 
-/**
- * Where the shop's events go once they have left it, and where anyone else reads them from. Closed when the graph
- * is given back, after the relay has stopped publishing to it.
- */
 interface EventBus : AutoCloseable {
 
     fun publish(event: ShopEvent): Either<BusRefused, ShopEvent>
 
-    /**
-     * Every event handed to [each], one at a time, until the run is stopped. A bus that remembers where a
-     * reader got to moves that on only once [each] has returned, so an event [each] was not given comes
-     * round again; the run answers with how many it handed over.
-     */
+    /** A bus that remembers offsets moves one on only after [each] returns. */
     fun consume(each: (ShopEvent) -> Unit): Run<Nothing, Long>
 }
 
-/** The bus said no. The event is still in the outbox, so no is "not yet" rather than "lost". */
+/** The event is still in the outbox, so a refusal means "not yet", not "lost". */
 data class BusRefused(val seq: Long, val why: String)
 
-/**
- * A bus in the same process: Lark's [Hub], a queue for each reader. It stands where a broker would, and
- * it refuses the way one does: when a reader's queue is full, and after it has closed.
- *
- * What is published before anyone reads is held for the first reader, and a reader runs on whichever
- * backend runs its stream.
- */
+/** Refuses when a reader's queue is full or after close. Events published before any reader are held for the first. */
 class HubBus(capacity: Int = 256) : EventBus {
 
     private val hub = Hub<ShopEvent>(capacity)

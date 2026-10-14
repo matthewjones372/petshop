@@ -1,14 +1,12 @@
 name: build
 
-# The shop built and tested as `./gradlew build` does on a laptop, so a pull request is not merged on a local run
-# alone. The load tests stay out, as they do locally: they measure the machine and belong to a quiet one.
+# Load tests are not part of `build`: they measure the machine and need a quiet one.
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
 
-# A later push makes an earlier run's answer about code nobody has any more.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -22,8 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # 21 for outbox-table's toolchain, installed rather than left to Gradle; 25, listed last, is
-      # the shop's toolchain and the JDK Gradle runs on.
+      # 21 for outbox-table's toolchain; 25, listed last, is the shop's and the one Gradle runs on.
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -33,7 +30,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
-      # The app's specs start Postgres and Kafka through Testcontainers, on the runner's own Docker.
+      # Testcontainers starts Postgres and Kafka on the runner's Docker.
       - name: Build and test
         run: ./gradlew build --stacktrace
 

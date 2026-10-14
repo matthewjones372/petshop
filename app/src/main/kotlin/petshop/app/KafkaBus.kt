@@ -28,13 +28,8 @@ import org.apache.kafka.common.serialization.LongSerializer
 import petshop.domain.ShopEvent
 
 /**
- * The bus on Kafka: each event an Avro record in the registry's wire format, keyed by its `seq`, and
- * read back by a consumer loop that runs on whichever backend the graph names.
- *
- * A record that cannot be read is not the reader's failure: it goes to [deadLetters], by default the
- * topic `<topic>.dead-letters` as it was read, and is committed past once it is there, so one bad
- * record does not stop the topic. A registry that cannot be asked is a failure, and the run ends `Died`
- * for its owner to start again, having committed nothing it did not hand over.
+ * An unreadable record goes to [deadLetters] and is committed past, so one bad record does not stop the
+ * topic. A schema registry that cannot be asked is a defect instead, and nothing unhandled is committed.
  */
 class KafkaBus(
     private val topic: Topic,
@@ -50,8 +45,7 @@ class KafkaBus(
         ConsumerConfig.AUTO_OFFSET_RESET_CONFIG to "earliest",
     )
 
-    // A send the broker has not taken within five seconds, retries included, is refused, and the event
-    // stays in the outbox for the relay's next pass.
+    // A send not taken within five seconds, retries included, is refused and stays in the outbox.
     private val producing: Map<String, Any> = mapOf(
         ProducerConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrap,
         ProducerConfig.ACKS_CONFIG to "all",
@@ -67,7 +61,6 @@ class KafkaBus(
     private val deadLetters: (DecodeError) -> Unit =
         deadLetters ?: letters.deadLetters(Topic("${topic.name}.dead-letters")).counted()
 
-    /** Taken once the broker has it: a refusal, or no answer in time, leaves the event in the outbox. */
     override fun publish(event: ShopEvent): Either<BusRefused, ShopEvent> =
         events.publish(topic.record(event.seq, event))
             .mapLeft { failed -> BusRefused(event.seq, "${failed.cause}") }
@@ -83,8 +76,7 @@ class KafkaBus(
         )
             .divertLefts(deadLetters)
             .mapRecord { record -> each(record.value()) }
-            // A defect, the schema registry down above all, closes the consumer and opens another from the last
-            // commit after a backoff capped at 30s: a registry outage pauses the projection rather than ending it.
+            // A schema registry outage pauses the projection rather than ending it: restart from the last commit.
             .restartOnDefect(Schedule.exponential<Throwable>(100.milliseconds).delayed { _, wait -> minOf(wait, 30.seconds) })
             .runCommitting()
 
@@ -98,7 +90,6 @@ class KafkaBus(
     }
 }
 
-/** A dead letter written by [this], and logged and counted once it is. */
 private fun ((DecodeError) -> Unit).counted(): (DecodeError) -> Unit = { bad ->
     this(bad)
     logWarn("an unreadable record at ${bad.topic}-${bad.partition}@${bad.offset}: ${bad.cause}")

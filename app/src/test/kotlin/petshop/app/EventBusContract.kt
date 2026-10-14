@@ -24,25 +24,19 @@ import petshop.domain.PetShop
 import petshop.domain.ShopEvent
 import petshop.domain.Species
 
-/** The shop to act on, and the projection reading the bus. The relay is a dependency so that it runs. */
+/** The relay is a dependency so that it runs. */
 private class Served(val shop: PetShop, val projection: Projection)
 
 private val served: Module =
     single { shop: PetShop, projection: Projection, _: OutboxRelay -> Served(shop, projection) }
 
-/**
- * What every [EventBus] promises, as tests. A bus's spec extends this and says how to make one, and adds what is
- * true of that bus alone; a new bus is one more class that passes these.
- */
 abstract class EventBusContract {
 
-    /** A new bus with nothing on it. [name] is the test's own, for a bus whose topics and readers are shared. */
+    /** A new, empty bus. [name] keeps topics and readers apart on a shared broker. */
     abstract fun bus(name: String): EventBus
 
-    /** Whether the bus remembers where a reader got to, and so has [handled] to ask. */
     protected open val remembersReaders: Boolean = false
 
-    /** How many events the reader named [name] has acknowledged handling, on a bus that [remembersReaders]. */
     protected open fun handled(name: String): Long? = null
 
     @Test
@@ -103,7 +97,6 @@ abstract class EventBusContract {
     private fun Tally.adopted(species: Species): Int = bySpecies.single { it.species == species }.adopted
 }
 
-/** The in-process bus: Lark's [io.github.matthewjones372.lark.stream.Hub], and nothing to set up. */
 class HubBusSpec : EventBusContract() {
 
     override fun bus(name: String): EventBus = HubBus()

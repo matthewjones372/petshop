@@ -10,11 +10,6 @@ import petshop.domain.NoSuchPet
 import petshop.domain.PetId
 import petshop.domain.PetShop
 
-/**
- * The endpoints answered. A handler names the declared failure it is producing, so returning one the
- * endpoint never declared does not compile. [health]'s probes, `/health/live` and `/health/ready`, are
- * Pelican's, answering whatever checks the app declared.
- */
 fun petshopApi(shop: PetShop, health: Health, scrape: () -> String, tally: () -> Tally) = api(
     endpoints = listOf(
         listPets handledNow { shop.all().toDto() },

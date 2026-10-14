@@ -33,15 +33,11 @@ private class OnePet(private var pet: Pet) : PetShop {
     }
 }
 
-/**
- * Two promises, kept apart on purpose: what the shop's own code may call, and what its callers hold.
- * A rename breaks the first at compile time; only the second is allowed to notice a URL.
- */
 class ContractSpec {
 
     private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 
-    // No checks: the probes' paths are Pelican's, and are pinned below whatever the app declares.
+    // No checks: the probes' paths are Pelican's whatever the app declares.
     private val probes = health { }
 
     private val app = petshopApi(

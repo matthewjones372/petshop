@@ -9,22 +9,17 @@ import io.github.matthewjones372.lark.app.typesafe.Reading
 import io.github.matthewjones372.lark.app.typesafe.choosing
 import io.github.matthewjones372.lark.kafka.Topic
 
-/** Which bus the shop's events go out on: `petshop.bus.kind` in application.conf, `BUS` in the environment. */
+/** Set by `petshop.bus.kind` in application.conf, overridden by `BUS`. */
 sealed interface BusSettings {
 
-    /** Lark's hub in the same process: nothing to run beside the shop, and nothing kept if it stops. */
+    /** Events are not kept if the process stops. */
     data object InProcess : BusSettings
 
-    /** A Kafka topic, each event Avro in the schema registry's wire format. */
     data class OnKafka(val bootstrap: String, val topic: String, val group: String, val registry: String) :
         BusSettings
 }
 
-/**
- * The bus `petshop.bus` names, chosen where the graph is assembled: the branch not taken contributes no
- * node, so a shop on the in-process bus opens no producer and asks no broker anything. Both branches
- * depend on [BusSettings], so a section that will not read refuses the start wherever the bus is reached.
- */
+/** The branch not taken contributes no node, so the in-process bus opens no Kafka producer. */
 fun bus(conf: Config): Module =
     conf.choosing("petshop.bus", Reading::busSettings) { chosen ->
         when (chosen) {
@@ -44,7 +39,6 @@ private fun Reading.busSettings(): BusSettings =
         else -> BusSettings.InProcess
     }
 
-/** `kind`, refused as a fault naming where it was set when it is neither bus. */
 private fun Reading.kind(): String =
     of(IN_PROCESS) {
         getString("kind").also { kind ->
@@ -55,7 +49,6 @@ private fun Reading.kind(): String =
     }
 
 private val inProcessBus: Module =
-    // Closed after the relay stops publishing to it, because the relay depends on it.
     singleOf({ _: BusSettings -> HubBus() }, { bus -> bus.close() }).boundTo<EventBus>()
 
 private fun kafkaBus(on: BusSettings.OnKafka): Module =

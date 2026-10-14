@@ -1,8 +1,6 @@
 name: dependency-graph
 
-# Hands GitHub the resolved Gradle graph, so Dependabot alerts cover the libraries the shop actually runs on.
-# GitHub's own scan cannot read build.gradle.kts, so without this the graph is empty. outbox-table is an
-# included build, and the submission resolves it with the rest.
+# GitHub cannot read build.gradle.kts, so this submits the resolved graph for Dependabot.
 on:
   push:
     branches: [main]

@@ -1,5 +1,4 @@
-<!-- Read in place of logback.xml when LOKI_URL is set (see app/build.gradle.kts): the console as before, and each
-     line pushed to Loki under app="petshop", which is the stream the demo's Estate reads the shop's logs from. -->
+<!-- Used instead of logback.xml when LOKI_URL is set (see app/build.gradle.kts). -->
 <configuration>
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
@@ -11,16 +10,15 @@
     <http>
       <url>${LOKI_URL}/loki/api/v1/push</url>
     </http>
-    <!-- Every two seconds rather than loki4j's minute: the demo is watched, and a line a minute late reads as lost. -->
+    <!-- Two seconds rather than loki4j's default, so demo logs do not look lost. -->
     <batch>
       <timeoutMs>2000</timeoutMs>
     </batch>
-    <!-- Few labels, each with few values: a label per pet or per adopter would make a stream of each. -->
+    <!-- Keep label cardinality low: a label per pet or adopter would create a stream for each. -->
     <labels>
       app = petshop
       level = %level
     </labels>
-    <!-- What lark puts in the MDC about an adoption rides along without becoming a label. -->
     <structuredMetadata>
       logger = %logger
       thread = %thread
@@ -32,7 +30,7 @@
     </message>
   </appender>
 
-  <!-- Kafka's and Confluent's clients print their whole configuration at INFO each time one is made. -->
+  <!-- These clients log their whole configuration at INFO on every creation. -->
   <logger name="org.apache.kafka" level="WARN"/>
   <logger name="io.confluent" level="WARN"/>
 

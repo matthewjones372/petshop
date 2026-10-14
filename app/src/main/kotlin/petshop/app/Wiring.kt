@@ -31,7 +31,7 @@ import petshop.api.petshopApi
 import petshop.api.petshopDocs
 import petshop.domain.PetShop
 
-/** [host] is the interface the port is bound on: loopback unless something outside this machine has to reach it. */
+/** [host] is loopback unless something outside this machine has to reach the port. */
 data class Settings(val host: String, val port: Int, val arrivalsEvery: Duration, val outboxEvery: Duration)
 
 private val settings: Module =
@@ -40,39 +40,27 @@ private val settings: Module =
     }
 
 private val telemetry: Module =
-    // Added to Micrometer's global composite, which is where lark-micrometer writes unless it is
-    // handed a registry: the graph owns the registry's life, and nothing has to bind anything.
+    // Added to Micrometer's global composite, which is where lark-micrometer writes by default.
     singleOf<PrometheusMeterRegistry>(
         { PrometheusMeterRegistry(PrometheusConfig.DEFAULT).also(MicrometerRegistries::addRegistry) },
         { registry -> MicrometerRegistries.removeRegistry(registry); registry.close() },
     ) +
     singleOf<OpenTelemetrySdk>({ OpenTelemetrySdk.builder().build() }, { sdk -> sdk.close() }) +
-        // boundTo rather than a type argument: `getTracer` is Java, so the inferred key is the
-        // platform type `Tracer!` that nothing matches — and naming the key as a type argument would
-        // force naming the dependency as one too.
+        // boundTo because `getTracer` returns the platform type `Tracer!`, which no key matches.
         single { sdk: OpenTelemetrySdk -> sdk.getTracer("petshop") }.boundTo<Tracer>()
 
-/**
- * Pekko, for HTTP and nothing else: Pelican's server binds the port on it, and the chip registry's
- * client sends through Pekko HTTP. The shop's actor and every stream run on Lark.
- */
+/** Pekko is for HTTP only; the shop's actor and every stream run on Lark. */
 private val http: Module =
     singleOf<ActorSystem>({ ActorSystem.create("petshop") }, { system -> system.terminate() }) +
-        // The typed view of the same system, which is the one Pelican binds a port with.
         single { classic: ActorSystem -> Adapter.toTyped(classic) }.boundTo<TypedSystem<Void>>()
 
 private val events: Module =
-    // What the streams run on: the relay, the arrivals, the projection and the readiness gauges. Each describes its stream and
-    // names no backend; this is the one place that decides, and a test that wants the relay on its own
-    // clock overrides it. Forks runs a stream as one loop on a virtual thread, so the relay's claim blocks
-    // on Postgres where it is and a stop interrupts it.
+    // The one place that picks the stream backend; a test overrides it to run the relay on its own clock.
     single { -> Forks() }.boundTo<StreamBackend>() +
         outbox +
         projection
 
 private val web: Module =
-    // The port is a resource like any other: bound here, unbound when the graph is given back, which
-    // is what lets a load test start the whole application in its own process.
     singleOf(
         { shop: PetShop, config: Settings, system: TypedSystem<Void>, health: Health,
             registry: PrometheusMeterRegistry, projection: Projection, _: Arrivals, _: OutboxRelay, _: Meters ->
@@ -82,33 +70,20 @@ private val web: Module =
         { server -> server.stop() },
     )
 
-/**
- * The whole service, read from [conf]: the document `petshop.bus` was chosen from is the one every
- * other section is read from, so a test assembling with its own configuration gets all of it.
- */
 fun petshopFrom(conf: Config): Module =
     configOf(conf) + settings + telemetry + database + http + registry + theShop + checks + meters + arrivals + events + bus(conf) + web
 
-/** What the shop reads at start: system properties over application.conf over the reference. */
 private val read: Config = ConfigFactory.load()
 
 val petshop: Module = petshopFrom(read)
 
 /**
- * The `petshop` section and where each value in it came from, which is all the shop reads: the rest of the document
- * is every property the JVM set. The database URL is masked as well as the password, because `DATABASE_URL` is where
- * a password usually ends up.
- *
- * From the merged document rather than lark's `layeredConfig()`, which would also say what each value overrode:
- * in lark 0.9.2 its `origins()` throws on the `key = default` then `key = ${?ENV}` pair application.conf is made of.
+ * The database URL is masked too, because `DATABASE_URL` often carries a password. Not `layeredConfig()`:
+ * in lark 0.9.2 its `origins()` throws on the `key = default` then `key = ${?ENV}` pairs in application.conf.
  */
 private fun reported(): String =
     read.withOnlyPath("petshop").origins(Secrets.default.and("petshop.database.url")).report()
 
-/**
- * The application as a value, so `main` is the leaving and the build can read the root it starts
- * from without running anything.
- */
 object Petshop : LarkApp<PelicanServer>() {
 
     override val module: Module = petshop
@@ -116,9 +91,8 @@ object Petshop : LarkApp<PelicanServer>() {
     override fun AppScope.run(root: PelicanServer) {
         logInfo(reported())
         logInfo("Petshop on ${root.baseUrl}, docs at ${root.baseUrl}/api-docs, reference at ${root.baseUrl}/reference")
-        // Until the process is asked to stop, and no longer: the graph's release is what stops the server, the relay
-        // and the pool, and it runs once this returns. `root.block()` would wait for that release, so a SIGTERM
-        // would sit out lark's whole grace period and leave the relay and the Kafka offsets as they were.
+        // Not `root.block()`: it waits for the graph's release, so a SIGTERM would sit out lark's whole grace
+        // period instead of stopping the relay and committing Kafka offsets.
         awaitShutdown()
     }
 }
