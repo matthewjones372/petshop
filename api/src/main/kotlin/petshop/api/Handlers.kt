@@ -16,9 +16,7 @@ import petshop.domain.PetShop
  * Pelican's, answering whatever checks the app declared.
  */
 fun petshopApi(shop: PetShop, health: Health, scrape: () -> String, tally: () -> Tally) = api(
-    endpoints = health.endpoints + listOf(
-        metrics handledNow { scrape() },
-        stats handledNow { tally() },
+    endpoints = listOf(
         listPets handledNow { shop.all().toDto() },
         getPet handledOrFail { id ->
             shop.find(PetId(id))?.let { pet -> ok(pet.toDto()) } ?: petMissing(NoSuchPet(id).toDto())
@@ -36,9 +34,18 @@ fun petshopApi(shop: PetShop, health: Health, scrape: () -> String, tally: () ->
                 { pet -> ok(pet.toDto()) },
             )
         },
-    ),
+        metrics handledNow { scrape() },
+        stats handledNow { tally() },
+    ) + health.endpoints,
     codecs = JacksonCodecs,
 ) {
     title = "Petshop"
     version = "1.0.0"
+    description = """
+        A small shop of tortoises, dogs, cats and parrots. An adoption records the new keeper with the chip
+        registry before the pet leaves the shop, and a pet with no chip on record stays on the shelf.
+
+        **pets** is the shop itself: what is on the shelf, and taking one home. **shop** is what the shop says about
+        itself, its meters and what its events add up to. **health** is whether it can take traffic.
+    """.trimIndent()
 }

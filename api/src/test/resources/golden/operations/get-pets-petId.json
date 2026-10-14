@@ -4,6 +4,9 @@
       "get": {
         "summary": "One pet",
         "operationId": "getPetsByPetId",
+        "tags": [
+          "pets"
+        ],
         "parameters": [
           {
             "name": "petId",

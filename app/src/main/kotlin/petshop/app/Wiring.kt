@@ -14,7 +14,6 @@ import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.pelican.health.Health
-import io.github.matthewjones372.pelican.openapi.docs
 import io.github.matthewjones372.pelican.pekko.PelicanServer
 import io.github.matthewjones372.pelican.pekko.docs.startWithDocs
 import io.micrometer.core.instrument.Metrics as MicrometerRegistries
@@ -27,6 +26,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.typed.ActorSystem as TypedSystem
 import org.apache.pekko.actor.typed.javadsl.Adapter
 import petshop.api.petshopApi
+import petshop.api.petshopDocs
 import petshop.domain.PetShop
 
 /** [host] is the interface the port is bound on: loopback unless something outside this machine has to reach it. */
@@ -80,7 +80,7 @@ private val web: Module =
         { shop: PetShop, config: Settings, system: TypedSystem<Void>, health: Health,
             registry: PrometheusMeterRegistry, projection: Projection, _: Arrivals, _: OutboxRelay, _: Meters ->
             petshopApi(shop, health, registry::scrape, projection::tally)
-                .startWithDocs(system, port = config.port, host = config.host, docs = docs { docsPath = "/api-docs" })
+                .startWithDocs(system, port = config.port, host = config.host, docs = petshopDocs)
         },
         { server -> server.stop() },
     )
@@ -103,7 +103,7 @@ object Petshop : LarkApp<PelicanServer>() {
     override val module: Module = petshop
 
     override fun AppScope.run(root: PelicanServer) {
-        logInfo("Petshop on ${root.baseUrl}, docs at ${root.baseUrl}/api-docs")
+        logInfo("Petshop on ${root.baseUrl}, docs at ${root.baseUrl}/api-docs, reference at ${root.baseUrl}/reference")
         root.block()
     }
 }

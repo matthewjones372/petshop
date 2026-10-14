@@ -27,18 +27,21 @@ val unavailable = errorJson<ProblemDto.Unavailable>(503, "The adoption could not
 
 val listPets = endpoint {
     get("pets")
+    tag("pets")
     summary = "Every pet in the shop"
     json<List<PetDto>>()
 }
 
 val getPet = endpoint(petId) {
     get("pets" / petId)
+    tag("pets")
     summary = "One pet"
     json<PetDto>() orFail petMissing
 }
 
 val adoptPet = endpoint(petId) {
     post("pets" / petId / "adoption")
+    tag("pets")
     summary = "Take a pet home"
     json<PetDto>().orFail(petMissing, petTaken, petNotChipped, unavailable)
 }
@@ -51,6 +54,7 @@ val adoptPet = endpoint(petId) {
  */
 val metrics = endpoint {
     get("metrics")
+    tag("shop")
     summary = "Every meter, in Prometheus' exposition format"
     text()
 }
@@ -66,6 +70,7 @@ data class Tally(val events: Int, val duplicates: Int, val bySpecies: List<Speci
 
 val stats = endpoint {
     get("stats")
+    tag("shop")
     summary = "What the shop's events add up to, as a consumer of them sees it"
     json<Tally>()
 }
