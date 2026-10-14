@@ -1,6 +1,7 @@
 package petshop.app
 
 import arrow.core.Either
+import io.github.matthewjones372.lark.Schedule
 import io.github.matthewjones372.lark.counter
 import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.kafka.DecodeError
@@ -16,6 +17,9 @@ import io.github.matthewjones372.lark.kafka.record
 import io.github.matthewjones372.lark.kafka.runCommitting
 import io.github.matthewjones372.lark.logWarn
 import io.github.matthewjones372.lark.stream.Run
+import io.github.matthewjones372.lark.stream.restartOnDefect
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.ByteArraySerializer
@@ -79,6 +83,9 @@ class KafkaBus(
         )
             .divertLefts(deadLetters)
             .mapRecord { record -> each(record.value()) }
+            // A defect, the schema registry down above all, closes the consumer and opens another from the last
+            // commit after a backoff capped at 30s: a registry outage pauses the projection rather than ending it.
+            .restartOnDefect(Schedule.exponential<Throwable>(100.milliseconds).delayed { _, wait -> minOf(wait, 30.seconds) })
             .runCommitting()
 
     override fun close() {

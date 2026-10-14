@@ -74,6 +74,10 @@ class ScrapeSpec {
                 now shouldContain "petshop_ready 1.0"
                 now shouldContain """petshop_health_check{check="database",} 1.0"""
                 now shouldContain """petshop_health_check{check="shop",} 1.0"""
+                // The work beside the requests, each its own series: one that stopped is named, not just counted.
+                listOf("relay", "projection", "arrivals").forEach { run ->
+                    now shouldContain """petshop_health_check{check="$run",} 1.0"""
+                }
             }
         }
     }

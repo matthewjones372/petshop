@@ -107,6 +107,18 @@ class RegistrySpec {
     }
 
     @Test
+    fun `a registry that keeps failing stops being asked`() = story {
+        Given("a registry that answers 500 to every lookup") { registry.stub(lookupChip, 1L) breaksWith 500 }
+        val answers = When("Ada asks for Nibbles six times, each refusal putting her back on the shelf") {
+            testApp(shop) { shop: PetShop -> (1..6).map { shop.adopt(PetId(1), by = "Ada") } }
+        }
+        Then("every time she is told the registry is down") { answers.forEach { it shouldBeLeft RegistryDown(1) } }
+        And("the registry was asked five times: after five failures in a row the breaker answers for it") {
+            registry.calls(lookupChip) shouldBe 5
+        }
+    }
+
+    @Test
     fun `twenty adopters race for one tortoise and the registry hears from one of them`() = story {
         Given("a registry that knows Nibbles' chip and records any keeper") {
             registry.stub(lookupChip, 1L) answers ok(chip)

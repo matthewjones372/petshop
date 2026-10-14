@@ -2,7 +2,7 @@ plugins {
     application
     `java-test-fixtures`
     // Checks every graph in this project on `check`, and renders each one.
-    id("io.github.matthewjones372.lark.wiring") version "0.2.0"
+    id("io.github.matthewjones372.lark.wiring") version "0.9.2"
     // The shop's events on the wire are Avro records, derived by avro4k from @Serializable classes.
     kotlin("plugin.serialization")
     // Domain events to wire records and back, derived at compile time: a field that cannot be mapped
@@ -86,6 +86,8 @@ dependencies {
     // A real Postgres for every test that builds the shop, and for the load test, which builds all of it.
     testFixturesApi("org.testcontainers:testcontainers-postgresql:2.0.5")
     testFixturesImplementation("io.github.matthewjones372:lark-app:$larkVersion")
+    // The password a container hands out is a Secret in DatabaseSettings, as the configured one is.
+    testFixturesImplementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
     testFixturesImplementation("org.postgresql:postgresql:42.7.13")
     testFixturesImplementation(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
 
@@ -104,11 +106,4 @@ dependencies {
 
     // The shop's own typed client, for the end-to-end test: it calls the service by endpoint, not URL.
     testImplementation("io.github.matthewjones372:pelican-test:$pelicanVersion")
-}
-
-// lark-test's stories colour their console copy under FORCE_COLOR or -Plark.test.colour, and a test worker does
-// not see the shell's environment, so these are handed on. Lark spec 0118 has its wiring plugin do this instead.
-tasks.test {
-    listOf("FORCE_COLOR", "NO_COLOR").forEach { name -> providers.environmentVariable(name).orNull?.let { environment(name, it) } }
-    providers.gradleProperty("lark.test.colour").orNull?.let { systemProperty("lark.test.colour", it) }
 }

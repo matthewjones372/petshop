@@ -8,8 +8,10 @@ import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.app.typesafe.Secrets
 import io.github.matthewjones372.lark.app.typesafe.config
 import io.github.matthewjones372.lark.app.typesafe.configOf
+import io.github.matthewjones372.lark.app.typesafe.origins
 import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.StreamBackend
@@ -48,12 +50,7 @@ private val telemetry: Module =
         // boundTo rather than a type argument: `getTracer` is Java, so the inferred key is the
         // platform type `Tracer!` that nothing matches — and naming the key as a type argument would
         // force naming the dependency as one too.
-        single { sdk: OpenTelemetrySdk -> sdk.getTracer("petshop") }.boundTo<Tracer>() +
-        // The JVM's meters and the shop's health, on the registry /metrics scrapes.
-        singleOf(
-            { registry: PrometheusMeterRegistry, readiness: Readiness -> Meters(registry, readiness) },
-            { meters -> meters.close() },
-        )
+        single { sdk: OpenTelemetrySdk -> sdk.getTracer("petshop") }.boundTo<Tracer>()
 
 /**
  * Pekko, for HTTP and nothing else: Pelican's server binds the port on it, and the chip registry's
@@ -65,7 +62,7 @@ private val http: Module =
         single { classic: ActorSystem -> Adapter.toTyped(classic) }.boundTo<TypedSystem<Void>>()
 
 private val events: Module =
-    // What the streams run on: the relay, the arrivals and the projection. Each describes its stream and
+    // What the streams run on: the relay, the arrivals, the projection and the readiness gauges. Each describes its stream and
     // names no backend; this is the one place that decides, and a test that wants the relay on its own
     // clock overrides it. Forks runs a stream as one loop on a virtual thread, so the relay's claim blocks
     // on Postgres where it is and a stop interrupts it.
@@ -90,9 +87,23 @@ private val web: Module =
  * other section is read from, so a test assembling with its own configuration gets all of it.
  */
 fun petshopFrom(conf: Config): Module =
-    configOf(conf) + settings + telemetry + database + http + registry + theShop + checks + arrivals + events + bus(conf) + web
+    configOf(conf) + settings + telemetry + database + http + registry + theShop + checks + meters + arrivals + events + bus(conf) + web
 
-val petshop: Module = petshopFrom(ConfigFactory.load())
+/** What the shop reads at start: system properties over application.conf over the reference. */
+private val read: Config = ConfigFactory.load()
+
+val petshop: Module = petshopFrom(read)
+
+/**
+ * The `petshop` section and where each value in it came from, which is all the shop reads: the rest of the document
+ * is every property the JVM set. The database URL is masked as well as the password, because `DATABASE_URL` is where
+ * a password usually ends up.
+ *
+ * From the merged document rather than lark's `layeredConfig()`, which would also say what each value overrode:
+ * in lark 0.9.2 its `origins()` throws on the `key = default` then `key = ${?ENV}` pair application.conf is made of.
+ */
+private fun reported(): String =
+    read.withOnlyPath("petshop").origins(Secrets.default.and("petshop.database.url")).report()
 
 /**
  * The application as a value, so `main` is the leaving and the build can read the root it starts
@@ -103,7 +114,11 @@ object Petshop : LarkApp<PelicanServer>() {
     override val module: Module = petshop
 
     override fun AppScope.run(root: PelicanServer) {
+        logInfo(reported())
         logInfo("Petshop on ${root.baseUrl}, docs at ${root.baseUrl}/api-docs, reference at ${root.baseUrl}/reference")
-        root.block()
+        // Until the process is asked to stop, and no longer: the graph's release is what stops the server, the relay
+        // and the pool, and it runs once this returns. `root.block()` would wait for that release, so a SIGTERM
+        // would sit out lark's whole grace period and leave the relay and the Kafka offsets as they were.
+        awaitShutdown()
     }
 }
