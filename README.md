@@ -29,7 +29,7 @@ The libraries being tried out:
 | Library | What it does here |
 |---|---|
 | [Pelican](https://github.com/matthewjones372/pelican) | the shop's HTTP contract as values: routes, the OpenAPI document, Swagger UI and a themed Redoc reference, handlers that must answer a declared failure; live and ready probes (`pelican-health`); the chip registry's client generated from its contract; typed WireMock stubs, golden files and a typed test client |
-| [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`), with its settings and secrets read and reported by `lark-app-typesafe` and the graph checked at build time by the wiring plugin; the shop's actor, on virtual threads in a `flock` (`lark-actor`, `lark-app-actor`); the background work, the readiness gauges and the in-process bus as `Stream`s on Lark's Forks (`lark-stream`); Kafka as a `Stream` that commits what it handled and restarts after a defect (`lark-kafka`); a circuit breaker on the chip registry, and retries on schedules; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
+| [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`), with its settings and secrets read and reported by `lark-app-typesafe`, the schema migrated by `lark-app-liquibase` before anything reads it, and the graph checked at build time by the wiring plugin; the shop's actor, on virtual threads in a `flock` (`lark-actor`, `lark-app-actor`); the background work, the readiness gauges and the in-process bus as `Stream`s on Lark's Forks (`lark-stream`); Kafka as a `Stream` that commits what it handled and restarts after a defect (`lark-kafka`); a circuit breaker on the chip registry, and retries on schedules; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
 | [Proofload](https://github.com/matthewjones372/proofload) | load tests that start the whole service in-process, assert correctness under load, and write an HTML report |
 | [ExoQuery](https://github.com/ExoQuery/ExoQuery) | every statement against the outbox table, written as Kotlin and checked at compile time |
 | [kimney](https://github.com/matthewjones372/kimney) | the mappings between the shop's events and their wire records, and between the domain and the API's DTOs, derived at compile time |
@@ -136,8 +136,10 @@ Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT �
   unreachable registry (`Unavailable`, with a message saying which), because
   Pelican allows only one response per status. `seq` is an identity column, so
   it keeps counting across restarts.
-- **Every statement is ExoQuery**, apart from the `CREATE TABLE` the pool runs
-  when it opens. The insert is `insert<OutboxRow> { setParams(row).excluding(seq) }.returning { it.seq }`.
+- **Every statement is ExoQuery**, apart from the schema, which is a
+  SQL-formatted Liquibase changelog (`app/src/main/resources/db/changelog.sql`)
+  run by `lark-app-liquibase` as a graph node: the outbox takes its `Migrated`,
+  so it cannot be built before the tables exist. The insert is `insert<OutboxRow> { setParams(row).excluding(seq) }.returning { it.seq }`.
   ExoQuery has no locking clause, so the claim is a `@SqlFragment` that wraps
   the query in a free block:
   ```kotlin
@@ -570,8 +572,8 @@ the build on any Kotlin minor version it does not support yet.
 
 ### ExoQuery
 
-**What it gives.** Every statement against the outbox except its `CREATE TABLE`
-is Kotlin, checked when it compiles. The locking clause, which it has no syntax
+**What it gives.** Every statement against the outbox except the schema, which
+is a Liquibase changelog, is Kotlin, checked when it compiles. The locking clause, which it has no syntax
 for, is a `@SqlFragment` around a `free` block.
 
 **What it costs.** Its compiler plugin is built for Kotlin 2.3.0 and does not

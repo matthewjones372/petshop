@@ -47,6 +47,12 @@ single { sdk: OpenTelemetrySdk -> sdk.getTracer("petshop") }.boundTo<Tracer>()
  */
 ```
 
+## No `runCatching`
+
+Never, in main or test sources. It catches interrupts, cancellations and bugs
+along with the failure that was meant. Catch the exception you expect, by name,
+or let it propagate.
+
 ## Use what lark and pelican already provide
 
 Before writing a scheduler, a retry, a breaker, a health check, a config reader

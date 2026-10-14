@@ -1,5 +1,8 @@
 package petshop.app
 
+import io.github.matthewjones372.lark.app.Module
+import io.github.matthewjones372.lark.app.liquibase.Migrated
+import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.test.story
@@ -137,7 +140,7 @@ class PostgresOutboxSpec {
 
     @Test
     fun `a pet's change and its event are one transaction, so an event that fails leaves the pet as it was`() = story {
-        testApp(Petshop.module.onAFreshDatabase().subgraph<DataSource>()) { dataSource: DataSource ->
+        testApp(migrated) { (dataSource): Tables ->
             val table = Given("a pets table with Nibbles on the shelf") {
                 OutboxTable(dataSource).also { it.stock(listOf(PetRow(1, "Nibbles", "Tortoise", adopted = false))) }
             }
@@ -155,3 +158,9 @@ class PostgresOutboxSpec {
         }
     }
 }
+
+/** The pool once the changelog has run, for a test that writes the tables without the outbox in front. */
+private data class Tables(val dataSource: DataSource)
+
+private val migrated: Module =
+    (Petshop.module.onAFreshDatabase() + single { source: DataSource, _: Migrated -> Tables(source) }).subgraph<Tables>()

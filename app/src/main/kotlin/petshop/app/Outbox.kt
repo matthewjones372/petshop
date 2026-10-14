@@ -3,6 +3,8 @@ package petshop.app
 import io.github.matthewjones372.lark.Schedule
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
+import io.github.matthewjones372.lark.app.liquibase.Migrated
+import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.counter
 import io.github.matthewjones372.lark.gauge
@@ -20,6 +22,7 @@ import io.github.matthewjones372.lark.stream.restartOnDefect
 import io.github.matthewjones372.lark.stream.runFold
 import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.stream.tick
+import javax.sql.DataSource
 import kotlin.time.Duration
 import petshop.domain.Pet
 import petshop.domain.ShopEvent
@@ -80,7 +83,7 @@ private fun published(claimed: List<ShopEvent>, bus: EventBus): List<ShopEvent> 
 }
 
 val outbox: Module =
-    singleOf(::PostgresOutbox).boundTo<Outbox>() +
+    single { source: DataSource, _: Migrated -> PostgresOutbox(source) }.boundTo<Outbox>() +
         singleOf(
             { outbox: Outbox, config: Settings, bus: EventBus, streams: StreamBackend ->
                 relay(every = config.outboxEvery, outbox = outbox, bus = bus)
