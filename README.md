@@ -18,7 +18,7 @@ docker compose -f demo/docker-compose.yml up -d postgres registry
 `web/` is a SolidJS front end for the shop, in TypeScript: browse pets by species, adopt one, watch `/stats` update,
 and follow arrivals and adoptions live on `/live`, which reads the shop's server-sent events at `/events` as an Effect
 `Stream` and reconnects on an Effect `Schedule`. Its dev server proxies to the shop on :8080 (`PETSHOP_URL` overrides
-that), and Estate's `app` link opens it.
+that), and Estate's `app` link opens it. The demo's compose also builds and serves it on the same port.
 
 ```bash
 bun install --cwd web

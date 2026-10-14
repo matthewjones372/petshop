@@ -15,7 +15,7 @@ services:
       requests: sum(rate(petshop_adoptions_total[1m]))
       errors: sum(rate(petshop_adoptions_total{outcome=~"registry_down|not_recorded"}[1m])) or vector(0)
     links:
-      # The front end in web/, run with `bun run --cwd web dev`.
+      # The front end in web/, served by compose's `web` service, or by `bun run --cwd web dev`.
       app: http://localhost:5173
       api: http://localhost:8080/api-docs
       health: http://localhost:8080/health/ready

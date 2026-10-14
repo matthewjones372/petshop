@@ -1,11 +1,11 @@
 # Watching the numbers
 
 Two terminals. The application runs on the host. Everything else runs in
-Docker: Prometheus, Grafana, Alertmanager, Estate, Loki, Tempo, a traffic generator, the Postgres the outbox is in,
+Docker: the front end, Prometheus, Grafana, Alertmanager, Estate, Loki, Tempo, a traffic generator, the Postgres the outbox is in,
 Kafka and its schema registry, an exporter for each of those two, and a stand-in
 chip registry. Compose goes first,
-because the application will not start without its database. The first `up` builds the traffic generator's image,
-which takes a few minutes.
+because the application will not start without its database. The first `up` builds the traffic generator's image
+and the front end's, which takes a few minutes.
 
 ```bash
 cd demo && docker compose up -d
@@ -37,6 +37,11 @@ every panel stays empty. Binding all interfaces lets the scrape in. It also
 serves the shop to your network, which is why it is not the default. Docker
 Desktop on a Mac or Windows forwards `host.docker.internal` to loopback, so
 there it is harmless either way.
+
+The shop's front end is at <http://localhost:5173>, built from `web/` and served by compose's `web` service, which
+points it at the shop on the host and the browser's spans, lines and metrics at Tempo, Loki and Prometheus. If
+`bun run --cwd web dev` already holds 5173, `WEB_PORT=5175 docker compose up -d` serves it on 5175 instead. After
+changing `web/`, `docker compose up -d --build web` rebuilds it.
 
 Then open Grafana at <http://localhost:3000>, or Estate at
 <http://localhost:8095> (see [Estate](#estate) below). Grafana's dashboard is
@@ -89,8 +94,10 @@ above the shop's own, so an adoption is one trace from the click. Tempo turns ev
 service graph, written to Prometheus, and that is how Estate shows `petshop-web`: its calls, errors and p99, the
 adoption's click-to-answer time and `/live`'s reconnects from the span metrics, the edge to the shop from the service
 graph, and the latest Core Web Vitals from the browser's own OTLP metrics. Its lines (errors, vitals, reconnects) go to
-Loki as `{service_name="petshop-web"}`. Run the shop with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` and the
-front end with `bun run --cwd web dev`, click about, and the numbers appear on Estate within a minute.
+Loki as `{service_name="petshop-web"}`. With the shop running as above, click about the front end at
+<http://localhost:5173> and the numbers appear on Estate within a minute. The traffic generator calls the API
+directly, so `petshop-web` is quiet while nobody has the front end open; its `/stats` page asks every three seconds,
+which is enough to keep it moving.
 
 ## On Kafka
 
@@ -160,7 +167,8 @@ here is a process on your machine. There is no p99 either: the adoption timer is
 
 | | |
 |---|---|
-| `docker-compose.yml` | Prometheus, Alertmanager, Grafana, Estate, Loki, Tempo, Proofload's visitors (`traffic/Dockerfile`), the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
+| `docker-compose.yml` | the front end, Prometheus, Alertmanager, Grafana, Estate, Loki, Tempo, Proofload's visitors (`traffic/Dockerfile`), the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
+| `web/Dockerfile` | the front end in `web/`, built with bun and served by `vite preview` through the same proxies as `bun run dev` |
 | `tempo/tempo.yaml` | Tempo, receiving OTLP over HTTP on 4318, and writing span metrics and the service graph to Prometheus |
 | `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
 | `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds, which on Linux needs the app started with `HOST=0.0.0.0`, and the Postgres and Kafka exporters. It also takes Tempo's remote writes and the front end's OTLP metrics |
