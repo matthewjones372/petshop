@@ -11,7 +11,9 @@ import io.github.matthewjones372.proofload.Tail
 import io.github.matthewjones372.proofload.Timing
 import io.github.matthewjones372.proofload.engine.Proofload
 import io.github.matthewjones372.proofload.feed
+import io.github.matthewjones372.proofload.generatorSaturated
 import io.github.matthewjones372.proofload.hold
+import io.github.matthewjones372.proofload.inFlightAtMost
 import io.github.matthewjones372.proofload.perSecond
 import io.github.matthewjones372.proofload.rampRate
 import io.github.matthewjones372.proofload.report.writeHtmlReport
@@ -23,7 +25,6 @@ import io.github.matthewjones372.proofload.then
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.SplittableRandom
-import java.util.concurrent.Semaphore
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -94,28 +95,30 @@ fun main() {
         val profile = rampRate(from = START.perSecond, to = peak.perSecond, over = ramp) then hold(peak.perSecond, held)
         println("Visiting $target: up to $peak a second over $ramp, then held for $held, against $pets pets")
         val mix = feed(ROLL) { user -> SplittableRandom(user).nextInt(MIX) }
-        val result = Proofload().run(Simulation(visitor, profile, mix))
+        val result = Proofload().run(Simulation(visitor, profile, mix).inFlightAtMost(CONNECTIONS))
 
         Files.createDirectories(reports)
         result.writeHtmlReport(reports.resolve("heavy.html"))
         Files.writeString(reports.resolve("seconds.tsv"), result.seconds(peak, ramp))
         println(result.summary(listOf(lookAtAPet.name, browse.name, adopt.name)))
+        if (result.generatorSaturated()) {
+            println("Void: the generator refused ${result.refused} arrivals at its cap of $CONNECTIONS in flight")
+        }
         println("Adoptions: ${taken.get()} taken, ${refused.get()} refused as declared")
         println("Report at ${reports.resolve("heavy.html")}, each second in ${reports.resolve("seconds.tsv")}")
     }
 }
 
 /**
- * Jetty's client, with at most [CONNECTIONS] requests in flight; one more fails at once as [NoFreeConnection], so a
- * backlog is counted in the report rather than kept in this process. Waiting does not scale: Jetty's own queue and a
- * timed semaphore both unlink a waiter that times out by walking the queue, and 40,000 of them took every core and
- * then the heap. Not the JDK's client: it opens a connection per request in flight, which takes every ephemeral port.
+ * Jetty's client, with a connection for each of the [CONNECTIONS] users the simulation lets be in flight, so no request
+ * waits in Jetty's queue. The cap is the engine's: an arrival past it is refused and counted in `result.refused`, never
+ * kept in this process. Waiting does not scale: Jetty's own queue and a timed semaphore both unlink a waiter that times
+ * out by walking the queue, and 40,000 of them took every core and then the heap. Not the JDK's client: it opens a
+ * connection per request in flight, which takes every ephemeral port.
  */
 private class JettyTransport(target: String, private val timeout: Duration) : Transport, AutoCloseable {
 
     private val base = target.trimEnd('/')
-
-    private val inFlight = Semaphore(CONNECTIONS)
 
     private val client = HttpClient().apply {
         maxConnectionsPerDestination = CONNECTIONS
@@ -125,25 +128,17 @@ private class JettyTransport(target: String, private val timeout: Duration) : Tr
     }
 
     override fun send(request: RequestSpec): ResponseSpec {
-        if (!inFlight.tryAcquire()) throw NoFreeConnection()
-        try {
-            val response = client.newRequest(base + request.target)
-                .method(request.method.name)
-                .timeout(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
-                .headers { headers -> request.headers.forEach { (name, value) -> headers.add(name, value) } }
-                .apply { request.body?.let { body(StringRequestContent("application/json", it)) } }
-                .send()
-            return ResponseSpec(response.status, response.headers.map { it.name to it.value }, response.contentAsString)
-        } finally {
-            inFlight.release()
-        }
+        val response = client.newRequest(base + request.target)
+            .method(request.method.name)
+            .timeout(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+            .headers { headers -> request.headers.forEach { (name, value) -> headers.add(name, value) } }
+            .apply { request.body?.let { body(StringRequestContent("application/json", it)) } }
+            .send()
+        return ResponseSpec(response.status, response.headers.map { it.name to it.value }, response.contentAsString)
     }
 
     override fun close() = client.stop()
 }
-
-/** Without a stack trace: tens of thousands a second, each the same line of this file. */
-private class NoFreeConnection : RuntimeException("the generator had no free connection", null, false, false)
 
 private val ROLL = sessionKey<Int>("roll")
 
@@ -175,16 +170,18 @@ private fun RunResult.summary(steps: List<String>): String = buildString {
                 "${stage.failed} failed, service p50/p99/p99.9/max ms ${stage.serviceTime.row().replace('\t', '/')}",
         )
     }
+    appendLine("not sent: generator saturated, $refused")
     append("generator: behind p99 ${behind.p99.ms()} ms, its own pauses p99 ${hiccups.p99.ms()} ms")
 }
 
 /** One row a second: what the profile asked for, what came back, and how long it took. */
 private fun RunResult.seconds(peak: Int, ramp: Duration): String = buildString {
-    appendLine("second\tasked\tanswered\tfailed\tp50_ms\tp99_ms\tin_flight")
+    appendLine("second\tasked\tanswered\tfailed\trefused\tp50_ms\tp99_ms\tin_flight")
     timeline.forEachIndexed { second, slot ->
         val asked = if (second < ramp.inWholeSeconds) START + (peak - START) * second / ramp.inWholeSeconds else peak
         val inFlight = usersInFlight.getOrNull(second)?.toString() ?: "-"
-        val row = listOf(second, asked, slot.count, slot.failed, slot.p50.ms(), slot.serviceTime.p99.ms(), inFlight)
+        val refused = refusedPerSecond.getOrNull(second) ?: 0L
+        val row = listOf(second, asked, slot.count, slot.failed, refused, slot.p50.ms(), slot.serviceTime.p99.ms(), inFlight)
         appendLine(row.joinToString("\t"))
     }
 }
