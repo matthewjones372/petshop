@@ -6,11 +6,6 @@ import org.apache.avro.Schema
 import org.apache.avro.SchemaCompatibility
 import org.junit.jupiter.api.Test
 
-/**
- * The events' Avro schema is the shop's contract with whoever reads the topic, so it is a file in the
- * repository: a change to the wire classes is a change to this file, reviewed as one, and a change a
- * reader of the old schema could not follow fails here before any record is written with it.
- */
 class SchemaSpec {
 
     private val golden: Schema =

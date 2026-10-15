@@ -33,6 +33,8 @@ import java.util.Enumeration
 import java.util.UUID
 import java.util.concurrent.CompletionException
 import kotlin.reflect.typeOf
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 // ------------------------------------------------------------------ runtime
 //
@@ -411,15 +413,18 @@ private fun segment(value: Any?): String = urlEncode(plain(value) ?: "").replace
 
 // ---------------------------------------------------------------- payloads
 
+@Serializable
 data class ChipRecord(
     val number: String,
     val keeper: String,
 )
 
+@Serializable
 data class Problem(
     val message: String,
 )
 
+@Serializable
 data class NewKeeper(
     val keeper: String,
 )

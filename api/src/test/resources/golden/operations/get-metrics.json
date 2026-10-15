@@ -4,6 +4,9 @@
       "get": {
         "summary": "Every meter, in Prometheus' exposition format",
         "operationId": "getMetrics",
+        "tags": [
+          "shop"
+        ],
         "responses": {
           "200": {
             "description": "Success.",

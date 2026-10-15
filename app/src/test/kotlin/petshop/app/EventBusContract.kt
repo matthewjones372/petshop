@@ -3,11 +3,11 @@ package petshop.app
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.stream.Forks
+import io.github.matthewjones372.lark.stream.Hub
 import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.test.story
 import io.kotest.assertions.arrow.core.shouldBeRight
@@ -24,30 +24,30 @@ import petshop.domain.PetShop
 import petshop.domain.ShopEvent
 import petshop.domain.Species
 
-/** The shop to act on, and the projection reading the bus. The relay is a dependency so that it runs. */
 private class Served(val shop: PetShop, val projection: Projection)
 
 private val served: Module =
     single { shop: PetShop, projection: Projection, _: OutboxRelay -> Served(shop, projection) }
 
-/**
- * What every [EventBus] promises, as tests. A bus's spec extends this and says how to make one, and adds what is
- * true of that bus alone; a new bus is one more class that passes these.
- */
 abstract class EventBusContract {
 
-    /** A new bus with nothing on it. [name] is the test's own, for a bus whose topics and readers are shared. */
-    abstract fun bus(name: String): EventBus
+    /** The bus and what it holds open; [name] keeps topics and readers apart on a shared broker. */
+    abstract fun bus(name: String): Module
 
-    /** Whether the bus remembers where a reader got to, and so has [handled] to ask. */
+    /** The `petshop.bus` section that puts the whole service on this bus. */
+    abstract fun busConfig(name: String): String
+
+    /** [block] against the bus, in a graph that closes what the bus holds once it returns. */
+    protected fun <A> using(bus: Module, block: (EventBus) -> A): A =
+        testApp(bus.subgraph<EventBus>()) { theBus: EventBus -> block(theBus) }
+
     protected open val remembersReaders: Boolean = false
 
-    /** How many events the reader named [name] has acknowledged handling, on a bus that [remembersReaders]. */
     protected open fun handled(name: String): Long? = null
 
     @Test
     fun `an event published before anyone reads it reaches the first reader`() = story {
-        bus("early").use { bus ->
+        using(bus("early")) { bus ->
             val waffle = Given("Waffle's arrival, published before anyone reads the bus") {
                 arrival(1, "Waffle").also { bus.publish(it).shouldBeRight() }
             }
@@ -60,7 +60,7 @@ abstract class EventBusContract {
 
     @Test
     fun `a reader reads events in the order they were published`() = story {
-        bus("ordered").use { bus ->
+        using(bus("ordered")) { bus ->
             val seen = ConcurrentLinkedQueue<ShopEvent>()
             Given("a reader") { bus.consume { seen.add(it) }.start(Forks()) }.use { _ ->
                 val published = When("three arrivals are published") {
@@ -73,15 +73,26 @@ abstract class EventBusContract {
     }
 
     @Test
+    fun `a reader handles an event inside the trace it was published in`() = story {
+        using(bus("traced")) { bus ->
+            val traces = ConcurrentLinkedQueue<String>()
+            Given("a reader noting the trace it handles each event in") {
+                bus.consume { traces.add(currentTrace) }.start(Forks())
+            }.use { _ ->
+                When("Waffle's arrival is published inside a trace") {
+                    inATrace { bus.publish(arrival(1, "Waffle")).shouldBeRight() }
+                }
+                Then("the reader handled it in that trace").eventually(30.seconds) { traces.toList() shouldBe listOf(A_TRACE) }
+            }
+        }
+    }
+
+    @Test
     fun `the whole service runs on it, and an adoption reaches the projection`() = story {
         val service = Given("the whole service with its events on this bus") {
-            (
-                petshop.overriding(single<ChipRegistry> { FakeRegistry() })
-                    .overriding(singleOf<EventBus>({ bus("service") }, { bus -> bus.close() }))
-                    .onAFreshDatabase() + served
-                )
+            (Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() }).onAFreshDatabase() + served)
                 .subgraph<Served>()
-                .overridingConfig("petshop.outboxEvery = 50ms")
+                .overridingConfig(busConfig("service") + "\npetshop.outboxEvery = 50ms")
         }
         testApp(service) { app: Served ->
             When("Ada adopts Nibbles") { app.shop.adopt(PetId(1), by = "Ada") }
@@ -103,14 +114,15 @@ abstract class EventBusContract {
     private fun Tally.adopted(species: Species): Int = bySpecies.single { it.species == species }.adopted
 }
 
-/** The in-process bus: Lark's [io.github.matthewjones372.lark.stream.Hub], and nothing to set up. */
 class HubBusSpec : EventBusContract() {
 
-    override fun bus(name: String): EventBus = HubBus()
+    override fun bus(name: String): Module = hubBus()
+
+    override fun busConfig(name: String): String = "petshop.bus.kind = in-process"
 
     @Test
     fun `a closed bus turns an event away, and says so`() = story {
-        val bus = Given("a bus that has closed") { HubBus().apply { close() } }
+        val bus = Given("a bus whose hub has closed") { HubBus(Hub<Claimed>(1).apply { close() }) }
         val answer = When("an arrival is published to it") { bus.publish(PetArrived(1, Pet(PetId(9), "Waffle", Species.Dog))) }
         Then("it is refused, so the outbox keeps it") { answer.isLeft() shouldBe true }
     }

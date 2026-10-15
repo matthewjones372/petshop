@@ -1,5 +1,10 @@
 package petshop.app
 
+import io.github.matthewjones372.lark.Carriers
+import io.github.matthewjones372.lark.otel.span
+import io.opentelemetry.api.trace.Span
+import io.opentelemetry.api.trace.Tracer
+import kotlinx.serialization.json.Json
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
@@ -13,42 +18,48 @@ import petshop.outbox.OutboxTable
 import javax.sql.DataSource
 
 /**
- * The outbox as a Postgres table. The SQL is [OutboxTable]'s, in ExoQuery; what is left here is the
- * shop's side of it, which is an event flattened into a row and read back out of one.
- *
- * A claim selects the oldest unpublished rows `FOR UPDATE SKIP LOCKED`, publishes them, and deletes the
- * ones the bus took before it commits. Two relays claiming at once — two instances of the service, or
- * a restarted relay beside one still finishing — never wait for each other and never hand the bus the
- * same row at the same time. If the process dies between publishing and committing, the rows are
- * claimed again, which is the at-least-once the consumer already expects.
+ * Claims use `FOR UPDATE SKIP LOCKED`, so concurrent relays never block each other or publish the same
+ * row at once. A crash between publish and commit publishes the rows again: delivery is at-least-once.
  */
-class PostgresOutbox(dataSource: DataSource) : Outbox {
+class PostgresOutbox(dataSource: DataSource, private val tracer: Tracer) : Outbox {
 
     private val table = OutboxTable(dataSource)
 
-    // Everything in a row but its seq is known before Postgres numbers it.
+    // Postgres assigns the seq, so the row is built with a placeholder of 0. Captured inside the span, so the
+    // relay's publish is this write's child.
     override fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent =
-        numbered(table.record(pet.row(), numbered(0).row()))
+        tracer.span("INSERT outbox") {
+            Span.current().setAttribute("db.system.name", "postgresql")
+            numbered(table.record(pet.row(), numbered(0).row(Carriers.capture())))
+        }
 
     override fun shelf(opening: List<Pet>): List<Pet> {
         table.stock(opening.map { it.row() })
         return table.pets().map { Pet(PetId(it.id), it.name, Species.valueOf(it.species), it.adopted) }
     }
 
-    override fun claim(limit: Int, publish: (List<ShopEvent>) -> List<ShopEvent>): List<ShopEvent> {
+    override fun claim(limit: Int, publish: (List<Claimed>) -> List<ShopEvent>): List<ShopEvent> {
         val taken = mutableListOf<ShopEvent>()
-        table.claim(limit) { rows -> publish(rows.map { it.event() }).also { taken += it }.map { it.seq } }
+        table.claim(limit) { rows ->
+            publish(rows.map { Claimed(it.event(), it.carried()) }).also { taken += it }.map { it.seq }
+        }
         return taken
     }
 }
 
 private fun Pet.row(): PetRow = PetRow(id.value, name, species.name, adopted)
 
-private fun ShopEvent.row(): OutboxRow = when (this) {
-    is PetArrived -> OutboxRow(seq, "arrived", pet.id.value, pet.name, pet.species.name, pet.adopted, null)
-    is PetAdopted -> OutboxRow(seq, "adopted", pet.id.value, pet.name, pet.species.name, pet.adopted, by)
-    is PetReturned -> OutboxRow(seq, "returned", pet.id.value, pet.name, pet.species.name, pet.adopted, null)
+private fun ShopEvent.row(carried: Map<String, String>): OutboxRow {
+    val metadata = carried.takeIf { it.isNotEmpty() }?.let { Json.encodeToString(it) }
+    return when (this) {
+        is PetArrived -> OutboxRow(seq, "arrived", pet.id.value, pet.name, pet.species.name, pet.adopted, null, metadata)
+        is PetAdopted -> OutboxRow(seq, "adopted", pet.id.value, pet.name, pet.species.name, pet.adopted, by, metadata)
+        is PetReturned -> OutboxRow(seq, "returned", pet.id.value, pet.name, pet.species.name, pet.adopted, null, metadata)
+    }
 }
+
+private fun OutboxRow.carried(): Map<String, String> =
+    metadata?.let { Json.decodeFromString<Map<String, String>>(it) } ?: emptyMap()
 
 private fun OutboxRow.event(): ShopEvent {
     val pet = Pet(PetId(petId), petName, Species.valueOf(species), adopted)

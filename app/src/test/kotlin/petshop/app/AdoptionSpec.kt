@@ -26,15 +26,8 @@ import petshop.domain.RegistryDown
 import petshop.domain.ShopEvent
 import petshop.domain.Unreachable
 
-/**
- * The shop under test, and nothing else: no port bound, no documents served, and no arrivals turning
- * up mid-assertion. `subgraph` is what makes that a line rather than a second wiring.
- */
 class AdoptionSpec {
 
-    // The shop needs a system, an actor, a tracer and a registry. Not a port, not a config file, and —
-    // since the actor stopped pretending to depend on them — not the settings either. The registry is
-    // a fake at the node: this file is about who gets the pet, and RegistrySpec is about the wire.
     private val settled: Module = shopWith(FakeRegistry())
 
     @Test
@@ -78,10 +71,10 @@ class AdoptionSpec {
 
             override fun shelf(opening: List<Pet>): List<Pet> = opening
 
-            override fun claim(limit: Int, publish: (List<ShopEvent>) -> List<ShopEvent>) = emptyList<ShopEvent>()
+            override fun claim(limit: Int, publish: (List<Claimed>) -> List<ShopEvent>) = emptyList<ShopEvent>()
         }
         val unrecorded = Given("an outbox that cannot write, and a registry that counts what it is asked") {
-            petshop.overriding(single<ChipRegistry> { counting })
+            Petshop.module.overriding(single<ChipRegistry> { counting })
                 .overriding(single<Outbox> { down })
                 .subgraph<PetShop>()
         }
@@ -106,13 +99,12 @@ class AdoptionSpec {
     }
 }
 
-/** That the file is read at all, which a graph makes easy to assert and easy to forget. */
 class SettingsSpec {
 
     @Test
     fun `a test changes one setting and the file keeps the rest`() = story {
         val faster = Given("the settings with arrivals every second") {
-            petshop.subgraph<Settings>().overridingConfig("petshop.arrivalsEvery = 1s")
+            Petshop.module.subgraph<Settings>().overridingConfig("petshop.arrivalsEvery = 1s")
         }
         val read = When("they are read") { testApp(faster) { settings: Settings -> settings } }
         Then("arrivals are every second") { read.arrivalsEvery shouldBe 1.seconds }
@@ -122,7 +114,7 @@ class SettingsSpec {
     @Test
     fun `the settings come from the file rather than a default`() = story {
         val read = When("the settings are read with nothing overridden") {
-            testApp(petshop.subgraph<Settings>()) { settings: Settings -> settings }
+            testApp(Petshop.module.subgraph<Settings>()) { settings: Settings -> settings }
         }
         Then("they are application.conf's") {
             read.host shouldBe "127.0.0.1"
@@ -133,7 +125,7 @@ class SettingsSpec {
 
     @Test
     fun `every node that takes the settings uses them`() = story {
-        val drawn = When("the whole graph is drawn") { petshop.render() }
+        val drawn = When("the whole graph is drawn") { Petshop.module.render() }
         Then("the shop's actor does not take the settings: a dependency nothing reads is an edge that lies") {
             drawn.contains("Settings --> ActorRef_Shop_") shouldBe false
         }

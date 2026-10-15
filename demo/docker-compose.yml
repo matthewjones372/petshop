@@ -1,12 +1,4 @@
-# Prometheus and Grafana, pointed at a petshop running on the host, a stand-in
-# for the chip registry the petshop calls out to, the Postgres its outbox is in,
-# and the Kafka broker and schema registry its events go to when BUS=kafka.
-#
-# The application is not in here on purpose: it is the thing being demonstrated,
-# and running it with `./gradlew :app:run` is how a reader would run it anyway.
 services:
-  # The chip registry is somebody else's service; this is WireMock answering in its place, from
-  # the same kind of stub the tests use. application.conf points at it by default.
   registry:
     image: wiremock/wiremock:3.13.1
     volumes:
@@ -14,7 +6,16 @@ services:
     ports:
       - "8089:8080"
 
-  # Where the outbox table lives. The petshop creates the table itself on start.
+  # Pretends to be GitHub Actions, Argo CD and Kubernetes, so Estate has builds, releases and running versions to
+  # show for a shop that runs on the host (tools/fake.ts).
+  tools:
+    image: oven/bun:1.3.11
+    command: ["bun", "/tools/fake.ts"]
+    volumes:
+      - ./tools:/tools:ro
+    ports:
+      - "8096:8080"
+
   postgres:
     image: postgres:17-alpine
     environment:
@@ -22,14 +23,12 @@ services:
       POSTGRES_USER: petshop
       POSTGRES_PASSWORD: petshop
     ports:
-      # 55432 on the host rather than 5432, which a Postgres installed on the machine is usually
-      # already holding. application.conf points at this one.
+      # 55432 on the host, since a local Postgres usually holds 5432.
       - "55432:5432"
 
-  # The bus, for BUS=kafka: one KRaft node, so there is no ZooKeeper beside it. The shop on the host
-  # reaches it on 9092; the schema registry, in here, on kafka:29092.
+  # The JVM image: kafka-native segfaults on some starts.
   kafka:
-    image: apache/kafka-native:4.3.1
+    image: apache/kafka:4.3.1
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -45,9 +44,12 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     ports:
       - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
 
-  # Postgres as Prometheus sees it: whether it answers (pg_up), its connections, transactions and size, and
-  # each table's live rows, which is how many events wait in the outbox. Estate's postgres store reads these.
   postgres-exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
     depends_on: [postgres]
@@ -56,19 +58,20 @@ services:
       DATA_SOURCE_USER: petshop
       DATA_SOURCE_PASS: petshop
 
-  # Kafka as Prometheus sees it: each partition's offsets and the projection's consumer lag. Estate's kafka
-  # store reads these. The broker speaks Kafka 4, which dropped the protocol versions the exporter asks for
-  # unless it is told which version it is talking to.
+  # --kafka.version: Kafka 4 dropped the protocol versions the exporter asks for by default.
   kafka-exporter:
     image: danielqsj/kafka-exporter:v1.10.0
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy
     command: ["--kafka.server=kafka:29092", "--kafka.version=3.9.0"]
     restart: unless-stopped
 
-  # Where the events' Avro schema is registered. application.conf points at it when BUS=kafka.
   schema-registry:
     image: confluentinc/cp-schema-registry:8.3.2
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
@@ -76,9 +79,6 @@ services:
     ports:
       - "8081:8081"
 
-  # Visitors for the shop running on the host, from loadtest's DemoTraffic: five a second, each looking at a pet and
-  # the stats, one in four adopting. Restarted when it ends or when the shop is not up yet, so it waits for the shop
-  # and follows it across restarts. `docker compose stop traffic` for a quiet shop.
   traffic:
     build:
       context: ..
@@ -86,24 +86,62 @@ services:
     environment:
       PETSHOP_URL: http://host.docker.internal:8080
       RATE: "5"
+      # A day a run, then restarted: Proofload keeps a run in a fixed number of slots, so a day holds about 7 MiB.
       DURATION: 24h
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
-  # Where the shop's lines go when it runs with LOKI_URL=http://localhost:3100, and where Estate reads them.
+  # The front end in web/, built and served at http://localhost:5173; WEB_PORT moves it, say while `bun run dev` holds 5173.
+  web:
+    build:
+      context: ..
+      dockerfile: demo/web/Dockerfile
+    environment:
+      PETSHOP_URL: http://host.docker.internal:8080
+      TEMPO_URL: http://tempo:4318
+      LOKI_URL: http://loki:3100
+      PROMETHEUS_URL: http://prometheus:9090
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+
+  # Headless Chromium visiting the front end, so petshop-web has numbers with nobody at the keyboard. RATE is visits a minute.
+  browser:
+    build:
+      context: ..
+      dockerfile: demo/browser/Dockerfile
+    depends_on: [web]
+    environment:
+      WEB_URL: http://web:5173
+      RATE: "4"
+    restart: unless-stopped
+
+  # Receives the shop's lines when it runs with LOKI_URL=http://localhost:3100.
   loki:
     image: grafana/loki:3.6.3
     command: ["-config.file=/etc/loki/local-config.yaml"]
     ports:
       - "3100:3100"
 
+  tempo:
+    image: grafana/tempo:2.10.8
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "3200:3200"
+      - "4318:4318"
+
   prometheus:
     image: prom/prometheus:v2.54.1
     command:
       - --config.file=/etc/prometheus/prometheus.yml
-      # Five seconds of history is nothing; the demo is watched, not kept.
       - --storage.tsdb.retention.time=1h
+      # Tempo's span metrics arrive by remote write, and the front end's own metrics over OTLP.
+      - --web.enable-remote-write-receiver
+      - --enable-feature=otlp-write-receiver
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/rules.yml:/etc/prometheus/rules.yml:ro
@@ -115,7 +153,7 @@ services:
 
   grafana:
     image: grafana/grafana:11.2.0
-    depends_on: [prometheus]
+    depends_on: [prometheus, loki, tempo]
     environment:
       # A demo nobody logs into. Do not copy this into anything that matters.
       GF_AUTH_ANONYMOUS_ENABLED: "true"
@@ -128,8 +166,6 @@ services:
     ports:
       - "3000:3000"
 
-  # Where the rules in prometheus/rules.yml fire. It sends them nowhere: Estate reads them from here, and the silences
-  # written on Estate's page are kept here.
   alertmanager:
     image: prom/alertmanager:v0.27.0
     command:
@@ -139,11 +175,9 @@ services:
     ports:
       - "9093:9093"
 
-  # Estate: is the petshop well, and if not, where to look. Its catalog is estate/catalog.yaml; it reads the
-  # Prometheus and Alertmanager above. http://localhost:8095
   estate:
     image: ghcr.io/matthewjones372/estate:main
-    depends_on: [prometheus, alertmanager]
+    depends_on: [prometheus, alertmanager, tools]
     volumes:
       - ./estate:/etc/estate:ro
     ports:

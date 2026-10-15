@@ -3,13 +3,17 @@ package petshop.api
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
-import io.github.matthewjones372.pelican.test.pekko.inMemory
+import io.github.matthewjones372.lark.stream.Forks
+import io.github.matthewjones372.lark.stream.Stream
+import io.github.matthewjones372.lark.stream.empty
+import io.github.matthewjones372.lark.stream.of
+import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.github.matthewjones372.pelican.test.shouldBeError
 import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
-import io.github.matthewjones372.pelican.health.Status
 import io.github.matthewjones372.pelican.health.health
+import io.github.matthewjones372.pelican.jetty.Handlers
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
@@ -34,22 +38,21 @@ private class OnePet(private var pet: Pet) : PetShop {
     }
 }
 
-/**
- * Two promises, kept apart on purpose: what the shop's own code may call, and what its callers hold.
- * A rename breaks the first at compile time; only the second is allowed to notice a URL.
- */
 class ContractSpec {
 
     private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 
-    private val probes = health { live("always") { Status.Pass } }
+    // No checks: the probes' paths are Pelican's whatever the app declares.
+    private val probes = health { }
 
     private val app = petshopApi(
+        streams = Forks(),
         shop = OnePet(nibbles),
         health = probes,
         scrape = { "petshop_adoptions_total 1.0" },
         tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
-    ).inMemory("petshop-contract")
+        watch = { Stream.empty() },
+    ).inMemory(Handlers.onVirtualThreads)
 
     @Test
     fun `a test names the endpoint, not the URL`() {
@@ -65,6 +68,7 @@ class ContractSpec {
         app.request(probes.ready, Unit) shouldBuild "GET /health/ready"
         app.request(metrics, Unit) shouldBuild "GET /metrics"
         app.request(stats, Unit) shouldBuild "GET /stats"
+        app.request(events, Unit) shouldBuild "GET /events"
     }
 
     @Test
@@ -92,35 +96,33 @@ class ContractSpec {
             NotRecorded(1) to ProblemDto.NotRecorded(1, NotRecorded(1).message),
         ).forEach { (refusal, declared) ->
             val refusing = petshopApi(
+                streams = Forks(),
                 shop = object : PetShop by OnePet(nibbles) {
                     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = refusal.left()
                 },
-                health = health { live("always") { Status.Pass } },
+                health = health { },
                 scrape = { "" },
                 tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
-            ).inMemory("petshop-refusing-${refusal::class.simpleName}")
+                watch = { Stream.empty() },
+            ).inMemory(Handlers.onVirtualThreads)
 
             refusing.outcome(adoptPet, 1L).shouldBeError() shouldBe declared
         }
     }
 
-
     @Test
-    fun `the probes answer in health+json, and a failing check takes the shop out of rotation`() {
-        app.outcome(probes.ready, Unit).shouldBeOk().status shouldBe "pass"
-
-        val failing = health { ready("database") { Status.Fail("no connection") } }
-        val down = petshopApi(
+    fun `the events endpoint streams each event the feed hands it, then ends with the feed`() {
+        val arrived = ShopEventDto(1, ShopEventKind.Arrived, nibbles.toDto())
+        val adopted = ShopEventDto(2, ShopEventKind.Adopted, nibbles.copy(adopted = true).toDto())
+        val watched = petshopApi(
+            streams = Forks(),
             shop = OnePet(nibbles),
-            health = failing,
+            health = probes,
             scrape = { "" },
             tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
-        ).inMemory("petshop-contract-down")
+            watch = { Stream.of(arrived, adopted) },
+        ).inMemory(Handlers.onVirtualThreads)
 
-        // A failing probe is pelican-health's declared failure (Pelican spec 0070), so the report comes back as a value.
-        val report = down.outcome(failing.ready, Unit).shouldBeError()
-        report.status shouldBe "fail"
-        report.checks.keys shouldBe setOf("database:responseTime")
-        down.outcome(failing.live, Unit).shouldBeOk().status shouldBe "pass"
+        watched.collect(events, Unit) shouldBe listOf(arrived, adopted)
     }
 }

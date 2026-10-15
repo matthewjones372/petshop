@@ -1,15 +1,19 @@
 package petshop.app
 
+import io.github.matthewjones372.lark.Carriers
 import io.github.matthewjones372.lark.Schedule
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
-import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.app.closingOf
+import io.github.matthewjones372.lark.app.liquibase.Migrated
+import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.counter
 import io.github.matthewjones372.lark.gauge
 import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.logAnnotated
 import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.logWarn
+import io.github.matthewjones372.lark.otel.span
 import io.github.matthewjones372.lark.stream.Run
 import io.github.matthewjones372.lark.stream.Running
 import io.github.matthewjones372.lark.stream.Stream
@@ -20,65 +24,51 @@ import io.github.matthewjones372.lark.stream.restartOnDefect
 import io.github.matthewjones372.lark.stream.runFold
 import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.stream.tick
+import io.opentelemetry.api.OpenTelemetry
+import io.opentelemetry.api.trace.Span
+import io.opentelemetry.api.trace.StatusCode
+import io.opentelemetry.api.trace.Tracer
+import javax.sql.DataSource
 import kotlin.time.Duration
 import petshop.domain.Pet
 import petshop.domain.ShopEvent
 
-/**
- * Where the shop writes what happened, and where the relay reads it back from.
- *
- * An event leaves only once the bus has taken it, and a claim holds what it read from every other
- * claim until it has answered, so two relays never publish the same event at once.
- */
+/** A claim holds its rows from every other claim until it answers, so two relays never publish the same event. */
 interface Outbox {
 
-    /**
-     * Writes [pet] as it now is and the event [numbered] makes, with the next `seq`, in one transaction: both or
-     * neither. Answers the event numbered.
-     */
+    /** Writes [pet] and its event, with the next `seq`, in one transaction. */
     fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent
 
-    /** The catalogue as the shop last left it, stocked with [opening]'s pets the first time it is empty of them. */
     fun shelf(opening: List<Pet>): List<Pet>
 
-    /**
-     * Up to [limit] of the events nobody has published, oldest first, held from every other claim while
-     * [publish] runs. What [publish] answers with leaves the outbox; the rest stay for the next claim.
-     * Answers what left.
-     */
-    fun claim(limit: Int, publish: (List<ShopEvent>) -> List<ShopEvent>): List<ShopEvent>
+    /** Unpublished events, oldest first, held while [publish] runs. Only what [publish] answers leaves the outbox. */
+    fun claim(limit: Int, publish: (List<Claimed>) -> List<ShopEvent>): List<ShopEvent>
 }
 
-/** The relay's run, which answers with how many events it published once it is stopped. */
-class OutboxRelay internal constructor(val running: Running<Nothing, Long>)
+/** An event and what its write carried, so publishing it continues the trace it was recorded in. */
+data class Claimed(val event: ShopEvent, val carried: Map<String, String> = emptyMap())
+
+class OutboxRelay internal constructor(val running: Running<Nothing, Long>) : AutoCloseable by running
 
 private const val batch = 100
 
 /**
- * What the shop recorded, carried to the bus: at least once, in the order it was recorded unless the
- * bus turns one away, in which case that one goes again on a later tick.
- *
- * An event leaves the outbox only after the bus has taken it. The other order loses one whenever the
- * process stops in between, and this order publishes one twice, which a consumer that knows events
- * by their `seq` can shrug off.
- *
- * Every [every], the [outbox] is asked for a claim on what the shop has not sent, and each claimed
- * event is offered to [bus] while the claim is held. The description names no backend: the service
- * runs it on Forks, and `RelaySpec` on a clock the test moves.
+ * At least once, in recorded order except for a refused event, which goes again on a later tick.
+ * Consumers deduplicate by `seq`.
  */
 internal fun relay(
     every: Duration,
     outbox: Outbox,
     bus: EventBus,
+    tracer: Tracer = OpenTelemetry.noop().getTracer("petshop"),
 ): Run<Nothing, Long> =
     Stream.tick(every = every, element = Unit)
-        // The claim blocks on Postgres, and mapPar gives it a virtual thread of its own.
-        // Publishing happens inside it, because the rows are only held while the claim is open.
-        .mapPar(1) { _ -> outbox.claim(batch) { claimed -> published(claimed, bus) } }
+        // mapPar gives the blocking claim its own virtual thread. Publishing happens inside the
+        // claim because the rows are only held while it is open.
+        .mapPar(1) { _ -> outbox.claim(batch) { claimed -> published(claimed, bus, tracer) } }
         .mapConcat { published -> published }
-        // A claim that throws — Postgres gone, a connection that timed out — is a defect, and without
-        // this one would stop the outbox draining until the process restarted. Nothing is lost by
-        // starting again: the claim rolled back, and whatever it held is in the outbox still.
+        // A throwing claim would otherwise stop the outbox draining. Restarting is safe: the claim
+        // rolled back.
         .restartOnDefect(Schedule.spaced(every))
         .runFold(0L) { published, event ->
             logAnnotated("seq" to event.seq.toString()) {
@@ -88,32 +78,32 @@ internal fun relay(
             published + 1
         }
 
-/**
- * A refusal is not the relay's failure: it is logged, counted, and left where it is for the next tick.
- * Only what the bus took is answered, and so only that leaves the outbox.
- */
-private fun published(claimed: List<ShopEvent>, bus: EventBus): List<ShopEvent> {
+/** Each event is published inside the trace its write carried, so the bus's consumer continues that trace. */
+private fun published(claimed: List<Claimed>, bus: EventBus, tracer: Tracer): List<ShopEvent> {
     gauge("petshop.outbox.claimed").set(claimed.size.toDouble())
-    return claimed.mapNotNull { event ->
-        bus.publish(event).fold(
-            { refused ->
-                logWarn("the bus refused event ${refused.seq}: ${refused.why}")
-                counter("petshop.outbox.refused").increment()
-                null
-            },
-            { published -> published },
-        )
+    return claimed.mapNotNull { (event, carried) ->
+        Carriers.within(carried) {
+            tracer.span("publish") {
+                bus.publish(event).fold(
+                    { refused ->
+                        Span.current().setStatus(StatusCode.ERROR, refused.why)
+                        logWarn("the bus refused event ${refused.seq}: ${refused.why}")
+                        counter("petshop.outbox.refused").increment()
+                        null
+                    },
+                    { published -> published },
+                )
+            }
+        }
     }
 }
 
 val outbox: Module =
-    singleOf(::PostgresOutbox).boundTo<Outbox>() +
-        singleOf(
-            { outbox: Outbox, config: Settings, bus: EventBus, streams: StreamBackend ->
-                relay(every = config.outboxEvery, outbox = outbox, bus = bus)
+    single { source: DataSource, tracer: Tracer, _: Migrated -> PostgresOutbox(source, tracer) }.boundTo<Outbox>() +
+        closingOf(
+            { outbox: Outbox, config: Settings, bus: EventBus, streams: StreamBackend, tracer: Tracer ->
+                relay(every = config.outboxEvery, outbox = outbox, bus = bus, tracer = tracer)
                     .start(streams)
                     .let(::OutboxRelay)
             },
-            // Stopped before the bus it publishes to is closed, because it depends on the bus.
-            { relay -> relay.running.close() },
         )
