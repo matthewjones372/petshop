@@ -7,6 +7,7 @@ import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.use
 import io.github.matthewjones372.lark.test.eventually
 import io.github.matthewjones372.pelican.Outcome
+import io.github.matthewjones372.pelican.jetty.PelicanServer
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.test.ApiClient
@@ -40,13 +41,12 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.extension.RegisterExtension
-import petshop.api.KotlinxShopCodecs
+import petshop.api.ShopCodecs
 import petshop.api.adoptPet
 import petshop.api.listPets
 import petshop.app.DatabaseSettings
 import petshop.app.Petshop
 import petshop.app.RegistrySettings
-import petshop.app.Shopfront
 import petshop.app.TestPostgres
 import petshop.app.onDatabase
 import petshop.registry.ChipRecord
@@ -55,10 +55,10 @@ import petshop.registry.recordKeeper
 
 /**
  * The ladder behind docs/performance.md, climbed until the shop falls behind. Each rung is written to
- * `stepped-<scenario>.tsv` rather than asserted, so a slow combination is measured, not failed; the only assertion is
- * that no adoption was lost.
+ * `stepped-<scenario>.tsv` rather than asserted, so a slow rung is measured, not failed; the only assertion is that no
+ * adoption was lost.
  */
-class StackComparison {
+class Ladder {
 
     @JvmField
     @RegisterExtension
@@ -80,7 +80,7 @@ class StackComparison {
 
     @LoadTest
     fun `browsing, stepped up until the shop falls behind`(proofload: Proofload) {
-        shop(TestPostgres.fresh().stocked(pets = CATALOGUE)).use { server: Shopfront ->
+        shop(TestPostgres.fresh().stocked(pets = CATALOGUE)).use { server: PelicanServer ->
             client(server).use { client ->
                 val browsing = scenario("browsing") {
                     exec(browse) { step ->
@@ -88,7 +88,7 @@ class StackComparison {
                     }
                 }
                 climb("browsing", browse) { rate, warming ->
-                    server to proofload.run(browsing.at(rate.perSecond, over = HELD).warmingUp(warming))
+                    proofload.run(browsing.at(rate.perSecond, over = HELD).warmingUp(warming))
                 }
             }
         }.shouldBeRight()
@@ -105,7 +105,7 @@ class StackComparison {
             val next = AtomicLong()
             val adopted = AtomicLong()
             val answered = AtomicLong()
-            shop(database).use { server: Shopfront ->
+            shop(database).use { server: PelicanServer ->
                 client(server).use { client ->
                     val adopting = scenario("adoption") {
                         exec(adopt) { step ->
@@ -129,7 +129,7 @@ class StackComparison {
                             shelf shouldBeLessThanOrEqual next.get()
                         }
                     }
-                    server to result
+                    result
                 }
             }.shouldBeRight()
         }
@@ -138,24 +138,24 @@ class StackComparison {
     private fun climb(
         name: String,
         measured: StepName,
-        rung: (rate: Int, warming: Duration) -> Pair<Shopfront, RunResult>,
+        rung: (rate: Int, warming: Duration) -> RunResult,
     ) {
+        val reports = Files.createDirectories(REPORTS)
         var table: Path? = null
         for ((index, rate) in LADDER.withIndex()) {
-            val (server, result) = rung(rate, if (index == 0) FIRST_WARM_UP else WARM_UP)
-            val reports = Files.createDirectories(server.reports())
+            val result = rung(rate, if (index == 0) FIRST_WARM_UP else WARM_UP)
             result.writeHtmlReport(reports.resolve("$name-$rate.html"))
 
             val written = table ?: reports.resolve("stepped-$name.tsv").also { Files.writeString(it, COLUMNS) }
             table = written
             val verdict = result.verdict(measured)
-            Files.writeString(written, result.row(server, name, rate, measured, verdict), CREATE, APPEND)
+            Files.writeString(written, result.row(name, rate, measured, verdict), CREATE, APPEND)
             if (verdict == Verdict.FellBehind) break
         }
     }
 
-    // HTTP/1.1 for both servers: the JDK client's default asks every server for an h2c upgrade, which one may take.
-    private fun client(server: Shopfront): ApiClient =
+    // HTTP/1.1: the JDK client's default asks the server for an h2c upgrade on every connection.
+    private fun client(server: PelicanServer): ApiClient =
         ApiClient(
             HttpClientTransport(
                 server.baseUrl,
@@ -164,7 +164,7 @@ class StackComparison {
                     .connectTimeout(java.time.Duration.ofSeconds(5))
                     .build(),
             ),
-            KotlinxShopCodecs,
+            ShopCodecs,
         )
 }
 
@@ -193,7 +193,7 @@ private enum class Verdict {
 }
 
 private val COLUMNS = listOf(
-    "stack", "codec", "scenario", "rate", "requests", "failed", "p50_ms", "p99_ms", "p999_ms", "max_ms",
+    "scenario", "rate", "requests", "failed", "p50_ms", "p99_ms", "p999_ms", "max_ms",
     "behind_p99_ms", "verdict",
 ).joinToString("\t", postfix = "\n")
 
@@ -203,14 +203,14 @@ private fun RunResult.verdict(measured: StepName): Verdict = when {
     else -> Verdict.KeptUp
 }
 
-private fun RunResult.row(server: Shopfront, name: String, rate: Int, measured: StepName, verdict: Verdict): String {
+private fun RunResult.row(name: String, rate: Int, measured: StepName, verdict: Verdict): String {
     val service = this[measured].serviceTime
     val p999 = when (val tail = service.p999) {
         is Tail.Measured -> tail.duration.ms()
         is Tail.Absent -> "-"
     }
     return listOf(
-        server.stack.name.lowercase(), server.codec.name.lowercase(), name, rate, count, failed,
+        name, rate, count, failed,
         service.p50.ms(), service.p99.ms(), p999, service.max.ms(), behind.p99.ms(), verdict,
     ).joinToString("\t", postfix = "\n")
 }

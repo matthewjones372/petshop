@@ -13,21 +13,23 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * KotlinxCodecs, with pelican-health's report read through a `@Serializable` copy: HealthReport is a plain data
- * class, which kotlinx refuses when the API is assembled. The copy's serial names keep the components Jackson's.
+ * KotlinxCodecs, with pelican-health's HealthReport, a plain data class kotlinx refuses, read and described through a
+ * `@Serializable` copy serial-named as the original.
  */
-object KotlinxShopCodecs : Codecs by KotlinxCodecs {
+object ShopCodecs : Codecs by KotlinxCodecs {
 
     @Suppress("UNCHECKED_CAST")
     override fun <T> codec(type: KType): BodyCodec<T> =
-        if (type.classifier == HealthReport::class) health as BodyCodec<T> else KotlinxCodecs.codec(type)
+        if (type.isHealth) health as BodyCodec<T> else KotlinxCodecs.codec(type)
 
     // Delegated, this would call KotlinxCodecs' own codec(type) and miss the one above.
     override fun <T> codec(type: KType, mediaType: String): BodyCodec<T> =
-        if (type.classifier == HealthReport::class) codec(type) else KotlinxCodecs.codec(type, mediaType)
+        if (type.isHealth) codec(type) else KotlinxCodecs.codec(type, mediaType)
 
     override fun schema(type: KType, components: SchemaComponents): JsonObj =
-        KotlinxCodecs.schema(if (type.classifier == HealthReport::class) typeOf<Report>() else type, components)
+        KotlinxCodecs.schema(if (type.isHealth) typeOf<Report>() else type, components)
+
+    private val KType.isHealth get() = classifier == HealthReport::class
 
     private val health = object : BodyCodec<HealthReport> {
         private val report = KotlinxCodecs.codec<Report>(typeOf<Report>())

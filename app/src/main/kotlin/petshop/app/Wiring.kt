@@ -14,9 +14,13 @@ import io.github.matthewjones372.lark.app.typesafe.layeredConfig
 import io.github.matthewjones372.lark.app.typesafe.layeredConfigOf
 import io.github.matthewjones372.lark.app.typesafe.origins
 import io.github.matthewjones372.lark.logInfo
+import io.github.matthewjones372.lark.stream.Forks
+import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.pelican.Api
-import io.github.matthewjones372.pelican.Codecs
+import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
 import io.github.matthewjones372.pelican.health.Health
+import io.github.matthewjones372.pelican.jetty.PelicanServer
+import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
 import io.micrometer.core.instrument.Metrics as MicrometerRegistries
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.prometheusmetrics.PrometheusConfig
@@ -25,8 +29,8 @@ import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk
 import kotlin.time.Duration
-import petshop.api.Binders
 import petshop.api.petshopApi
+import petshop.api.petshopDocs
 import petshop.domain.PetShop
 
 /** [host] is loopback unless something outside this machine has to reach the port. */
@@ -67,37 +71,38 @@ private fun tracing(): OpenTelemetrySdk =
         .build()
         .openTelemetrySdk
 
+/** Lark's streams run on virtual threads, and Jetty's client calls the registry. */
+private val jetty: Module =
+    single<StreamBackend> { Forks() } +
+        closingOf { -> JettyHttpTransport() }
+
 private val web: Module =
-    single { on: Binders, codecs: Codecs, shop: PetShop, health: Health, registry: PrometheusMeterRegistry,
+    single { streams: StreamBackend, shop: PetShop, health: Health, registry: PrometheusMeterRegistry,
         projection: Projection, feed: Feed, sdk: OpenTelemetrySdk ->
-        petshopApi(on, codecs, shop, health, registry::scrape, projection::tally, feed::watch, sdk)
+        petshopApi(streams, shop, health, registry::scrape, projection::tally, feed::watch, sdk)
     } +
-        single { api: Api, config: Settings, engine: Engine, codec: Codec, _: Arrivals, _: OutboxRelay,
-            _: ReadinessGauges, _: JvmGcMetrics ->
-            install({ engine.serve(api, config, codec) }) { server, _ -> server.stop() }.also { server ->
-                onStarted {
-                    logInfo(
-                        "Petshop on ${server.baseUrl} (${server.stack}, ${server.codec}), docs at /api-docs, " +
-                            "reference at /reference",
-                    )
-                }
+        single { api: Api, config: Settings, _: Arrivals, _: OutboxRelay, _: ReadinessGauges, _: JvmGcMetrics ->
+            install({ api.startWithDocs(port = config.port, host = config.host, docs = petshopDocs) }) { server, _ ->
+                server.stop()
+            }.also { server ->
+                onStarted { logInfo("Petshop on ${server.baseUrl}, docs at /api-docs, reference at /reference") }
             }
         }
 
 /** What the shop reads at start, its layers kept apart so the report can say what each setting overrode. */
 private val layers: Layered = layeredConfig()
 
-private val infrastructure: Module = settings + telemetry + database + engine + codecs + registry
+private val infrastructure: Module = settings + telemetry + database + jetty + registry
 private val shop: Module = theShop + checks + meters + arrivals
 private val events: Module = outbox + feed + projection + bus
 
-object Petshop : LarkApp<Shopfront>() {
+object Petshop : LarkApp<PelicanServer>() {
     override val module: Module = configOf(layers.config) + infrastructure + shop + events + web
 }
 
 /**
  * The petshop section and where each value came from, for `main` to log before the graph starts. DATABASE_URL often
- * carries a password. Each layer is cut to `petshop` so Pekko's reference.conf and the JVM's properties stay out.
+ * carries a password. Each layer is cut to `petshop` so libraries' reference.conf and the JVM's properties stay out.
  */
 fun configReport(): String =
     layeredConfigOf(*layers.layers.map { it.name to it.config.withOnlyPath("petshop") }.toTypedArray())

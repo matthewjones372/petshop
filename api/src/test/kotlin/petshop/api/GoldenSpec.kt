@@ -33,8 +33,7 @@ class GoldenSpec {
     }
 
     private val api = petshopApi(
-        onJetty,
-        KotlinxShopCodecs,
+        Forks(),
         shop,
         health = health { },
         scrape = { "" },

@@ -54,7 +54,6 @@ dependencies {
     implementation("org.postgresql:postgresql:42.7.13")
     implementation("com.zaxxer:HikariCP:7.1.0")
 
-    implementation("io.github.matthewjones372:pelican-client-pekko")
     implementation("io.github.matthewjones372:pelican-client-jetty")
 
     // Each registers itself through ServiceLoader, so being on the classpath is enough.
@@ -87,3 +86,18 @@ dependencies {
 
     testImplementation("io.github.matthewjones372:pelican-test")
 }
+
+// The shop runs on Jetty with kotlinx: a dependency that brings Pekko, Scala or Jackson's databind back fails `check`.
+val checkRuntimeClasspath by tasks.registering {
+    description = "Fails if the shop's runtime classpath holds Pekko, Scala, pelican-jackson or jackson-module-kotlin."
+    group = "verification"
+    val forbidden = listOf("org.apache.pekko", "pekko-", "scala-library", "pelican-jackson", "jackson-module-kotlin")
+    val entries = configurations.runtimeClasspath.flatMap { it.incoming.artifacts.resolvedArtifacts }
+        .map { artifacts -> artifacts.map { "${it.file.name} ${it.id.componentIdentifier.displayName}" } }
+    inputs.property("entries", entries)
+    doLast {
+        val refused = entries.get().filter { entry -> forbidden.any { entry.contains(it) } }
+        if (refused.isNotEmpty()) throw GradleException("The runtime classpath has ${refused.joinToString()}")
+    }
+}
+tasks.named("check") { dependsOn(checkRuntimeClasspath) }
