@@ -87,6 +87,27 @@ stores:
       - { title: Events on the topic, query: 'sum(kafka_topic_partition_current_offset{topic="petshop.events"})' }
       - { title: Projection lag, query: 'sum(kafka_consumergroup_lag{consumergroup="petshop-projection"}) or vector(0)' }
 
+# An adoption as one trace, from the click in the browser until the event reaches every open /live page. Estate reads
+# a sample of these from Tempo and shows where the time goes on the shop's and the front end's pages (spec 0046).
+journeys:
+  - name: adoption
+    title: Adoption, click to screen
+    environments: [ demo ]
+    start: { service: petshop-web, span: adopt pet }
+    stages:
+      # The browser's call and the shop's request span share a name, so the shop's is named by its service.
+      - { title: Click reaches the shop, where: web, from: { start: adopt pet }, to: { start: "POST /pets/{petId}/adoption", service: petshop } }
+      - { title: Shop decides, where: petshop, span: adopt }
+      # The registry client names its spans by method alone.
+      - { title: Checks the chip, where: registry, span: GET, service: petshop }
+      - { title: Written to the outbox, where: postgres, span: INSERT outbox }
+      # The relay polls every outboxEvery, so most of an adoption is usually spent here.
+      - { title: Waits in the outbox, where: postgres, from: { end: INSERT outbox }, to: { start: publish } }
+      - { title: Published, where: bus, span: publish }
+      - { title: Reaches the projection, where: bus, from: { end: publish }, to: { start: process } }
+      - { title: Projected, where: petshop, span: process }
+      - { title: Reaches the page, where: web, from: { end: process }, to: { start: live event } }
+
 alerts:
   ChipRegistryUnreachable: { impact: "Adopters are told to try again later, and the pet stays on the shelf." }
   AdoptionsNotRecorded: { impact: "Every adoption is refused with a 503 until the database answers again." }
