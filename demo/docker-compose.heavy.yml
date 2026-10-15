@@ -1,0 +1,14 @@
+# Heavy traffic, on top of docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.heavy.yml up -d
+#
+# Ten times the API's visitors and four times the browser's. Without this file the demo runs at its usual pace;
+# `up -d` without it puts the pace back.
+services:
+  traffic:
+    environment:
+      RATE: "50"
+  # Each visit is a whole Chromium page for about twenty seconds, so sixteen a minute keeps a few open at once.
+  browser:
+    environment:
+      RATE: "16"
