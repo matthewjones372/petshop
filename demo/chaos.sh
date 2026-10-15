@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Breaks one part of the demo at a time, so Estate has an alert to show and Ask AI something to explain.
 #
-#   ./chaos.sh <scenario> [seconds]     break it; with seconds, put it back after that long
-#   ./chaos.sh restore                  put everything back
+#   demo/chaos.sh <scenario> [seconds]  break it; with seconds, put it back after that long
+#   demo/chaos.sh restore               put everything back
 #
 # Scenarios, from obvious to not:
 #   registry-down   the chip registry stops: adoptions fail with registry_down
@@ -10,7 +10,7 @@
 #   postgres-down   the database stops: PostgresDown, then PetshopNotReady, with nobody needing to adopt
 #   kafka-down      the broker stops: KafkaDown, and the outbox fills while the bus is gone
 #
-# Run from demo/ with the stack up, the shop running on the host, and the traffic service sending adoptions.
+# Runs from any directory, with the stack up, the shop running on the host, and the traffic service sending adoptions.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here"
@@ -75,5 +75,5 @@ if [[ -n "${2:-}" ]]; then
   restore
 else
   echo
-  echo "  When done: ./chaos.sh restore"
+  echo "  When done: $0 restore"
 fi
