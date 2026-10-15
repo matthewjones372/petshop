@@ -47,9 +47,13 @@ seeded roll per visitor:
 Arrivals are open model: they depart on the profile's schedule whether or not earlier ones have been answered. Service
 time is measured from the moment a request left to the moment its answer arrived.
 
-The client is Jetty's, with at most 1,024 requests in flight; one more fails at once as `NoFreeConnection`. At 50,000
-a second, more than 1,024 in flight means the shop's answers were taking longer than about 20 ms, so a refusal says
-the shop was slow at that moment. It is not an error from the shop: a real crowd of clients would have waited.
+The simulation lets at most 1,024 visitors be in flight (`inFlightAtMost(CONNECTIONS)`), and Jetty's client has a
+connection for each. An arrival due while 1,024 are in flight is refused by Proofload: never sent, counted in
+`result.refused` and in the `refused` column of `seconds.tsv`, and kept apart from the shop's failures. The report and
+summary show it as "not sent: generator saturated", and a run that refused any arrival reads void
+(`result.generatorSaturated()`), so it does not count as the shop sustaining the rate or failing it. At 50,000 a second,
+more than 1,024 in flight means the shop's answers were taking longer than about 20 ms, so a refusal says the shop was
+slow at that moment, but it is not an error from the shop: a real crowd of clients would have waited.
 
 The adoption share writes to Postgres only until the shelf is empty: 99 adoptions taken in each run, then refusals.
 A catalogue large enough to keep 500 adoptions a second writing would make `GET /pets` return tens of thousands of
@@ -64,7 +68,9 @@ measures writes alone: about 1,000 a second before the shop falls behind.
 | G1, second | 25,900/s | 5.1% | 46 ms | 210 ms | 7.6 to 16.0 |
 | ZGC | 29,200/s | 30% | 109 ms | 604 ms | 7.9 to 30.4 |
 
-Every refusal in all three was `NoFreeConnection`: no timeouts and no errors from the shop. ZGC's pauses are under a
+These runs predate Proofload's cap: the transport refused with a semaphore of its own, and each refusal was counted
+as a failed request named `NoFreeConnection`. Every failure in all three was one: no timeouts and no errors from the
+shop. With the cap they would be counted as refused, and all three runs would read void. ZGC's pauses are under a
 millisecond, but its collector runs on threads of its own and competes for the same saturated cores, so that run
 neither confirms nor rules out G1's pauses as the cause of the bursts.
 
@@ -123,15 +129,16 @@ Each of these made the shop look broken while it sat idle. Thread dumps of both 
    a carrier to finish on.
 
 The final generator never waits for a slot: a request either gets one of 1,024 at once or is refused. Its CPU stayed
-at about three cores, and its slowest request in any run was 0.8 s.
+at about three cores, and its slowest request in any run was 0.8 s. Proofload now does this in the engine, with
+`inFlightAtMost`, so a refused arrival never gets a virtual thread at all.
 
 ## What would get it to 50,000 a second, sustained
 
 1. **Generate the load from a second machine.** This is the one change that would show whether the shop sustains the
    rate, because it gives the shop the cores the generator takes. Proofload can split a run across injectors.
-2. **Proofload: bound what a backlog costs the generator.** A cap on users in flight, with arrivals past it counted
-   as not sent rather than each given a thread, would do inside the engine what the transport does here, for any
-   client. A run whose generator saturated could then be reported void, as a run that ran out of ports already is.
+2. **Proofload: bound what a backlog costs the generator.** Done: `inFlightAtMost` caps users in flight inside the
+   engine, counts arrivals past it as not sent rather than giving each a thread, and reports a run that refused any as
+   void. The scenario uses it in place of the transport's own semaphore.
 3. **Allocate less per request.** Encoding `GET /pets` once per change to the catalogue, and serving it with an
    `ETag`, removes most of the 9% spent encoding and much of the allocation behind the GC pauses.
 4. **Serve reads without the actor.** Every read is an ask to the one actor that also writes adoptions to Postgres.
@@ -154,6 +161,6 @@ loadtest/heavy.sh build/heavy
 each JVM. The script starts Postgres on 55499, the registry stub on 8189 and the shop on 8180, so a running demo keeps
 its ports, and removes all three when it exits. It waits up to ten minutes (`QUIET_WAIT` times five seconds) for the
 load average to fall under the number of cores (`QUIET`), and refuses to run if it does not. It writes the HTML
-report, `seconds.tsv` (each second's requests, refusals and percentiles), `samples.tsv` (each process's CPU, the
+report, `seconds.tsv` (each second's requests, failures, arrivals refused at the cap and percentiles), `samples.tsv` (each process's CPU, the
 shop's threads and pool, Postgres's CPU and the sockets on the shop's port) and the shop's log.
 `./gradlew :loadtest:heavyTraffic` runs the scenario alone against a shop at `PETSHOP_URL`.
