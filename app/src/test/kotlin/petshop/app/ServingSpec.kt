@@ -53,11 +53,12 @@ class ServingSpec {
             )
 
             val reference = When("someone opens /reference") { get("/reference") }
-            Then("it is Redoc, in the shop's colours and fonts, with the paw for a logo") {
+            Then("it is RapiDoc, which can send a request, in the shop's colours and fonts, with the paw for a logo") {
                 reference.statusCode() shouldBe 200
-                reference.body() shouldContain "Redoc"
-                reference.body() shouldContain "#C2562B"
-                reference.body() shouldContain "x-logo"
+                reference.body() shouldContain "<rapi-doc "
+                reference.body() shouldContain "allow-try=\"true\""
+                reference.body() shouldContain "primary-color=\"#C2562B\""
+                reference.body() shouldContain "slot=\"nav-logo\""
                 reference.body() shouldContain "fonts.googleapis.com"
             }
             And("Swagger is where it was, and the document every client reads carries no logo") {
