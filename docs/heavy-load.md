@@ -1,20 +1,28 @@
 # Fifty thousand requests a second
 
 `loadtest/heavy.sh` ramps one shop from 100 to 50,000 requests a second over a minute, then holds it there for a
-minute. This page is what it found on one laptop on 2026-10-15.
+minute. This page is what it found on one laptop on 2026-10-15: first with that morning's lark and Proofload, then
+again that evening with lark's parked runners (lark #421) and Proofload's cap on users in flight (Proofload #126 to
+#128).
 
 ## Summary
 
 - **The shop answers 50,000 requests a second, but not cleanly, and this laptop cannot show whether it could.** In the
-  best run with the final generator, the hold sent 50,000 a second and the shop answered every request it was sent.
-  5.1% were refused by the generator because 1,024 were already in flight. The p99 service time over the hold was
-  46 ms and the slowest request 210 ms; seconds with no refusals had a p99 of 3 to 19 ms.
+  best run, with lark's parked runners and Proofload's cap, the shop answered 48,800 a second through the hold with
+  no failures, and the generator refused 2.4% of arrivals because 1,024 were already in flight. The p99 service time
+  over the hold was 36 ms and the slowest request 185 ms. Proofload reads every run void, because every run refused
+  some arrivals.
 - **The ceiling here is the machine's CPU, shared by the shop and its load generator.** At 50,000 a second the shop
-  used about 2.6 cores and the generator about 3. Each JVM sizes its thread pools to all eight cores, so together they
-  oversubscribe the machine: the load average climbed from under 8 to between 16 and 34 during each run, and how high
-  it went decided how much was refused (5% of the hold at 16, 30 to 36% at 30 to 34).
-- **The shop's own tail follows its garbage collection.** It allocates about 400 MB a second at this rate and pauses
-  for a young collection of 15 to 40 ms every one to two seconds, and the refusals come in bursts on that rhythm.
+  used about 2.7 cores and the generator about 3. Each JVM sizes its thread pools to all eight cores, so together they
+  oversubscribe the machine, and the load average climbed from under 8 to between 16 and 35 during each run. The
+  share refused in the hold ranged from 2.4% to 14% across four runs of the same code, and nothing measured in the
+  shop explains the difference.
+- **Garbage collection is not what sets the tail.** With a GC log and nothing else recording, the shop's young pauses
+  averaged 1.3 ms and the longest was 11 ms. A refusal needs the shop's answers to take more than about 20 ms, so the
+  bursts of refusals are not GC pauses. The 15 to 40 ms pauses this page first reported came from a run that was also
+  recording with JFR's profiling settings while its generator collapsed.
+- **Lark's parked runners moved its cost rather than removing it.** Lark's actor runtime took 17.5% of the shop's CPU
+  before and about 15% after, and the shop's CPU per request is unchanged at about 55 µs.
 - **Nothing else in the shop is near a limit.** Its Postgres pool never had more than one of ten connections in use
   or anyone waiting, Postgres stayed under 3% CPU, and the shop held at about 83 threads (handlers run on virtual
   threads; Jetty's pool of 200 only does I/O).
@@ -23,7 +31,7 @@ minute. This page is what it found on one laptop on 2026-10-15.
   here.
 
 What would show 50,000 a second sustained is the generator on a second machine. The changes at the end would lower the
-shop's GC tail and its CPU per request.
+shop's CPU per request.
 
 ## Machine and run
 
@@ -60,7 +68,23 @@ A catalogue large enough to keep 500 adoptions a second writing would make `GET 
 pets, because it returns every pet the shop has ever had. The adoption ladder in [performance.md](performance.md)
 measures writes alone: about 1,000 a second before the shop falls behind.
 
-## Results with the final generator
+## Results with lark's parked runners and Proofload's cap
+
+The lark snapshot was published from lark's main at 066eb9c, after #421, and the Proofload snapshot after #128. The
+fourth run also recorded the shop with JFR's default settings and a GC log.
+
+| Run | First refusal in the ramp | Hold: answered a second | Hold: refused | Hold: p99 | Hold: slowest | Load average, start to end |
+|---|---:|---:|---:|---:|---:|---|
+| First | 35,000/s | 43,100 | 13.8% | 76 ms | 470 ms | 6.9 to 19.0 |
+| Second | 20,900/s | 48,800 | 2.4% | 36 ms | 185 ms | 7.6 to 19.3 |
+| Third | 38,400/s | 46,500 | 7.1% | 50 ms | 285 ms | 7.7 to 16.4 |
+| With JFR | 27,500/s | 44,400 | 11.2% | 59 ms | 470 ms | 7.9 to 25.7 |
+
+No request failed in any of the four: every shortfall was an arrival Proofload refused at the cap. In the hold the shop
+used 2.2 to 2.7 cores and the generator 2.6 to 3.1. The Postgres pool never had more than one connection in use, and
+the shop never had more than 82 threads.
+
+## Earlier results
 
 | Run | First refusal in the ramp | Hold: refused | Hold: p99 | Hold: slowest | Load average, start to end |
 |---|---:|---:|---:|---:|---|
@@ -68,11 +92,11 @@ measures writes alone: about 1,000 a second before the shop falls behind.
 | G1, second | 25,900/s | 5.1% | 46 ms | 210 ms | 7.6 to 16.0 |
 | ZGC | 29,200/s | 30% | 109 ms | 604 ms | 7.9 to 30.4 |
 
-These runs predate Proofload's cap: the transport refused with a semaphore of its own, and each refusal was counted
+These runs, from before lark #421, predate Proofload's cap: the transport refused with a semaphore of its own, and each refusal was counted
 as a failed request named `NoFreeConnection`. Every failure in all three was one: no timeouts and no errors from the
 shop. With the cap they would be counted as refused, and all three runs would read void. ZGC's pauses are under a
 millisecond, but its collector runs on threads of its own and competes for the same saturated cores, so that run
-neither confirms nor rules out G1's pauses as the cause of the bursts.
+neither confirmed nor ruled out G1's pauses as the cause of the bursts; the GC log in the later runs did.
 
 The hold in the second G1 run, a second at a time:
 
@@ -92,21 +116,24 @@ The hold in the second G1 run, a second at a time:
 | Resource | What the runs showed |
 |---|---|
 | CPU, the machine | The limit. Shop and generator together oversubscribe eight cores; the load average passes 16. |
-| CPU, the shop | About 2.6 cores at 50,000/s, so about 50 µs a request. |
-| GC, the shop | About 400 MB a second; a young pause of 15 to 40 ms every one to two seconds, once 248 ms. |
+| CPU, the shop | About 2.7 cores at 48,800/s, so about 55 µs a request, before and after lark #421. |
+| GC, the shop | About 400 MB a second; young pauses averaged 1.3 ms, the longest 11 ms. |
 | The load generator | About 3 cores. Earlier designs collapsed first: see below. |
 | Postgres pool | At most one of ten connections in use, never a wait. |
 | Jetty threads | About 83 threads in the shop throughout. |
 
 ### Where the shop's CPU goes
 
-From a JFR recording of the shop at 50,000/s (`jfr view hot-methods`):
+From JFR recordings of the shop at 50,000/s (`jfr view hot-methods`):
 
-- **17.5%** in lark's actor runtime. `Runners.run` removes its runner from a `ConcurrentHashMap` key set each time
-  the shop actor's mailbox runs dry, and the next message starts a new virtual thread. That churn is also 13% of the
-  shop's allocation, as virtual thread stack chunks.
-- **9%** in kotlinx.serialization writing strings, nearly all of it encoding the 100-pet catalogue for `GET /pets`.
-- Jetty's request parsing and the virtual thread scheduler take most of the rest, a few percent each.
+- **Lark's actor runtime.** Before lark #421, 17.5%: `Runners.run` removed its runner from a `ConcurrentHashMap` key
+  set each time the shop actor's mailbox ran dry, and the next message started a new virtual thread. After it, about
+  15%: a runner that runs out of work pushes itself onto one shared stack of parked runners (`Runners.push`, 10.7%,
+  a compare-and-set loop on a single head that many runners contend for) after checking that both queues are empty
+  (4.2%). Virtual thread stack chunks are 13% of the shop's allocation either way.
+- **9 to 11%** in kotlinx.serialization writing strings, nearly all of it encoding the 100-pet catalogue for
+  `GET /pets`.
+- Jetty's request parsing and locking and the virtual thread scheduler take most of the rest, a few percent each.
 
 ## Generators that failed first
 
@@ -147,8 +174,9 @@ at about three cores, and its slowest request in any run was 0.8 s. Proofload no
 5. **Shed load in the shop.** A lark `Bulkhead` around the actor ask (`guard(Bulkhead(...))` in a `policy`, with a
    `deadline`) would answer a burst past its limit with an immediate 503, rather than letting thousands of requests
    park waiting for room in the actor's mailbox.
-6. **Lark: keep runners parked.** Keeping a runner, rather than retiring it each time one actor's mailbox empties,
-   would save most of the 17.5%.
+6. **Lark: park runners without contending.** Lark #421 keeps runners parked instead of retiring them, but every one
+   that parks pushes onto the same stack, and at this rate that compare-and-set loop is 10.7% of the shop's CPU. A
+   runner that spins briefly before parking, or a stack per carrier thread, might avoid most of it; neither is measured.
 
 ## Running it
 
