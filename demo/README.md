@@ -183,14 +183,19 @@ The shop's page carries its JVM (heap, GC pauses, threads, CPU), its connection 
 are failing. The Postgres store shows connections, transactions, size and the events waiting in the outbox. The
 Kafka store shows the topic's offsets and the projection's lag.
 
-The demo has no Kubernetes, Flux or CI, and Estate says so at the top of the page rather than leaving those parts
-blank. For the same reason it shows the shop as "not running": it reads that from a cluster or ECS, and the shop
-here is a process on your machine. There is no p99 either: the adoption timer is a summary without percentiles.
+The demo has no Kubernetes, Argo CD or CI, so compose's `tools` service pretends to be all three
+(`tools/fake.ts`), and Estate shows releases as it would for a shop that had them. Every nine minutes the shop has
+a new build on GitHub Actions, named for a plausible commit; two minutes later Argo CD applies it and its two pods roll
+to the new image, `main-<n>-<sha>`. The front end does the same every fourteen minutes, with one pod. So the cards
+carry a running version and a rail, the feed reads "build passed" and then "main-199-26d8c47 applied", and an alert
+that fires soon after a release says so. None of it is real: the shop is still the process on your machine, whatever
+version the card says. There is no p99 for the shop either: the adoption timer is a summary without percentiles.
 
 | | |
 |---|---|
 | `estate/catalog.yaml` | the petshop and its front end as two services in one environment, with its Postgres and Kafka as stores: the shop's load from adoptions, its JVM and pool, the front end's from Tempo's span metrics, the stores' stats, the vitals, the map, and the adoption as a journey through them |
-| `estate/estate.yaml` | Estate's settings: no sign-in (every visitor is an operator), and the demo's Prometheus, Alertmanager, Loki and Tempo as its sources |
+| `estate/estate.yaml` | Estate's settings: no sign-in (every visitor is an operator), the demo's Prometheus, Alertmanager, Loki and Tempo as its sources, and `tools` as its cluster, Argo CD and GitHub Actions |
+| `tools/fake.ts` | the stand-in for GitHub Actions, Argo CD and Kubernetes: a release of each service on a cadence of its own, worked out from the clock |
 | `prometheus/rules.yml` | the alerts: the shop's keep `job="petshop"`, which is how Estate knows an alert is the petshop's, the front end's keep `service="petshop-web"`, and the stores' carry `store:` naming theirs |
 | `alertmanager/alertmanager.yml` | routes every alert nowhere: Estate reads them, and keeps its silences there |
 | `estate/estate-ai.yaml` | `estate.yaml` with Ask AI turned on, read when Compose is started with `docker-compose.ai.yml` |

@@ -6,6 +6,16 @@ services:
     ports:
       - "8089:8080"
 
+  # Pretends to be GitHub Actions, Argo CD and Kubernetes, so Estate has builds, releases and running versions to
+  # show for a shop that runs on the host (tools/fake.ts).
+  tools:
+    image: oven/bun:1.3.11
+    command: ["bun", "/tools/fake.ts"]
+    volumes:
+      - ./tools:/tools:ro
+    ports:
+      - "8096:8080"
+
   postgres:
     image: postgres:17-alpine
     environment:
@@ -167,7 +177,7 @@ services:
 
   estate:
     image: ghcr.io/matthewjones372/estate:main
-    depends_on: [prometheus, alertmanager]
+    depends_on: [prometheus, alertmanager, tools]
     volumes:
       - ./estate:/etc/estate:ro
     ports:

@@ -15,3 +15,10 @@ sources:
     alertmanager: { url: http://alertmanager:9093 }
     loki: { url: http://loki:3100 }
     tempo: { url: http://tempo:3200 }
+    # tools/fake.ts, standing in for the cluster and Argo CD a real shop would deploy through.
+    kubernetes: { url: http://tools:8080/kubernetes }
+    argo: { url: http://tools:8080/argo }
+
+# tools/fake.ts again, standing in for GitHub Actions: a build of each service on main every few minutes.
+builds:
+  github: { url: http://tools:8080/github }
