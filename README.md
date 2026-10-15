@@ -460,8 +460,9 @@ reference, the registry's client, its stubs and a typed test client.
 
 **What it costs.** Two things to look up once: `errorJson` for a declared
 failure, and the import for `orFail`. The reference's `theme { }` names five
-colours and two fonts; anything past those is Scalar's own CSS. Scalar has no
-logo option, so the paw the Redoc reference carried is gone.
+colours, two fonts, a colour per method, the code panel and the heading weight;
+Pelican mixes the rest of Scalar's palette from those. Scalar has no logo
+option, so the paw the Redoc reference carried is gone.
 
 The demo's registry stubs are generated from the same endpoints too:
 `DemoStubsSpec` writes `demo/registry/mappings/chips.json`, including recording

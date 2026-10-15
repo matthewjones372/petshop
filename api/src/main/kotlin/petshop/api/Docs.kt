@@ -14,6 +14,13 @@ val petshopDocs: Docs = docs {
             error = RUST
             font("Nunito, sans-serif", stylesheet = NUNITO)
             codeFont("'JetBrains Mono', monospace", stylesheet = JETBRAINS_MONO)
+            methods {
+                get = SAGE
+                post = TERRACOTTA
+                delete = RUST
+            }
+            codePanel = BARK
+            headingWeight = 800
         }
     }
 }
