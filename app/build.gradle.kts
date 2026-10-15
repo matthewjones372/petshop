@@ -30,7 +30,7 @@ dependencies {
     implementation("com.github.avro-kotlin.avro4k:avro4k-confluent-kafka-serializer:2.12.0")
     implementation("io.confluent:kafka-avro-serializer:8.3.0")
     // Confluent 8.3 wants Kafka 8.3.0-ccs, not on Maven Central; the Apache 4.3 client stands in so there is
-    // one Kafka client on the classpath. lark-kafka is built against 3.8 and runs on it.
+    // one Kafka client on the classpath, the one lark-kafka is built against.
     implementation("org.apache.kafka:kafka-clients") { version { strictly("4.3.0") } }
     // Past open advisories: lz4-java 1.10.2 under kafka-clients, and HttpClient 5.5 and HttpCore 5.3.4
     // under Confluent's schema-registry client.

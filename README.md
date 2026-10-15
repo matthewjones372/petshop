@@ -570,9 +570,8 @@ backoff capped at 30 seconds. The producer's failure is a value,
 **What it costs.** Confluent's serializer is not on Maven Central, so the build
 adds Confluent's repository, limited to `io.confluent`. avro4k's serde needs
 Confluent 8.3, which asks for its own `8.3.0-ccs` build of the Kafka 4.3
-client, so the build pins Apache's `4.3.0` to keep one client on the classpath.
-`lark-kafka` is built against 3.8 and runs on it; `KafkaBusSpec` is what says
-so.
+client, so the build pins Apache's `4.3.0` to keep one client on the classpath,
+the same client `lark-kafka` is built against.
 
 **Its limits.** Delivery is at least once. `lark-kafka` has `transacted` for a
 consumer that writes back to Kafka, but the projection folds into memory, so it
@@ -627,7 +626,7 @@ loads on the project's Kotlin, or for a project with many more queries.
 
 ## Versions
 
-Pelican `1.0.1-SNAPSHOT`, Lark `0.10.0` (its Gradle wiring plugin `0.10.0`), Proofload
+Pelican `1.0.1-SNAPSHOT`, Lark `0.10.2-SNAPSHOT` (its Gradle wiring plugin too, which follows `larkVersion`), Proofload
 `0.1.0-rc4`, ExoQuery `2.0.4.PL`, kimney `0.3.0`, Jetty `12.1.13`,
 kotlinx.serialization `1.11.0`, Arrow `2.1.2`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`,
 HikariCP `7.1.0`, OpenTelemetry SDK `1.62.0`, Micrometer's Prometheus registry `1.16.6`, Logback `1.5.34`, Kotest `6.2.4`, JUnit `6.1.3`,
