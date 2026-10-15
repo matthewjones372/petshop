@@ -39,5 +39,9 @@ subprojects {
         "implementation"(platform("io.github.matthewjones372:pelican-bom:${providers.gradleProperty("pelicanVersion").get()}"))
     }
 
-    tasks.withType<Test> { useJUnitPlatform() }
+    tasks.withType<Test> {
+        useJUnitPlatform()
+        // `-Dpelican.golden.update=true` reaches the test JVM, which is where golden and stub files are rewritten.
+        providers.systemProperty("pelican.golden.update").orNull?.let { systemProperty("pelican.golden.update", it) }
+    }
 }

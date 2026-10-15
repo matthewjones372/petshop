@@ -22,6 +22,7 @@ services:
       # The front end in web/, served by compose's `web` service, or by `bun run --cwd web dev`.
       app: http://localhost:5173
       api: http://localhost:8080/api-docs
+      reference: http://localhost:8080/reference
       health: http://localhost:8080/health/ready
       metrics: http://localhost:8080/metrics
       dashboard: http://localhost:3000

@@ -9,6 +9,12 @@ import io.github.matthewjones372.pelican.jetty.PelicanServer
 import io.github.matthewjones372.pelican.test.apiClient
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
 import org.junit.jupiter.api.Test
 import petshop.api.ShopCodecs
 import petshop.api.listPets
@@ -30,5 +36,34 @@ class ServingSpec {
             }.shouldBeRight()
         }
         Then("the shop's opening pets are on it") { pets.take(opening.size) shouldBe opening.toDto() }
+    }
+
+    @Test
+    fun `the reference is served beside Swagger, in the shop's colours, over the same document`() = story {
+        val served = Given("the service on any free port") {
+            Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() })
+                .onAFreshDatabase()
+                .overridingConfig("petshop.port = 0")
+        }
+        served.use { server: PelicanServer ->
+            val http = HttpClient.newHttpClient()
+            fun get(path: String) = http.send(
+                HttpRequest.newBuilder(URI.create(server.baseUrl + path)).build(),
+                HttpResponse.BodyHandlers.ofString(),
+            )
+
+            val reference = When("someone opens /reference") { get("/reference") }
+            Then("it is Redoc, in the shop's colours and fonts, with the paw for a logo") {
+                reference.statusCode() shouldBe 200
+                reference.body() shouldContain "Redoc"
+                reference.body() shouldContain "#C2562B"
+                reference.body() shouldContain "x-logo"
+                reference.body() shouldContain "fonts.googleapis.com"
+            }
+            And("Swagger is where it was, and the document every client reads carries no logo") {
+                get("/api-docs").statusCode() shouldBe 200
+                get("/openapi.json").body() shouldNotContain "x-logo"
+            }
+        }.shouldBeRight()
     }
 }

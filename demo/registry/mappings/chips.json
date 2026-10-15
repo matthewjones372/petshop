@@ -1,33 +1,51 @@
 {
   "mappings": [
     {
-      "name": "every pet has a chip, except below",
-      "request": { "method": "GET", "urlPathPattern": "/chips/[0-9]+" },
+      "priority": 5,
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/chips/[^/]+"
+      },
       "response": {
         "status": 200,
-        "headers": { "Content-Type": "application/json" },
-        "jsonBody": { "number": "98100000000{{request.path.[1]}}", "keeper": "Petshop" },
-        "transformers": ["response-template"]
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"number\":\"98100000000{{request.pathSegments.[1]}}\",\"keeper\":\"Petshop\"}",
+        "transformers": [
+          "response-template"
+        ]
       }
     },
     {
-      "name": "pet 3 was never chipped",
       "priority": 1,
-      "request": { "method": "GET", "urlPath": "/chips/3" },
+      "request": {
+        "method": "GET",
+        "urlPath": "/chips/3"
+      },
       "response": {
         "status": 404,
-        "headers": { "Content-Type": "application/json" },
-        "jsonBody": { "message": "The registry has no chip under that id" }
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"message\":\"The registry has no chip under that id\"}"
       }
     },
     {
-      "name": "a new keeper is recorded as asked",
-      "request": { "method": "POST", "urlPathPattern": "/chips/[0-9]+/keeper" },
+      "priority": 5,
+      "request": {
+        "method": "POST",
+        "urlPathPattern": "/chips/[^/]+/keeper"
+      },
       "response": {
         "status": 200,
-        "headers": { "Content-Type": "application/json" },
-        "jsonBody": { "number": "{{request.path.[1]}}", "keeper": "{{jsonPath request.body '$.keeper'}}" },
-        "transformers": ["response-template"]
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"number\":\"{{request.pathSegments.[1]}}\",\"keeper\":\"{{jsonPath request.body '$.keeper'}}\"}",
+        "transformers": [
+          "response-template"
+        ]
       }
     }
   ]

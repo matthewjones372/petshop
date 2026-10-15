@@ -238,7 +238,7 @@ cause stops, so there is time to read the page and ask:
 | `chaos.sh` | breaks the registry, Postgres or Kafka, one at a time, and says which alert to look at |
 | `web/Dockerfile` | the front end in `web/`, built with bun and served by `vite preview` through the same proxies as `bun run dev` |
 | `tempo/tempo.yaml` | Tempo, receiving OTLP over HTTP on 4318, and writing span metrics and the service graph to Prometheus |
-| `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
+| `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3, written from the registry's endpoints by `DemoStubsSpec` |
 | `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds, which on Linux needs the app started with `HOST=0.0.0.0`, and the Postgres and Kafka exporters. It also takes Tempo's remote writes and the front end's OTLP metrics |
 | `grafana/provisioning/` | the Prometheus, Tempo and Loki datasources, Loki's lines linking to Tempo by `trace_id`, and the dashboard provider |
 | `grafana/dashboards/petshop.json` | the dashboard itself |

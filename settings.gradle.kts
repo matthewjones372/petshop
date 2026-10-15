@@ -1,14 +1,19 @@
 pluginManagement {
     val larkVersion = providers.gradleProperty("larkVersion").get()
+    val pelicanVersion = providers.gradleProperty("pelicanVersion").get()
     repositories {
         mavenCentral()
         gradlePluginPortal()
-        if (larkVersion.endsWith("-SNAPSHOT")) {
+        if (listOf(larkVersion, pelicanVersion).any { it.endsWith("-SNAPSHOT") }) {
             maven("https://central.sonatype.com/repository/maven-snapshots/")
             mavenLocal()
         }
     }
-    plugins { id("io.github.matthewjones372.lark.wiring") version larkVersion }
+    // Each plugin ships from the same build as its library, so it follows the library's version.
+    plugins {
+        id("io.github.matthewjones372.lark.wiring") version larkVersion
+        id("io.github.matthewjones372.pelican") version pelicanVersion
+    }
 }
 
 plugins { id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0" }

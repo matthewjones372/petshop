@@ -20,7 +20,13 @@ val petTaken = errorJson<ProblemDto.AlreadyAdopted>(409, "That pet has already b
 
 val petNotChipped = errorJson<ProblemDto.NotChipped>(422, "The registry has no chip for that pet")
 
-val unavailable = errorJson<ProblemDto.Unavailable>(503, "The adoption could not be finished just now; try again")
+// Both worth trying again, so both a 503. A status names one response unless its failures are tagged: the tag is
+// written into the body as `kind`, and a client reads the failure back by it (Pelican spec 0063).
+val registryDown = errorJson<ProblemDto.RegistryDown>(503, "The chip registry could not be reached; try again")
+    .tagged("registry_down")
+
+val notRecorded = errorJson<ProblemDto.NotRecorded>(503, "The adoption could not be recorded; try again")
+    .tagged("not_recorded")
 
 val listPets = endpoint {
     get("pets")
@@ -40,7 +46,7 @@ val adoptPet = endpoint(petId) {
     post("pets" / petId / "adoption")
     tag("pets")
     summary = "Take a pet home"
-    json<PetDto>().orFail(petMissing, petTaken, petNotChipped, unavailable)
+    json<PetDto>().orFail(petMissing, petTaken, petNotChipped, registryDown, notRecorded)
 }
 
 /** `text`, not `json`: Prometheus cannot parse its exposition format wrapped in a JSON string. */

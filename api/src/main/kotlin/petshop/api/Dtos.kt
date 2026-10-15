@@ -1,18 +1,15 @@
 package petshop.api
 
-import io.github.matthewjones372.kimney.into
 import io.github.matthewjones372.kimney.transformInto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
-import petshop.domain.NotRecorded
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
 import petshop.domain.PetReturned
 import petshop.domain.PetShopError
-import petshop.domain.RegistryDown
 import petshop.domain.ShopEvent
 
 // Kept apart from the domain so a change to either breaks the build here, not the JSON silently. Each is serial-named
@@ -43,10 +40,14 @@ sealed interface ProblemDto {
     @SerialName("NotChipped")
     data class NotChipped(override val id: Long, override val message: String) : ProblemDto
 
-    /** Registry down or sale not recorded: one case for both because a status names one response. */
     @Serializable
-    @SerialName("Unavailable")
-    data class Unavailable(override val id: Long, override val message: String) : ProblemDto
+    @SerialName("RegistryDown")
+    data class RegistryDown(override val id: Long, override val message: String) : ProblemDto
+
+    /** The pet is still for sale. */
+    @Serializable
+    @SerialName("NotRecorded")
+    data class NotRecorded(override val id: Long, override val message: String) : ProblemDto
 }
 
 @Serializable
@@ -62,10 +63,8 @@ fun Pet.toDto(): PetDto = transformInto()
 
 fun List<Pet>.toDto(): List<PetDto> = transformInto()
 
-fun PetShopError.toDto(): ProblemDto = into<_, ProblemDto>()
-    .withSealedCaseRenamed(RegistryDown::class, ProblemDto.Unavailable::class)
-    .withSealedCaseRenamed(NotRecorded::class, ProblemDto.Unavailable::class)
-    .transform()
+/** A domain failure added without a case of the same name here stops the build at this call. */
+fun PetShopError.toDto(): ProblemDto = transformInto()
 
 fun NoSuchPet.toDto(): ProblemDto.NoSuchPet = transformInto()
 

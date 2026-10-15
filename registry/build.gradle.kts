@@ -1,6 +1,6 @@
 plugins {
     // Checks on every build that the committed client still matches `registrySpec()`.
-    id("io.github.matthewjones372.pelican") version "1.0.0"
+    id("io.github.matthewjones372.pelican")
     kotlin("plugin.serialization")
 }
 

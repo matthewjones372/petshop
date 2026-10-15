@@ -95,14 +95,14 @@ What they run on, and what the tests use:
 val adoptPet = endpoint(petId) {
     post("pets" / petId / "adoption")
     summary = "Take a pet home"
-    json<PetDto>().orFail(petMissing, petTaken, petNotChipped, unavailable)
+    json<PetDto>().orFail(petMissing, petTaken, petNotChipped, registryDown, notRecorded)
 }
 ```
 
 The route, the OpenAPI document at `/openapi.json`, the Swagger page at
 `/api-docs` and the Redoc reference at `/reference`, in the shop's own look
 (`api/src/main/kotlin/petshop/api/Docs.kt`), are all generated from that. The handler must answer with `ok` or
-one of the four declared failures. A `when` over the sealed error type is
+one of the five declared failures. A `when` over the sealed error type is
 exhaustive, and returning a failure the endpoint did not declare does not
 compile.
 
@@ -115,10 +115,7 @@ writes each mapping at compile time:
 ```kotlin
 fun Pet.toDto(): PetDto = transformInto()                // PetId unwrapped, Species by name
 fun List<Pet>.toDto(): List<PetDto> = transformInto()
-fun PetShopError.toDto(): ProblemDto = into<_, ProblemDto>()
-    .withSealedCaseRenamed(RegistryDown::class, ProblemDto.Unavailable::class)
-    .withSealedCaseRenamed(NotRecorded::class, ProblemDto.Unavailable::class)
-    .transform()                                          // the rest by name
+fun PetShopError.toDto(): ProblemDto = transformInto()  // a case per failure, by name
 ```
 
 `id` is a plain number on the wire. If a species is added to the domain, or a
@@ -165,9 +162,10 @@ Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT �
   and the shop never sells a pet without recording the sale. If the write
   throws, the actor's state is
   unchanged and it answers `NotRecorded`, a 503: the pet is still available,
-  and the registry is never called. That 503 is the same response as an
-  unreachable registry (`Unavailable`, with a message saying which), because
-  Pelican allows only one response per status. `seq` is an identity column, so
+  and the registry is never called. An unreachable registry is a 503 too, and
+  the two share the status because each is tagged: the body carries `kind`,
+  `not_recorded` or `registry_down`, and the client reads each back as its own
+  case (Pelican spec 0063). `seq` is an identity column, so
   it keeps counting across restarts.
 - **Every statement is ExoQuery**, apart from the schema, which is a
   SQL-formatted Liquibase changelog (`app/src/main/resources/db/changelog.sql`)
@@ -463,9 +461,13 @@ reference, the registry's client, its stubs and a typed test client.
 failure, and the import for `orFail`. Redoc's theme is Redoc's own JSON, passed
 through as it is.
 
-**Its limits.** Two failures can share a status only when each is `tagged`; the
-shop does not tag its 503s, so `NotRecorded` and an unreachable registry are
-told apart by the message. A declared status whose body does not match the
+The demo's registry stubs are generated from the same endpoints too:
+`DemoStubsSpec` writes `demo/registry/mappings/chips.json`, including recording
+a keeper, whose answer is templated from the request body.
+
+**Its limits.** Two failures can share a status only when each is `tagged`,
+which writes a `kind` field into the body: a payload with a field of that name
+has to pick another. A declared status whose body does not match the
 declared shape is not that failure: the generated client throws
 `ApiCallFailed`, which the shop treats as the registry being unreachable.
 
