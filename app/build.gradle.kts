@@ -88,7 +88,7 @@ dependencies {
 }
 
 // The shop runs on Jetty with kotlinx: a dependency that brings Pekko, Scala or Jackson's databind back fails `check`.
-val checkRuntimeClasspath by tasks.registering {
+val checkRuntimeClasspath = tasks.register("checkRuntimeClasspath") {
     description = "Fails if the shop's runtime classpath holds Pekko, Scala, pelican-jackson or jackson-module-kotlin."
     group = "verification"
     val forbidden = listOf("org.apache.pekko", "pekko-", "scala-library", "pelican-jackson", "jackson-module-kotlin")

@@ -15,6 +15,9 @@ dependencies {
 
 kotlin { jvmToolchain(21) }
 
+// ExoQuery prints each compiled query as a compiler warning by default.
+exoQuery { queryPrintingEnabled.set(false) }
+
 // ExoQuery brings net.jpountz lz4 1.3.0, which has open advisories and no fix under those coordinates;
 // at.yawk.lz4:lz4-java is its continuation with the same packages.
 configurations.configureEach {

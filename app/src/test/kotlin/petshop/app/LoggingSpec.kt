@@ -55,7 +55,7 @@ class LoggingSpec {
 
     @Test
     fun `an adoption reaches the backend with the pet on it, not in it`() = story {
-        When("Ada adopts Nibbles") { testApp<PetShop, Unit>(settled) { shop -> shop.adopt(PetId(1), "Ada"); Unit } }
+        When("Ada adopts Nibbles") { testApp<PetShop, Unit>(settled) { shop -> shop.adopt(PetId(1), "Ada") } }
         val adopted = Then("logback received the adoption") { appender.list.single { it.message.contains("adopted") } }
         And("the pet and the adopter are in its MDC, which is what a pattern and a field search read") {
             adopted.mdcPropertyMap["pet_id"] shouldBe "1"
