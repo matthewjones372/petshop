@@ -10,6 +10,10 @@ services:
     repository: github:matthewjones372/petshop
     runbook: https://github.com/matthewjones372/petshop/blob/main/demo/README.md
     environments: [ demo ]
+    # Faked by demo/tools: its builds, the release Argo CD applied, and the pods running it.
+    build: { workflow: petshop.yml }
+    deploy: { argo: { application: petshop } }
+    runtime: { kubernetes: { namespace: shop, workloads: [ { kind: Deployment, name: petshop } ] } }
     # A declared refusal is an answer, not an error. No p99: the adoption timer is a summary without percentiles.
     load:
       requests: sum(rate(petshop_adoptions_total[1m]))
@@ -43,6 +47,9 @@ services:
     repository: github:matthewjones372/petshop
     runbook: https://github.com/matthewjones372/petshop/blob/main/README.md
     environments: [ demo ]
+    build: { workflow: petshop-web.yml }
+    deploy: { argo: { application: petshop-web } }
+    runtime: { kubernetes: { namespace: shop, workloads: [ { kind: Deployment, name: petshop-web } ] } }
     load:
       requests: 'sum(rate(traces_spanmetrics_calls_total{service="petshop-web", span_kind="SPAN_KIND_CLIENT"}[1m]))'
       errors: 'sum(rate(traces_spanmetrics_calls_total{service="petshop-web", span_kind="SPAN_KIND_CLIENT", status_code="STATUS_CODE_ERROR"}[1m])) or vector(0)'
