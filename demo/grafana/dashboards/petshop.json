@@ -22,7 +22,7 @@
         "type": "prometheus",
         "uid": "petshop-prometheus"
       },
-      "description": "A gauge: set by the arrivals stream on the Pekko thread it runs on.",
+      "description": "A gauge: set by the arrivals stream on the virtual thread it runs on.",
       "gridPos": {
         "x": 0,
         "y": 0,

@@ -15,17 +15,11 @@ docker compose -f demo/docker-compose.yml up -d postgres registry
 ./gradlew loadTest         # 200 requests a second at the real graph; not part of test or build
 ```
 
-The shop runs on either of two stacks, chosen at start. `petshop.stack` is `jetty` (the default) or `pekko`, and
-`petshop.codec` is `kotlinx` (the default) or `jackson`; `STACK` and `CODEC` override them, as do `-Dpetshop.stack`
-and `-Dpetshop.codec`. On Jetty, Pelican serves on Jetty, the chip registry is called with Jetty's HTTP client and
-Lark's streams run on its Forks, and no actor system is created. On Pekko, Pelican serves on Pekko HTTP, the registry is
-called with Pekko HTTP and Lark's streams run as Pekko streams. The handlers are written once
-(`api/src/main/kotlin/petshop/api/Binders.kt`) and bound by whichever server answers.
-
-```bash
-STACK=pekko CODEC=jackson ./gradlew :app:run
-./gradlew loadTest -Ppetshop.stack=pekko -Ppetshop.codec=jackson   # reports in loadtest/build/reports/proofload/pekko-jackson
-```
+The shop runs on Pelican's Jetty backend and reads and writes its bodies with kotlinx.serialization. Jetty serves the
+API and calls the chip registry, and Lark's streams run on its Forks, on virtual threads. Neither Pekko nor Scala is
+on the classpath, and `./gradlew check` fails if a dependency brings Pekko, Scala, `pelican-jackson` or
+`jackson-module-kotlin` back. [docs/performance.md](docs/performance.md) is the comparison with Pekko HTTP and Jackson
+that settled it.
 
 `web/` is a SolidJS front end for the shop, in TypeScript: browse pets by species, adopt one, watch `/stats` update,
 and follow arrivals and adoptions live on `/live`, which reads the shop's server-sent events at `/events` as an Effect
@@ -63,8 +57,8 @@ The libraries being tried out:
 
 | Library | What it does here |
 |---|---|
-| [Pelican](https://github.com/matthewjones372/pelican) | the shop's HTTP contract as values, served on Jetty or Pekko HTTP and read with kotlinx.serialization or Jackson: routes, the OpenAPI document, Swagger UI and a themed Redoc reference, handlers that must answer a declared failure; live and ready probes (`pelican-health`); the chip registry's client generated from its contract; typed WireMock stubs, golden files and a typed test client |
-| [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`), with its settings and secrets read and reported by `lark-app-typesafe`, the schema migrated by `lark-app-liquibase` before anything reads it, and the graph checked at build time by the wiring plugin; the shop's actor, on virtual threads in a `flock` (`lark-actor`, `lark-app-actor`); the background work, the readiness gauges and the in-process bus as `Stream`s on Lark's Forks, or on Pekko Streams on the Pekko stack (`lark-stream`); Kafka as a `Stream` that commits what it handled and restarts after a defect (`lark-kafka`); a circuit breaker on the chip registry, and retries on schedules; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
+| [Pelican](https://github.com/matthewjones372/pelican) | the shop's HTTP contract as values, served on Jetty and read with kotlinx.serialization: routes, the OpenAPI document, Swagger UI and a themed Redoc reference, handlers that must answer a declared failure; live and ready probes (`pelican-health`); the chip registry's client generated from its contract; typed WireMock stubs, golden files and a typed test client |
+| [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`), with its settings and secrets read and reported by `lark-app-typesafe`, the schema migrated by `lark-app-liquibase` before anything reads it, and the graph checked at build time by the wiring plugin; the shop's actor, on virtual threads in a `flock` (`lark-actor`, `lark-app-actor`); the background work, the readiness gauges and the in-process bus as `Stream`s on Lark's Forks (`lark-stream`); Kafka as a `Stream` that commits what it handled and restarts after a defect (`lark-kafka`); a circuit breaker on the chip registry, and retries on schedules; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
 | [Proofload](https://github.com/matthewjones372/proofload) | load tests that start the whole service in-process, assert correctness under load, and write an HTML report |
 | [ExoQuery](https://github.com/ExoQuery/ExoQuery) | every statement against the outbox table, written as Kotlin and checked at compile time |
 | [kimney](https://github.com/matthewjones372/kimney) | the mappings between the shop's events and their wire records, and between the domain and the API's DTOs, derived at compile time |
@@ -73,16 +67,15 @@ What they run on, and what the tests use:
 
 | | |
 |---|---|
-| Eclipse Jetty | with `petshop.stack = jetty`, the default: Pelican's server and the chip registry's client |
-| Apache Pekko | with `petshop.stack = pekko`: Pelican's server and the chip registry's client on Pekko HTTP, and Lark's streams on Pekko Streams |
-| kotlinx.serialization, Jackson | the bodies, with `petshop.codec = kotlinx` (the default) or `jackson` |
+| Eclipse Jetty | Pelican's server and the chip registry's client |
+| kotlinx.serialization | the bodies the shop serves and the registry's |
 | PostgreSQL, HikariCP | the `pets` and `outbox` tables |
 | Testcontainers | a real Postgres and a real Kafka broker for the tests, one container each per run: a fresh schema per graph, and topics and groups of each test's own |
 | WireMock | the chip registry in tests and the demo, stubbed through Pelican's `pelican-test-wiremock` |
 | Kotest assertions on JUnit 6 | every test; the end-to-end and app tests are written as stories (below) |
 | Arrow | `Either` and `Raise` for declared failures, from the domain up |
 | OpenTelemetry, Micrometer, Prometheus, Grafana, Tempo | a span per request, adoption, chip-registry call, outbox write, publish and projection, one trace from the browser through Kafka and back, exported over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; metrics at `/metrics`; the demo's dashboard and traces |
-| Logback | where Lark's log lines end up, through `lark-slf4j`, and Pekko's |
+| Logback | where Lark's log lines end up, through `lark-slf4j` |
 | Apache Kafka, avro4k, Confluent's schema registry client | the bus on a broker: events as Avro in the schema registry's wire format, written by avro4k's Confluent serde; tests run the broker in a container and Confluent's in-process `mock://` registry |
 
 ## Modules
@@ -91,7 +84,7 @@ What they run on, and what the tests use:
 |---|---|---|
 | `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | Arrow |
 | `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
-| `api` | the endpoints, their failures, the handlers, the DTOs, and the binders for each server | Pelican, Jetty, Pekko HTTP, kimney |
+| `api` | the endpoints, their failures, the handlers and the DTOs | Pelican, Jetty, kimney |
 | `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus (in process, or Kafka carrying Avro) and its consumer, the wiring, `main` | Lark, kimney |
 | `outbox-table` | the outbox's row and its SQL, in an included build on the Kotlin version ExoQuery supports | ExoQuery |
 | `loadtest` | the shop under load, started in-process | Proofload |
@@ -208,7 +201,7 @@ Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT �
   both. Each instance's projection sees only its own relay's bus, so the two
   counts must add up to exactly the number of events recorded. With the
   locking clause removed, they add up to more.
-- **The relay is a stream, run on Lark's Forks (Pekko Streams on the Pekko stack).** `Stream.tick` makes the
+- **The relay is a stream, run on Lark's Forks.** `Stream.tick` makes the
   claim on a virtual thread (`mapPar`, because JDBC blocks), and publishes
   inside it while the rows are held. A refusal is logged and counted, and the
   event stays in the table for the next tick. `restartOnDefect` restarts the
@@ -354,8 +347,8 @@ fun `somebody adopts a tortoise, and every part of the service hears about it`()
     Given("a chip registry that knows every pet but Mrs Peel") {
         registry.stub(lookupChip, 3L) answers noSuchChip(Problem("never chipped"))
     }
-    theService.use { server: Shopfront ->
-        apiClient(server.baseUrl, KotlinxShopCodecs).use { shop ->
+    theService.use { server: PelicanServer ->
+        apiClient(server.baseUrl, ShopCodecs).use { shop ->
             val nibbles = When("Ada adopts Nibbles") { shop.outcome(adoptPet, 1L) }
             Then("Nibbles is hers") { nibbles.shouldBeOk().adopted shouldBe true }
 
@@ -596,10 +589,10 @@ whole service started in-process:
 - two instances on one outbox table, whose two relays must publish every event
   exactly once between them.
 
-Two more, in `StackComparison`, step browsing and adoption up a ladder of rates
-and record each rung rather than assert a latency, so a slow stack is measured
-rather than failed. [docs/performance.md](docs/performance.md) has what they
-found on each stack and codec.
+Two more, in `Ladder`, step browsing and adoption up a ladder of rates and
+record each rung rather than assert a latency, so a rate the shop cannot keep
+up with is measured rather than failed. [docs/performance.md](docs/performance.md)
+has what they found.
 
 The report says whether the load generator kept to its own schedule, which
 tells you whether a p99 reflects the shop or the tool, so the test asserts the
@@ -635,8 +628,8 @@ loads on the project's Kotlin, or for a project with many more queries.
 ## Versions
 
 Pelican `1.0.1-SNAPSHOT`, Lark `0.10.0` (its Gradle wiring plugin `0.10.0`), Proofload
-`0.1.0-rc4`, ExoQuery `2.0.4.PL`, kimney `0.3.0`. Pekko `1.2.1`, Pekko HTTP
-`1.3.0`, Arrow `2.1.2`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`,
+`0.1.0-rc4`, ExoQuery `2.0.4.PL`, kimney `0.3.0`, Jetty `12.1.13`,
+kotlinx.serialization `1.11.0`, Arrow `2.1.2`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`,
 HikariCP `7.1.0`, OpenTelemetry SDK `1.62.0`, Micrometer's Prometheus registry `1.16.6`, Logback `1.5.34`, Kotest `6.2.4`, JUnit `6.1.3`,
 avro4k `2.12.0`, Confluent's Avro serializer `8.3.0`, Kafka client `4.3.0`, the
 `apache/kafka:4.3.1` image for tests and the demo, and

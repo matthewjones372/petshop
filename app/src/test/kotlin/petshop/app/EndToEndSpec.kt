@@ -7,6 +7,7 @@ import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.use
 import io.github.matthewjones372.lark.test.story
 import io.github.matthewjones372.pelican.health.health
+import io.github.matthewjones372.pelican.jetty.PelicanServer
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.test.apiClient
@@ -19,7 +20,7 @@ import kotlin.time.Duration.Companion.seconds
 import org.apache.kafka.common.serialization.LongDeserializer
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
-import petshop.api.KotlinxShopCodecs
+import petshop.api.ShopCodecs
 import petshop.api.adoptPet
 import petshop.api.getPet
 import petshop.api.stats
@@ -80,8 +81,8 @@ class EndToEndSpec {
             registry.stub(lookupChip, 3L) answers noSuchChip(Problem("never chipped"))
         }
 
-        theService.use { server: Shopfront ->
-            apiClient(server.baseUrl, KotlinxShopCodecs).use { shop ->
+        theService.use { server: PelicanServer ->
+            apiClient(server.baseUrl, ShopCodecs).use { shop ->
                 // The probe's path is Pelican's whatever checks are declared, so an empty `health { }` names it.
                 Given("the whole service, started as main starts it") {
                     shop.call(health { }.ready, Unit).status shouldBe "pass"

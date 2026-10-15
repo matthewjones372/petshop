@@ -26,9 +26,6 @@ import petshop.domain.PetShopError
 import petshop.domain.RegistryDown
 import petshop.domain.Species
 
-/** The default stack's binders, which every test here serves through. */
-internal val onJetty: Binders = JettyBinders(Forks())
-
 private class OnePet(private var pet: Pet) : PetShop {
     override fun all(): List<Pet> = listOf(pet)
 
@@ -49,8 +46,7 @@ class ContractSpec {
     private val probes = health { }
 
     private val app = petshopApi(
-        on = onJetty,
-        codecs = KotlinxShopCodecs,
+        streams = Forks(),
         shop = OnePet(nibbles),
         health = probes,
         scrape = { "petshop_adoptions_total 1.0" },
@@ -100,8 +96,7 @@ class ContractSpec {
             NotRecorded(1) to ProblemDto.Unavailable(1, NotRecorded(1).message),
         ).forEach { (refusal, declared) ->
             val refusing = petshopApi(
-                on = onJetty,
-                codecs = KotlinxShopCodecs,
+                streams = Forks(),
                 shop = object : PetShop by OnePet(nibbles) {
                     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = refusal.left()
                 },
@@ -120,8 +115,7 @@ class ContractSpec {
         val arrived = ShopEventDto(1, ShopEventKind.Arrived, nibbles.toDto())
         val adopted = ShopEventDto(2, ShopEventKind.Adopted, nibbles.copy(adopted = true).toDto())
         val watched = petshopApi(
-            on = onJetty,
-            codecs = KotlinxShopCodecs,
+            streams = Forks(),
             shop = OnePet(nibbles),
             health = probes,
             scrape = { "" },

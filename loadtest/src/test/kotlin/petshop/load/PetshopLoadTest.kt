@@ -7,6 +7,7 @@ import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.use
 import io.github.matthewjones372.lark.test.eventually
 import io.github.matthewjones372.pelican.Outcome
+import io.github.matthewjones372.pelican.jetty.PelicanServer
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.test.apiClient
@@ -30,7 +31,7 @@ import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.extension.RegisterExtension
-import petshop.api.KotlinxShopCodecs
+import petshop.api.ShopCodecs
 import petshop.api.ProblemDto
 import petshop.api.adoptPet
 import petshop.api.listPets
@@ -39,7 +40,6 @@ import petshop.app.Arrivals
 import petshop.app.DatabaseSettings
 import petshop.app.Projection
 import petshop.app.RegistrySettings
-import petshop.app.Shopfront
 import petshop.app.TestPostgres
 import petshop.app.onAFreshDatabase
 import petshop.app.onDatabase
@@ -64,20 +64,16 @@ class PetshopLoadTest {
 
     private val theShop: Module = calling.onAFreshDatabase()
 
-    /** Set from the shop as it started, so each of petshop.stack and petshop.codec's runs keeps its own reports. */
-    private var reports: Path = Path.of("build/reports/proofload")
-
     private val browse = step("browse the shop")
 
     private val adoptTaken = step("adopt a pet somebody already has")
 
     @LoadTest
     fun `browsing holds up at two hundred a second`(proofload: Proofload) {
-        val outcome = theShop.use { server: Shopfront ->
-            reports = server.reports()
-            apiClient(server.baseUrl, KotlinxShopCodecs).use { client ->
+        val outcome = theShop.use { server: PelicanServer ->
+            apiClient(server.baseUrl, ShopCodecs).use { client ->
                 // `response` rather than `call`: decoding every catalogue into a `List<Pet>` would put
-                // the generator's own Jackson time inside a number that is about the shop.
+                // the generator's own decoding time inside a number that is about the shop.
                 val shopping = scenario("browsing") {
                     exec(browse) { step ->
                         if (!client.response(listPets, Unit).isSuccess) step.fail("the shop did not answer")
@@ -92,7 +88,7 @@ class PetshopLoadTest {
 
         val result = outcome.shouldBeRight()
 
-        result.writeHtmlReport(reports.resolve("browsing.html"))
+        result.writeHtmlReport(REPORTS.resolve("browsing.html"))
         result.failed shouldBe 0L
         // Service time: response time also counts how far the generator fell behind its schedule.
         result[browse].serviceTime.p99 shouldBeLessThan 100.milliseconds
@@ -100,9 +96,8 @@ class PetshopLoadTest {
 
     @LoadTest
     fun `a pet already adopted is never sold again`(proofload: Proofload) {
-        val outcome = theShop.use { server: Shopfront ->
-            reports = server.reports()
-            apiClient(server.baseUrl, KotlinxShopCodecs).use { client ->
+        val outcome = theShop.use { server: PelicanServer ->
+            apiClient(server.baseUrl, ShopCodecs).use { client ->
                 // The first adoption is the setup, and it has to have worked: a rush against a pet
                 // nobody took would answer 200s and never reach the claim.
                 client.outcome(adoptPet, 1L).shouldBeOk()
@@ -123,7 +118,7 @@ class PetshopLoadTest {
 
         val result = outcome.shouldBeRight()
 
-        result.writeHtmlReport(reports.resolve("the-rush.html"))
+        result.writeHtmlReport(REPORTS.resolve("the-rush.html"))
         withClue("every one of them was told the tortoise was gone") { result.failed shouldBe 0L }
         result[adoptTaken].count shouldBe 2000L
     }
@@ -137,8 +132,8 @@ class PetshopLoadTest {
 
         val outcome = instance(database, port = 8081).use { first: Instance ->
             instance(database, port = 8082).use { second: Instance ->
-                apiClient(first.baseUrl, KotlinxShopCodecs).use { one ->
-                    apiClient(second.baseUrl, KotlinxShopCodecs).use { other ->
+                apiClient(first.baseUrl, ShopCodecs).use { one ->
+                    apiClient(second.baseUrl, ShopCodecs).use { other ->
                         val requests = java.util.concurrent.atomic.AtomicLong()
                         val browsing = scenario("browsing two instances") {
                             exec(browseEither) { step ->
@@ -172,7 +167,7 @@ class PetshopLoadTest {
         }
 
         val (result, drained, served) = outcome.shouldBeRight().shouldBeRight()
-        result.writeHtmlReport(reports.resolve("two-relays.html"))
+        result.writeHtmlReport(REPORTS.resolve("two-relays.html"))
         result.failed shouldBe 0L
 
         withClue("every event recorded by either instance was published by exactly one relay") {
@@ -193,15 +188,13 @@ class PetshopLoadTest {
     }
 
     private fun instance(database: DatabaseSettings, port: Int): Module =
-        (calling.onDatabase(database) + single { server: Shopfront, arrivals: Arrivals, projection: Projection ->
-            reports = server.reports()
+        (calling.onDatabase(database) + single { server: PelicanServer, arrivals: Arrivals, projection: Projection ->
             Instance(server.baseUrl, arrivals, projection)
         })
             .overridingConfig("petshop.port = $port\npetshop.arrivalsEvery = 5ms\npetshop.outboxEvery = 20ms")
 }
 
-internal fun Shopfront.reports(): Path =
-    Path.of("build/reports/proofload", "${stack.name.lowercase()}-${codec.name.lowercase()}")
+internal val REPORTS: Path = Path.of("build/reports/proofload")
 
 private class Instance(val baseUrl: String, val arrivals: Arrivals, val projection: Projection)
 

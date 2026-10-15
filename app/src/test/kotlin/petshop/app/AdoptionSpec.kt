@@ -92,7 +92,7 @@ class AdoptionSpec {
     fun `the subgraph binds no port and serves no documents`() = story {
         val drawn = When("the shop's subgraph is drawn") { settled.render() }
         Then("it holds no server, no arrivals and no registry settings: what a test of the shop needs is the shop") {
-            drawn.contains("Shopfront") shouldBe false
+            drawn.contains("PelicanServer") shouldBe false
             drawn.contains("Arrivals") shouldBe false
             drawn.contains("RegistrySettings") shouldBe false
         }

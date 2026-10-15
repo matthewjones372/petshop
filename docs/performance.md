@@ -1,5 +1,7 @@
 # Performance on each stack and codec
 
+After this comparison petshop runs only on Jetty with kotlinx; the `petshop.stack` and `petshop.codec` switches below were removed in #74.
+
 The shop runs on one of two stacks (`petshop.stack`, or `STACK`) and one of two codecs (`petshop.codec`, or
 `CODEC`):
 

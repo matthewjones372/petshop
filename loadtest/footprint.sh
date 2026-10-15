@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# What the shop costs as its own process on one stack and codec: start-up, heap, RSS, CPU and the classes it loads.
-# Usage: loadtest/footprint.sh <jetty|pekko> <kotlinx|jackson> <out-dir>, after ./gradlew :app:installDist.
+# What the shop costs as its own process: start-up, heap, RSS, CPU and the classes it loads.
+# Usage: loadtest/footprint.sh <out-dir>, after ./gradlew :app:installDist.
 # JAVA_HOME picks the JDK. A throwaway Postgres runs on 55432, the port application.conf defaults to.
 set -euo pipefail
 
-stack=$1 codec=$2 out=$3
+out=$1
 root=$(cd "$(dirname "$0")/.." && pwd)
 app=$root/app/build/install/app/bin/app
 url=http://127.0.0.1:8080/pets
@@ -23,7 +23,6 @@ fi
 fresh() { docker exec -e PGOPTIONS='-c client_min_messages=warning' "$pg" psql -qU petshop -d petshop -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' >/dev/null; }
 
 # No arrivals, so every launch serves the same three pets.
-export STACK=$stack CODEC=$codec
 base_opts="-Dpetshop.arrivalsEvery=1h"
 
 # Start-up, from launch to the first answer to GET /pets, three times on an empty database.
@@ -59,7 +58,7 @@ kill "$pid"; wait "$pid" 2>/dev/null || true
 classes=$out/classes.log
 {
   echo "classes	$(grep -c 'class,load' "$classes")"
-  for prefix in org.apache.pekko scala. org.eclipse.jetty com.fasterxml.jackson kotlinx.serialization; do
+  for prefix in org.apache.pekko scala. org.eclipse.jetty com.fasterxml.jackson com.fasterxml.jackson.databind kotlinx.serialization; do
     echo "$prefix	$(grep 'class,load' "$classes" | awk '{ print $2 }' | grep -c "^$prefix" || true)"
   done
   echo "jars	$(grep -o 'source: [^ ]*\.jar' "$classes" | sort -u | wc -l | tr -d ' ')"

@@ -13,9 +13,8 @@ dependencies {
     // api, so a module that depends on this one resolves the pelican modules named below without versions.
     api(platform("io.github.matthewjones372:pelican-bom:${providers.gradleProperty("pelicanVersion").get()}"))
     api("io.github.matthewjones372:pelican-core")
-    // The generated types are @Serializable data classes, which either codec reads.
+    // The generated types are @Serializable data classes.
     api("io.github.matthewjones372:pelican-kotlinx")
-    api("io.github.matthewjones372:pelican-jackson")
     codegen("io.github.matthewjones372:pelican-codegen:$pelicanVersion")
     codegen(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
 }

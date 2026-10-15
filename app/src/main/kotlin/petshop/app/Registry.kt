@@ -13,7 +13,8 @@ import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.config
 import io.github.matthewjones372.lark.guarded
 import io.github.matthewjones372.lark.policy
-import io.github.matthewjones372.pelican.Codecs
+import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
+import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.metrics.otel.traced
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import kotlin.time.Duration
@@ -32,14 +33,14 @@ import petshop.registry.client.RegistryClient
 
 data class RegistrySettings(val baseUrl: String, val timeout: Duration)
 
-class HttpChipRegistry(settings: RegistrySettings, engine: Engine, codecs: Codecs, telemetry: OpenTelemetrySdk) :
+class HttpChipRegistry(settings: RegistrySettings, transport: JettyHttpTransport, telemetry: OpenTelemetrySdk) :
     ChipRegistry {
 
     private val client = RegistryClient(
         baseUrl = settings.baseUrl,
-        codecs = codecs,
+        codecs = KotlinxCodecs,
         // A client span per call, sending traceparent so the registry continues the adoption's trace.
-        transport = engine.transport.traced(telemetry),
+        transport = transport.traced(telemetry),
         timeout = settings.timeout.toJavaDuration(),
     )
 

@@ -29,10 +29,6 @@ tasks.register<Test>("loadTest") {
     // Gradle's 512 MB default runs out under a rung the shop cannot keep up with; exit rather than hang when it does.
     maxHeapSize = "4g"
     jvmArgs("-XX:+ExitOnOutOfMemoryError")
-    // -Ppetshop.stack=pekko -Ppetshop.codec=jackson, or STACK and CODEC in the environment, pick what is measured.
-    listOf("petshop.stack", "petshop.codec").forEach { key ->
-        providers.gradleProperty(key).orNull?.let { systemProperty(key, it) }
-    }
 }
 
 // Against a running shop; PETSHOP_URL, RATE (visitors a second) and DURATION configure it.

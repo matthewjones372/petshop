@@ -15,8 +15,8 @@ import petshop.domain.PetShopError
 import petshop.domain.RegistryDown
 import petshop.domain.ShopEvent
 
-// Kept apart from the domain so a change to either breaks the build here, not the JSON silently. Each is
-// @Serializable for petshop.codec = kotlinx, and serial-named as Jackson names it so the document is the same.
+// Kept apart from the domain so a change to either breaks the build here, not the JSON silently. Each is serial-named
+// by its simple name, which is what the OpenAPI document's components are called.
 
 @Serializable
 @SerialName("SpeciesDto")
