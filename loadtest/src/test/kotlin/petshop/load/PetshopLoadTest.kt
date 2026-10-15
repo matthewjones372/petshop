@@ -5,6 +5,7 @@ import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.use
+import io.github.matthewjones372.lark.test.eventually
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.ok
@@ -23,6 +24,7 @@ import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.withClue
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.longs.shouldBeGreaterThan
+import io.kotest.matchers.longs.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.shouldBe
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
@@ -150,7 +152,12 @@ class PetshopLoadTest {
                         // Nothing new is recorded from here, so the relays can finish what is left.
                         first.arrivals.running.close()
                         second.arrivals.running.close()
-                        drains(database) { first.projection.tally().events + second.projection.tally().events }
+                        // A projection is a tick and a hop behind its relay, so an empty table alone is not done.
+                        eventually(5.seconds) {
+                            database.unsent() shouldBe 0L
+                            val published = first.projection.tally().events + second.projection.tally().events
+                            published.toLong() shouldBeGreaterThanOrEqual database.recorded()
+                        }
                         val drained = Drained(
                             recorded = database.recorded(),
                             unsent = database.unsent(),
@@ -193,19 +200,11 @@ class PetshopLoadTest {
             .overridingConfig("petshop.port = $port\npetshop.arrivalsEvery = 5ms\npetshop.outboxEvery = 20ms")
 }
 
-private fun Shopfront.reports(): Path =
+internal fun Shopfront.reports(): Path =
     Path.of("build/reports/proofload", "${stack.name.lowercase()}-${codec.name.lowercase()}")
 
 private class Instance(val baseUrl: String, val arrivals: Arrivals, val projection: Projection)
 
 private data class Drained(val recorded: Long, val unsent: Long, val first: Long, val second: Long) {
     val published: Long get() = first + second
-}
-
-/** A projection is a tick and a hop behind its relay, so an empty table alone is not done. */
-private fun drains(database: DatabaseSettings, published: () -> Int) {
-    val deadline = System.nanoTime() + 5_000_000_000L
-    while (!(database.unsent() == 0L && published() >= database.recorded()) && System.nanoTime() < deadline) {
-        Thread.sleep(20)
-    }
 }

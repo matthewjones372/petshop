@@ -596,6 +596,11 @@ whole service started in-process:
 - two instances on one outbox table, whose two relays must publish every event
   exactly once between them.
 
+Two more, in `StackComparison`, step browsing and adoption up a ladder of rates
+and record each rung rather than assert a latency, so a slow stack is measured
+rather than failed. [docs/performance.md](docs/performance.md) has what they
+found on each stack and codec.
+
 The report says whether the load generator kept to its own schedule, which
 tells you whether a p99 reflects the shop or the tool, so the test asserts the
 shop's service time rather than the response time. The load tests run as

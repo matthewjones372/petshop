@@ -8,6 +8,7 @@ dependencies {
     testImplementation("io.github.matthewjones372:lark-app:$larkVersion")
     testImplementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
     testImplementation("io.github.matthewjones372:lark-stream:$larkVersion")
+    testImplementation("io.github.matthewjones372:lark-test:$larkVersion")
     testImplementation("io.github.matthewjones372:pelican-test-wiremock")
     testImplementation(project(":registry"))
     testImplementation("io.github.matthewjones372:pelican-test")
@@ -25,6 +26,9 @@ tasks.register<Test>("loadTest") {
     classpath = sourceSets.test.get().runtimeClasspath
     // A cached pass says nothing about this machine now.
     outputs.upToDateWhen { false }
+    // Gradle's 512 MB default runs out under a rung the shop cannot keep up with; exit rather than hang when it does.
+    maxHeapSize = "4g"
+    jvmArgs("-XX:+ExitOnOutOfMemoryError")
     // -Ppetshop.stack=pekko -Ppetshop.codec=jackson, or STACK and CODEC in the environment, pick what is measured.
     listOf("petshop.stack", "petshop.codec").forEach { key ->
         providers.gradleProperty(key).orNull?.let { systemProperty(key, it) }
