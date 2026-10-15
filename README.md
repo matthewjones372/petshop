@@ -57,7 +57,7 @@ The libraries being tried out:
 
 | Library | What it does here |
 |---|---|
-| [Pelican](https://github.com/matthewjones372/pelican) | the shop's HTTP contract as values, served on Jetty and read with kotlinx.serialization: routes, the OpenAPI document, Swagger UI and a themed Redoc reference, handlers that must answer a declared failure; live and ready probes (`pelican-health`); the chip registry's client generated from its contract; typed WireMock stubs, golden files and a typed test client |
+| [Pelican](https://github.com/matthewjones372/pelican) | the shop's HTTP contract as values, served on Jetty and read with kotlinx.serialization: routes, the OpenAPI document, Swagger UI and a themed RapiDoc reference that sends requests, handlers that must answer a declared failure; live and ready probes (`pelican-health`); the chip registry's client generated from its contract; typed WireMock stubs, golden files and a typed test client |
 | [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`), with its settings and secrets read and reported by `lark-app-typesafe`, the schema migrated by `lark-app-liquibase` before anything reads it, and the graph checked at build time by the wiring plugin; the shop's actor, on virtual threads in a `flock` (`lark-actor`, `lark-app-actor`); the background work, the readiness gauges and the in-process bus as `Stream`s on Lark's Forks (`lark-stream`); Kafka as a `Stream` that commits what it handled and restarts after a defect (`lark-kafka`); a circuit breaker on the chip registry, and retries on schedules; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
 | [Proofload](https://github.com/matthewjones372/proofload) | load tests that start the whole service in-process, assert correctness under load, and write an HTML report |
 | [ExoQuery](https://github.com/ExoQuery/ExoQuery) | every statement against the outbox table, written as Kotlin and checked at compile time |
@@ -100,7 +100,7 @@ val adoptPet = endpoint(petId) {
 ```
 
 The route, the OpenAPI document at `/openapi.json`, the Swagger page at
-`/api-docs` and the Redoc reference at `/reference`, in the shop's own look
+`/api-docs` and the RapiDoc reference at `/reference`, in the shop's own look
 (`api/src/main/kotlin/petshop/api/Docs.kt`), are all generated from that. The handler must answer with `ok` or
 one of the five declared failures. A `when` over the sealed error type is
 exhaustive, and returning a failure the endpoint did not declare does not
@@ -434,7 +434,7 @@ exec(adoptTaken) { step ->
 
 ### Pelican
 
-One contract value gives the routes, the OpenAPI document, Swagger UI, a Redoc
+One contract value gives the routes, the OpenAPI document, Swagger UI, a RapiDoc
 reference, the registry's client, its stubs and a typed test client.
 
 **What it gives.**
@@ -443,8 +443,9 @@ reference, the registry's client, its stubs and a typed test client.
   handler's type, so the `when` over the shop's errors is exhaustive and a new
   error is a build failure, not a 500.
 - **The documents cannot drift.** The OpenAPI document is the only description
-  of the API; nothing is written in YAML. Swagger UI at `/api-docs` and a Redoc
-  reference at `/reference`, themed with Pelican's `reference { }` look, read it.
+  of the API; nothing is written in YAML. Swagger UI at `/api-docs` and a RapiDoc
+  reference at `/reference`, themed with Pelican's `theme { }`, read it, and
+  both send requests to the shop.
 - **Probes from checks.** `pelican-health` serves `/health/live` and
   `/health/ready` in `application/health+json` from the checks the shop
   declares: the database and the actor are critical, the background runs are
@@ -458,8 +459,9 @@ reference, the registry's client, its stubs and a typed test client.
   that would break them.
 
 **What it costs.** Two things to look up once: `errorJson` for a declared
-failure, and the import for `orFail`. Redoc's theme is Redoc's own JSON, passed
-through as it is.
+failure, and the import for `orFail`. The reference's `theme { }` names five
+colours, two fonts and the paw; anything past those is RapiDoc's own
+attributes. RapiDoc 9.3.8 takes its colours as hex.
 
 The demo's registry stubs are generated from the same endpoints too:
 `DemoStubsSpec` writes `demo/registry/mappings/chips.json`, including recording

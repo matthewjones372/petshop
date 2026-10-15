@@ -1,51 +1,23 @@
 package petshop.api
 
-import io.github.matthewjones372.pelican.jsonObj
 import io.github.matthewjones372.pelican.openapi.Docs
 import io.github.matthewjones372.pelican.openapi.docs
 
 val petshopDocs: Docs = docs {
     docsPath = "/api-docs"
-    reference("/reference") {
-        logo(PAW, altText = "Petshop", backgroundColor = CREAM)
-        stylesheet("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&family=JetBrains+Mono&display=swap")
-        options = jsonObj {
-            put(
-                "theme",
-                jsonObj {
-                    put(
-                        "colors",
-                        jsonObj {
-                            put("primary", jsonObj { "main" to TERRACOTTA })
-                            put("success", jsonObj { "main" to SAGE })
-                            put("text", jsonObj { "primary" to BARK })
-                            put("responses", jsonObj {
-                                put("error", jsonObj { "color" to RUST; "backgroundColor" to "#FBEDE7" })
-                            })
-                            put("http", jsonObj {
-                                "get" to SAGE
-                                "post" to TERRACOTTA
-                            })
-                        },
-                    )
-                    put(
-                        "typography",
-                        jsonObj {
-                            "fontFamily" to "Nunito, sans-serif"
-                            "fontSize" to "15px"
-                            "lineHeight" to "1.6"
-                            put("headings", jsonObj { "fontFamily" to "Nunito, sans-serif"; "fontWeight" to "800" })
-                            put("code", jsonObj { "fontFamily" to "'JetBrains Mono', monospace"; "color" to RUST })
-                        },
-                    )
-                    put("sidebar", jsonObj { "backgroundColor" to CREAM; "textColor" to BARK })
-                    put("rightPanel", jsonObj { "backgroundColor" to BARK })
-                    put("logo", jsonObj { "maxHeight" to "72px"; "gutter" to "20px" })
-                },
-            )
-            "expandResponses" to "200"
-            "hideDownloadButton" to false
+    rapiDocReference("/reference") {
+        theme {
+            accent = TERRACOTTA
+            text = BARK
+            sidebar = CREAM
+            success = SAGE
+            error = RUST
+            font("Nunito, sans-serif", stylesheet = NUNITO)
+            codeFont("'JetBrains Mono', monospace", stylesheet = JETBRAINS_MONO)
+            logo(PAW, altText = "Petshop", backgroundColor = CREAM)
         }
+        // One server and no credentials: RapiDoc's pickers for either would offer nothing to choose.
+        attributes("allow-server-selection" to "false", "allow-authentication" to "false")
     }
 }
 
@@ -54,6 +26,9 @@ private const val RUST = "#9A3A1A"
 private const val SAGE = "#5E8C61"
 private const val BARK = "#3B2A20"
 private const val CREAM = "#FBF6EF"
+
+private const val NUNITO = "https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap"
+private const val JETBRAINS_MONO = "https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap"
 
 private const val PAW =
     "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='96' height='96'%3E" +
