@@ -12,6 +12,10 @@ import io.github.matthewjones372.pelican.test.shouldBeError
 import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.pelican.test.shouldBuild
 import io.kotest.matchers.shouldBe
+import io.opentelemetry.api.OpenTelemetry
+import io.opentelemetry.api.trace.Span
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
+import io.opentelemetry.context.propagation.ContextPropagators
 import io.github.matthewjones372.pelican.health.health
 import io.github.matthewjones372.pelican.jetty.Handlers
 import org.junit.jupiter.api.Test
@@ -124,5 +128,28 @@ class ContractSpec {
         ).inMemory(Handlers.onVirtualThreads)
 
         watched.collect(events, Unit) shouldBe listOf(arrived, adopted)
+    }
+
+    @Test
+    fun `a request arriving with a traceparent is handled inside the caller's trace`() {
+        val callersTrace = "4bf92f3577b34da6a3ce929d0e0e4736"
+        var handledIn: String? = null
+        val traced = petshopApi(
+            streams = Forks(),
+            shop = object : PetShop by OnePet(nibbles) {
+                override fun all(): List<Pet> = listOf(nibbles).also { handledIn = Span.current().spanContext.traceId }
+            },
+            health = probes,
+            scrape = { "" },
+            tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+            watch = { Stream.empty() },
+            telemetry = OpenTelemetry.propagating(ContextPropagators.create(W3CTraceContextPropagator.getInstance())),
+        ).inMemory(Handlers.onVirtualThreads)
+
+        traced.transport.send(
+            traced.request(listPets, Unit).withHeader("traceparent", "00-$callersTrace-00f067aa0ba902b7-01"),
+        ).status shouldBe 200
+
+        handledIn shouldBe callersTrace
     }
 }

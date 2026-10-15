@@ -13,6 +13,8 @@ subprojects {
         if (listOf("larkVersion", "pelicanVersion").any { providers.gradleProperty(it).get().endsWith("-SNAPSHOT") }) {
             maven("https://central.sonatype.com/repository/maven-snapshots/")
             mavenLocal()
+            // Gradle keeps a snapshot for 24h by default, so CI's cache compiled against a lark from before toSequence.
+            configurations.configureEach { resolutionStrategy.cacheChangingModulesFor(0, "seconds") }
         } else {
             // Proofload's snapshot, for the load test: a day of demo traffic needs spec 0143, which no release has yet.
             maven("https://central.sonatype.com/repository/maven-snapshots/") {

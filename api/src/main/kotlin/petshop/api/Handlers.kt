@@ -2,6 +2,7 @@ package petshop.api
 
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.StreamBackend
+import io.github.matthewjones372.lark.stream.toSequence
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.health.Health
 import io.github.matthewjones372.pelican.jetty.handledNow
@@ -46,13 +47,13 @@ fun petshopApi(
         },
         metrics handledNow { scrape() },
         stats handledNow { tally() },
-        events streamedNow { watch().pulledOn(streams) },
+        events streamedNow { watch().toSequence(streams) },
     ) + health.endpoints,
     codecs = ShopCodecs,
 ) {
     title = "Petshop"
     version = "1.0.0"
-    filter(openTelemetry(telemetry, incomingHeaders = requestHeaders))
+    filter(openTelemetry(telemetry))
     description = """
         A small shop of tortoises, dogs, cats and parrots. An adoption records the new keeper with the chip
         registry before the pet leaves the shop, and a pet with no chip on record stays on the shelf.
