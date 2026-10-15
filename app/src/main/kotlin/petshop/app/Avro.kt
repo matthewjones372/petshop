@@ -1,5 +1,4 @@
-// avro4k's serde for Confluent's registry is all experimental; it is also the one avro4k keeps, where the
-// GenericData round trip it replaces is deprecated.
+// avro4k's Confluent serde is experimental, but the GenericData path it replaces is deprecated.
 @file:OptIn(ExperimentalAvro4kApi::class)
 
 package petshop.app
@@ -20,19 +19,12 @@ import petshop.app.wire.WireEvent
 import petshop.domain.ShopEvent
 import java.io.IOException
 
-/** The schema every event on the topic is written with, derived from the wire classes. */
 val shopEventSchema: Schema = Avro.schema<ShopEventRecord>()
 
-/** A domain event as the record the shop publishes. */
 fun ShopEvent.toWire(): WireEvent = transformInto()
 
-/** A record read back as the domain event it was. */
 fun WireEvent.toDomain(): ShopEvent = transformInto()
 
-/**
- * A domain event in the schema registry's wire format: avro4k's serializer registers [shopEventSchema]
- * under the topic's subject and writes its id before the Avro body, as Confluent's own does.
- */
 class ShopEventSerializer(registry: Map<String, Any>) : Serializer<ShopEvent> {
 
     private val avro = SpecificAvro4kKafkaSerializer<ShopEventRecord>(isKey = false, props = registry)
@@ -43,7 +35,6 @@ class ShopEventSerializer(registry: Map<String, Any>) : Serializer<ShopEvent> {
     override fun close() = avro.close()
 }
 
-/** The other way: the id names the writer's schema, which the registry answers with. */
 class ShopEventDeserializer(registry: Map<String, Any>) : Deserializer<ShopEvent> {
 
     private val avro = SpecificAvro4kKafkaDeserializer<ShopEventRecord>(isKey = false, props = registry)
@@ -57,9 +48,8 @@ class ShopEventDeserializer(registry: Map<String, Any>) : Deserializer<ShopEvent
 }
 
 /**
- * A registry that cannot be asked, as against a record that cannot be read. Confluent's deserializer
- * throws the same `SerializationException` for both; what it wraps says which. A 5xx arrives as a
- * `RestClientException`, not an `IOException`, and missing it would send every record to dead letters.
+ * Confluent throws the same `SerializationException` for a down registry and an unreadable record; the
+ * cause says which. A 5xx is a `RestClientException`, and missing it would dead-letter every record.
  */
 fun registryDown(thrown: Throwable): Boolean =
     generateSequence(thrown) { it.cause }

@@ -25,12 +25,12 @@ import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
 
-/**
- * An outbox in a list, for a test about what the relay does on each tick rather than about the table:
- * PostgresOutboxSpec is about the table. [claiming] runs before each claim, so a test can make one
- * throw.
- */
-private class Recorded(vararg events: ShopEvent, private val claiming: () -> Unit = {}) : Outbox {
+/** [claiming] runs before each claim, so a test can make one throw. */
+private class Recorded(
+    vararg events: ShopEvent,
+    private val carried: Map<String, String> = emptyMap(),
+    private val claiming: () -> Unit = {},
+) : Outbox {
 
     private val waiting = events.toMutableList()
 
@@ -43,35 +43,37 @@ private class Recorded(vararg events: ShopEvent, private val claiming: () -> Uni
 
     override fun shelf(opening: List<Pet>): List<Pet> = opening
 
-    override fun claim(limit: Int, publish: (List<ShopEvent>) -> List<ShopEvent>): List<ShopEvent> {
+    override fun claim(limit: Int, publish: (List<Claimed>) -> List<ShopEvent>): List<ShopEvent> {
         claiming()
-        val taken = publish(synchronized(waiting) { waiting.take(limit) })
+        val taken = publish(synchronized(waiting) { waiting.take(limit).map { Claimed(it, carried) } })
         synchronized(waiting) { waiting.removeAll { event -> taken.any { it.seq == event.seq } } }
         return taken
     }
 }
 
-/** A bus that keeps what it took, and turns an event away while [refuses] says so. */
 private class Taking(private val refuses: (ShopEvent) -> Boolean = { false }) : EventBus {
 
     private val taken = mutableListOf<Long>()
     private val turnedAway = mutableListOf<Long>()
+    private val inTraces = mutableListOf<String>()
+
+    val traces: List<String> get() = synchronized(inTraces) { inTraces.toList() }
 
     val took: List<Long> get() = synchronized(taken) { taken.toList() }
     val refused: List<Long> get() = synchronized(turnedAway) { turnedAway.toList() }
 
-    override fun publish(event: ShopEvent): Either<BusRefused, ShopEvent> =
-        if (refuses(event)) {
+    override fun publish(event: ShopEvent): Either<BusRefused, ShopEvent> {
+        synchronized(inTraces) { inTraces += currentTrace }
+        return if (refuses(event)) {
             synchronized(turnedAway) { turnedAway += event.seq }
             BusRefused(event.seq, "full").left()
         } else {
             synchronized(taken) { taken += event.seq }
             event.right()
         }
+    }
 
     override fun consume(each: (ShopEvent) -> Unit): Run<Nothing, Long> = error("nothing reads the bus in these tests")
-
-    override fun close() = Unit
 }
 
 private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
@@ -79,10 +81,7 @@ private val arrived = PetArrived(seq = 1, pet = nibbles)
 private val adopted = PetAdopted(seq = 2, pet = nibbles.copy(adopted = true), by = "Ada")
 private val returned = PetReturned(seq = 3, pet = nibbles)
 
-/**
- * The relay on a clock the test owns. Each `adjust` returns once every tick due by then has run, so a
- * test says which tick an event went on, where EventsSpec, on the wall clock, can only wait for it.
- */
+/** Each `adjust` returns once every tick due by then has run. */
 class RelaySpec {
 
     private val every = 50.milliseconds
@@ -117,6 +116,18 @@ class RelaySpec {
         }
         Then("the return went on that tick") { bus.took shouldBe listOf(1L, 2L, 3L) }
         And("stopped, the relay answers with how many it published") { relay.stopped shouldBe Exit.Done(3L) }
+    }
+
+    @Test
+    fun `an event is published inside the trace it was recorded in`() = story {
+        val outbox = Given("Nibbles' arrival, recorded inside a trace") {
+            Recorded(arrived, carried = mapOf("traceparent" to "00-$A_TRACE-00f067aa0ba902b7-01"))
+        }
+        val bus = Taking()
+        relaying(outbox, bus).use { _ ->
+            When("the relay ticks") { clock.adjust(every) }
+            Then("the bus was handed it inside that trace") { bus.traces shouldBe listOf(A_TRACE) }
+        }
     }
 
     @Test

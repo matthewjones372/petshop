@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm") version "2.4.10" apply false
-    kotlin("plugin.serialization") version "2.4.10" apply false
+    kotlin("jvm") version "2.4.20" apply false
+    kotlin("plugin.serialization") version "2.4.20" apply false
 }
 
 subprojects {
@@ -8,13 +8,16 @@ subprojects {
 
     repositories {
         mavenCentral()
-        // Confluent's Avro serializer and schema-registry client, which are not on Maven Central.
+        // Confluent's artifacts are not on Maven Central.
         maven("https://packages.confluent.io/maven/") { content { includeGroup("io.confluent") } }
-        // A lark change is tried before it is released as a snapshot: one snapshot.yml published to Central's
-        // snapshot repository, or one installed locally.
-        if (providers.gradleProperty("larkVersion").get().endsWith("-SNAPSHOT")) {
+        if (listOf("larkVersion", "pelicanVersion").any { providers.gradleProperty(it).get().endsWith("-SNAPSHOT") }) {
             maven("https://central.sonatype.com/repository/maven-snapshots/")
             mavenLocal()
+        } else {
+            // Proofload's snapshot, for the load test: a day of demo traffic needs spec 0143, which no release has yet.
+            maven("https://central.sonatype.com/repository/maven-snapshots/") {
+                content { includeModuleByRegex("io\\.github\\.matthewjones372", "proofload-.*") }
+            }
         }
     }
 
@@ -26,9 +29,12 @@ subprojects {
         "testImplementation"(kotlin("test"))
         "testImplementation"("org.junit.jupiter:junit-jupiter:6.1.3")
         "testImplementation"("io.kotest:kotest-assertions-core:6.2.4")
-        // shouldBeRight and shouldBeLeft, so a test asserts on an Either rather than unwrapping one.
         "testImplementation"("io.kotest:kotest-assertions-arrow:6.2.4")
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
+        // pelican-core, Avro and Confluent bring Jackson before 2.22.3, which has open advisories.
+        "implementation"(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
+        // Every pelican module at pelicanVersion, so no build file names a pelican version of its own.
+        "implementation"(platform("io.github.matthewjones372:pelican-bom:${providers.gradleProperty("pelicanVersion").get()}"))
     }
 
     tasks.withType<Test> { useJUnitPlatform() }

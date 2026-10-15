@@ -1,11 +1,8 @@
-# Estate's settings for the demo: nobody signs in, and its one environment reads the demo's own Prometheus and
-# Alertmanager. There is no Kubernetes, Flux or CI here, and Estate says so where those parts would be.
 port: 8080
 catalog: /etc/estate/catalog.yaml
 
 auth:
-  # Only for a demo on a laptop: a session secret anyone can read, and every visitor an operator, so silences and
-  # notes work without signing in.
+  # Demo only: a public session secret, and every visitor an operator.
   sessionSecret: the-petshop-demo-runs-on-a-laptop-only
   roles:
     viewer: [ developers ]
@@ -17,3 +14,11 @@ sources:
     prometheus: { url: http://prometheus:9090 }
     alertmanager: { url: http://alertmanager:9093 }
     loki: { url: http://loki:3100 }
+    tempo: { url: http://tempo:3200 }
+    # tools/fake.ts, standing in for the cluster and Argo CD a real shop would deploy through.
+    kubernetes: { url: http://tools:8080/kubernetes }
+    argo: { url: http://tools:8080/argo }
+
+# tools/fake.ts again, standing in for GitHub Actions: a build of each service on main every few minutes.
+builds:
+  github: { url: http://tools:8080/github }

@@ -1,24 +1,34 @@
 # Watching the numbers
 
 Two terminals. The application runs on the host. Everything else runs in
-Docker: Prometheus, Grafana, Alertmanager, Estate, Loki, a traffic generator, the Postgres the outbox is in,
+Docker: the front end, Prometheus, Grafana, Alertmanager, Estate, Loki, Tempo, a traffic generator, a headless browser visiting the front end, the Postgres the outbox is in,
 Kafka and its schema registry, an exporter for each of those two, and a stand-in
 chip registry. Compose goes first,
-because the application will not start without its database.
+because the application will not start without its database. The first `up` builds the traffic generator's image
+and the front end's, which takes a few minutes.
 
 ```bash
 cd demo && docker compose up -d
 ```
 
+From the repository root:
+
 ```bash
-BUS=kafka LOKI_URL=http://localhost:3100 HOST=0.0.0.0 ./gradlew :app:run
+BUS=kafka LOKI_URL=http://localhost:3100 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 HOST=0.0.0.0 ./gradlew :app:run
+```
+
+The demo's Postgres keeps its data between runs, so pets and adoptions pile up. To start from an empty shop:
+
+```bash
+docker compose down -v && docker compose up -d
 ```
 
 `BUS=kafka` puts the shop's events on the demo's Kafka, which is what gives Estate's
 Kafka store and the projection's lag something to show. Without it the events stay
 in the process. `LOKI_URL` sends the shop's log lines to the demo's Loki as well as the
 console, under `app="petshop"`, which is where Estate's logs panel reads them; without it
-the shop logs to the console only.
+the shop logs to the console only. `OTEL_EXPORTER_OTLP_ENDPOINT` sends the shop's traces to the demo's Tempo; without
+it no span leaves the process.
 
 `HOST=0.0.0.0` is for Linux. There, `host.docker.internal` is the Docker bridge
 (`host-gateway`, usually 172.17.0.1) rather than the host's loopback. The app
@@ -27,6 +37,11 @@ every panel stays empty. Binding all interfaces lets the scrape in. It also
 serves the shop to your network, which is why it is not the default. Docker
 Desktop on a Mac or Windows forwards `host.docker.internal` to loopback, so
 there it is harmless either way.
+
+The shop's front end is at <http://localhost:5173>, built from `web/` and served by compose's `web` service, which
+points it at the shop on the host and the browser's spans, lines and metrics at Tempo, Loki and Prometheus. If
+`bun run --cwd web dev` already holds 5173, `WEB_PORT=5175 docker compose up -d` serves it on 5175 instead. After
+changing `web/`, `docker compose up -d --build web` rebuilds it.
 
 Then open Grafana at <http://localhost:3000>, or Estate at
 <http://localhost:8095> (see [Estate](#estate) below). Grafana's dashboard is
@@ -44,23 +59,76 @@ visitors run from Gradle, for half an hour by default:
 Five visitors a second, each looking at a pet and the stats, and one in four
 trying to adopt. The adoptions land on every outcome the shop
 declares (taken, already adopted, not chipped, no such pet), so Estate and
-Grafana show refusals as well as sales. `RATE`, `DURATION` (`10m`) and
+Grafana show refusals as well as sales. `RATE`, `DURATION` (`24h`) and
 `PETSHOP_URL` change how many, for how long, and where. Proofload's report is
 written to `loadtest/build/reports/proofload/demo-traffic.html`.
 
-Or make something happen by hand:
+Those visitors call the API, so the front end hears nothing of them. Compose's `browser` service is the front end's
+traffic: headless Chromium (Playwright's image, `browser/Dockerfile`) opening <http://web:5173> four times a
+minute. Each visitor loads `/pets`, opens a pet, adopts it one time in four, then watches `/live` and `/stats` for
+a few seconds before leaving. Every visit is a fresh page load, so it reports its own Web Vitals, and Estate's
+`petshop-web` and the map's edge to the shop move with nobody at the keyboard. `RATE` sets visits a minute, and
+`docker compose stop browser` quiets it.
+
+Or make something happen by hand. Stop the traffic first, or it may adopt the pet you picked, and pick a pet that
+`curl localhost:8080/pets` shows with `"adopted": false`:
 
 ```bash
-curl -X POST localhost:8080/pets/1/adoption   # taken
-curl -X POST localhost:8080/pets/1/adoption   # already_adopted
-curl -X POST localhost:8080/pets/999/adoption # no_such_pet
-curl -X POST localhost:8080/pets/3/adoption   # not_chipped: the registry has no chip for Mrs Peel
+docker compose stop traffic
+PET=15                                                 # a pet nobody has adopted yet
+curl -X POST localhost:8080/pets/$PET/adoption         # taken
+curl -X POST localhost:8080/pets/$PET/adoption         # already_adopted
+curl -X POST localhost:8080/pets/999999999/adoption    # no_such_pet
+curl -X POST localhost:8080/pets/3/adoption            # not_chipped: the registry has no chip for Mrs Peel
 docker compose stop registry
-curl -X POST localhost:8080/pets/2/adoption   # registry_down, and Barnaby stays in the shop
-docker compose start registry
+curl -X POST localhost:8080/pets/16/adoption           # registry_down, and pet 16 stays in the shop
+docker compose start registry traffic
 ```
 
 Arrivals happen on their own, every `petshop.arrivalsEvery`.
+
+## Traces
+
+An adoption from the front end is one trace in Tempo, from the click to the page that shows it:
+
+```
+adopt pet                         petshop-web   the click
+  POST /pets/{petId}/adoption     petshop-web   the browser's call, which sends traceparent
+    POST /pets/{petId}/adoption   petshop       the shop's request span
+      adopt                       petshop
+        INSERT outbox             petshop       the pet and its event, in one transaction
+          publish                 petshop       the relay, up to outboxEvery later
+            process               petshop       the projection, after Kafka
+              live event          petshop-web   /live showing it
+        GET, POST                 petshop       the calls to the chip registry
+```
+
+The trace crosses the outbox because the write keeps what it was made in (lark's `Carriers.capture()`) in the
+row's `metadata` column, and the relay publishes each event inside it. On Kafka it rides as record headers, and the
+projection handles each record inside them. `/events` hands each event's `traceparent` to the page, which opens
+`live event` under it. An arrival is a trace of its own, `arrival`, that ends the same way.
+
+Open Grafana's Explore at <http://localhost:3000/explore>, pick **Tempo**, and search for service `petshop-web` or
+`petshop`, or run the TraceQL `{ name = "adopt pet" } && { name = "live event" }` for adoptions someone watched
+arrive.
+
+The shop's log lines about an adoption carry its `trace_id`. In Explore with **Loki**, `{app="petshop"} | trace_id != ""`
+lists them, and each line links to its trace.
+
+The front end in `web/` traces itself as service `petshop-web`. Tempo turns every span into span metrics and a
+service graph, written to Prometheus, and that is how Estate shows `petshop-web`: its calls, errors and p99, the
+adoption's click-to-answer time and `/live`'s reconnects from the span metrics, the edge to the shop from the service
+graph, and the latest Core Web Vitals from the browser's own OTLP metrics. Its lines (errors, vitals, reconnects) go to
+Loki as `{service_name="petshop-web"}`. With the shop running as above, click about the front end at
+<http://localhost:5173> and the numbers appear on Estate within a minute. Compose's `browser` service does the
+clicking when nobody else is: see the traffic above.
+
+Estate reads the adoption's traces too. The catalog names it as a journey, *Adoption, click to screen*, with a stage
+for each step from the click to `live event`, and on the `petshop` and `petshop-web` pages *Show where its time goes*
+reads a sample of the last 15 minutes' adoptions from Tempo: each stage's p50 and p99, the largest marked, and a
+typical adoption drawn in lanes, one for each of the browser, the shop, the chip registry, Postgres and Kafka. Most of
+an adoption is usually *Waits in the outbox*, close to half of `outboxEvery`, since the relay polls. Each example
+opens its own page, where the same trace is also a waterfall.
 
 ## On Kafka
 
@@ -97,13 +165,13 @@ resolves once the registry is back:
 
 ```bash
 docker compose stop registry
-curl -X POST localhost:8080/pets/2/adoption   # registry_down
+curl -X POST localhost:8080/pets/16/adoption   # registry_down: any pet nobody has adopted
 docker compose start registry
 ```
 
 Stop the database and two alerts fire within about ten seconds, with nobody adopting anything:
 `PostgresDown`, from the exporter's `pg_up`, on the Postgres store and the map's edge to it, and `PetshopNotReady`,
-from the shop's own health check, whose `database` probe stops answering. Stop Kafka and `KafkaDown` fires on the
+from the shop's own health check, whose `database` check stops passing. Stop Kafka and `KafkaDown` fires on the
 Kafka store.
 
 ```bash
@@ -115,25 +183,64 @@ The shop's page carries its JVM (heap, GC pauses, threads, CPU), its connection 
 are failing. The Postgres store shows connections, transactions, size and the events waiting in the outbox. The
 Kafka store shows the topic's offsets and the projection's lag.
 
-The demo has no Kubernetes, Flux or CI, and Estate says so at the top of the page rather than leaving those parts
-blank. For the same reason it shows the shop as "not running": it reads that from a cluster or ECS, and the shop
-here is a process on your machine. There is no p99 either: the adoption timer is a summary without percentiles.
+The demo has no Kubernetes, Argo CD or CI, so compose's `tools` service pretends to be all three
+(`tools/fake.ts`), and Estate shows releases as it would for a shop that had them. Every nine minutes the shop has
+a new build on GitHub Actions, named for a plausible commit; two minutes later Argo CD applies it and its two pods roll
+to the new image, `main-<n>-<sha>`. The front end does the same every fourteen minutes, with one pod. So the cards
+carry a running version and a rail, the feed reads "build passed" and then "main-199-26d8c47 applied", and an alert
+that fires soon after a release says so. None of it is real: the shop is still the process on your machine, whatever
+version the card says. There is no p99 for the shop either: the adoption timer is a summary without percentiles.
 
 | | |
 |---|---|
-| `estate/catalog.yaml` | the petshop as one service in one environment, with its Postgres and Kafka as stores: its load from adoptions, its JVM and pool, the stores' stats, the vitals and the map |
-| `estate/estate.yaml` | Estate's settings: no sign-in (every visitor is an operator), and the demo's Prometheus and Alertmanager as its sources |
-| `prometheus/rules.yml` | the alerts: the shop's keep `job="petshop"`, which is how Estate knows an alert is the petshop's, and the stores' carry `store:` naming theirs |
+| `estate/catalog.yaml` | the petshop and its front end as two services in one environment, with its Postgres and Kafka as stores: the shop's load from adoptions, its JVM and pool, the front end's from Tempo's span metrics, the stores' stats, the vitals, the map, and the adoption as a journey through them |
+| `estate/estate.yaml` | Estate's settings: no sign-in (every visitor is an operator), the demo's Prometheus, Alertmanager, Loki and Tempo as its sources, and `tools` as its cluster, Argo CD and GitHub Actions |
+| `tools/fake.ts` | the stand-in for GitHub Actions, Argo CD and Kubernetes: a release of each service on a cadence of its own, worked out from the clock |
+| `prometheus/rules.yml` | the alerts: the shop's keep `job="petshop"`, which is how Estate knows an alert is the petshop's, the front end's keep `service="petshop-web"`, and the stores' carry `store:` naming theirs |
 | `alertmanager/alertmanager.yml` | routes every alert nowhere: Estate reads them, and keeps its silences there |
+| `estate/estate-ai.yaml` | `estate.yaml` with Ask AI turned on, read when Compose is started with `docker-compose.ai.yml` |
+
+## Ask AI, and breaking things to ask it about
+
+Estate's Ask AI reads an alert's brief (the alert, the shop's stats, its logs in Loki, what is around it) and asks
+Claude for the likely cause and what to do. It needs an Anthropic API key, from <https://console.anthropic.com>, in
+the shell that starts Compose; `read -s` keeps it out of your shell history:
+
+```bash
+read -rs ANTHROPIC_API_KEY && export ANTHROPIC_API_KEY
+docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d
+```
+
+`docker-compose.ai.yml` points Estate at `estate/estate-ai.yaml`, which is `estate.yaml` with `ai:` added: Claude
+Haiku, capped at 150,000 tokens a day. Without the override the demo runs as before, and Ask AI is hidden. Estate
+refuses to start when the key is unset, which is why `estate.yaml` does not name it.
+
+`chaos.sh` breaks one thing at a time, says which alert to open, and what a useful answer would name. Run it from
+`demo/` with the shop running and the traffic on, since most of the alerts need adoptions to fail. It leaves the
+fault in place until `./chaos.sh restore`, or for a number of seconds if one is given (`./chaos.sh registry-slow 120`).
+`ChipRegistryUnreachable`, `AdoptionsNotRecorded` and `BusRefusingEvents` keep firing for five minutes after their
+cause stops, so there is time to read the page and ask:
+
+```bash
+./chaos.sh registry-down    # the chip registry stops
+./chaos.sh registry-slow    # it answers, but after the shop's 2s timeout: the same alert, a subtler cause
+./chaos.sh postgres-down    # the database stops
+./chaos.sh kafka-down       # the broker stops; the outbox fills
+./chaos.sh restore
+```
 
 ## What is where
 
 | | |
 |---|---|
-| `docker-compose.yml` | Prometheus, Alertmanager, Grafana, Estate, Loki, Proofload's visitors (`traffic/Dockerfile`), the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
+| `docker-compose.yml` | the front end, Prometheus, Alertmanager, Grafana, Estate, Loki, Tempo, Proofload's visitors (`traffic/Dockerfile`), a headless browser visiting the front end (`browser/Dockerfile`), the outbox's Postgres, Kafka and its schema registry, and a WireMock stand-in for the chip registry. The app itself runs on the host |
+| `docker-compose.ai.yml` | an override that turns on Estate's Ask AI and passes `ANTHROPIC_API_KEY` through |
+| `chaos.sh` | breaks the registry, Postgres or Kafka, one at a time, and says which alert to look at |
+| `web/Dockerfile` | the front end in `web/`, built with bun and served by `vite preview` through the same proxies as `bun run dev` |
+| `tempo/tempo.yaml` | Tempo, receiving OTLP over HTTP on 4318, and writing span metrics and the service graph to Prometheus |
 | `registry/mappings/` | what the stand-in registry answers: a chip for every pet but number 3 |
-| `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds, which on Linux needs the app started with `HOST=0.0.0.0`, and the Postgres and Kafka exporters |
-| `grafana/provisioning/` | the datasource and the dashboard provider |
+| `prometheus/prometheus.yml` | scrapes `host.docker.internal:8080/metrics` every two seconds, which on Linux needs the app started with `HOST=0.0.0.0`, and the Postgres and Kafka exporters. It also takes Tempo's remote writes and the front end's OTLP metrics |
+| `grafana/provisioning/` | the Prometheus, Tempo and Loki datasources, Loki's lines linking to Tempo by `trace_id`, and the dashboard provider |
 | `grafana/dashboards/petshop.json` | the dashboard itself |
 
 `extra_hosts: host.docker.internal:host-gateway` is there for Linux, where that
@@ -166,9 +273,10 @@ label names per metric name, and a series registered with a different set is
 dropped silently. That is how the first version of this lost every refusal while
 appearing to work.
 
-**The durations are milliseconds.** `timed` records in milliseconds and
-Prometheus convention is seconds, so `petshop_adopt_duration_sum` is not a
-`_seconds_sum`. The panels say `ms` for that reason.
+**The durations are seconds.** `timed` records in seconds, Prometheus's
+convention, though the name has no `_seconds` suffix:
+`petshop_adopt_duration_sum` is seconds. The panels say `s`, and Estate's
+mean adoption multiplies by 1000 to show milliseconds.
 
 ## Anonymous admin
 

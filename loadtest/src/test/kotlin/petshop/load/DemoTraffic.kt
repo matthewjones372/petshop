@@ -1,6 +1,8 @@
 package petshop.load
 
-import io.github.matthewjones372.pelican.jackson.JacksonCodecs
+import io.github.matthewjones372.lark.Schedule
+import io.github.matthewjones372.lark.retry
+import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.proofload.at
 import io.github.matthewjones372.proofload.engine.Proofload
@@ -12,23 +14,15 @@ import java.nio.file.Path
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
+import petshop.api.ShopCodecs
 import petshop.api.adoptPet
-import petshop.api.listPets
 import petshop.api.getPet
+import petshop.api.listPets
 import petshop.api.stats
 
-/**
- * Visitors for the demo, so Estate and Grafana have something to show: run against the shop already up on
- * `PETSHOP_URL` (http://localhost:8080 by default), at `RATE` visitors a second for `DURATION`, with
- * `./gradlew :loadtest:demoTraffic`.
- *
- * Each visitor looks at a pet and at the stats, and one in four tries to adopt. Adoptions land on every outcome
- * the shop declares: a pet taken, one somebody already has, Mrs Peel (pet 3) with no chip, and a pet that is not
- * there. They aim at the newest pets, since arrivals add one every five seconds and the old ones are soon gone.
- * Those are answers, so they are not failures here: `outcome` hands back whichever the endpoint declared, and
- * throws only for something it never declared, which Proofload records as the step failing.
- */
+/** Declared refusals are answers, not failures: only an undeclared response fails a step. */
 fun main() {
     val target = System.getenv("PETSHOP_URL") ?: "http://localhost:8080"
     val rate = System.getenv("RATE")?.toInt() ?: DEFAULT_RATE
@@ -38,9 +32,11 @@ fun main() {
     val adopt = step("try to adopt one")
     val readTheStats = step("read the stats")
 
-    apiClient(target, JacksonCodecs).use { client ->
+    apiClient(target, ShopCodecs).use { client ->
+        // The shop runs on the host and may start after this container: wait for it rather than exit.
+        println("Waiting for the shop at $target")
         // The newest pet now, asked once; after that the newest grows by one each arrival.
-        val newestAtStart = client.call(listPets, Unit).maxOf { it.id }
+        val newestAtStart = newestPet(client)
         val started = TimeSource.Monotonic.markNow()
         fun recentPet(): Long {
             val newest = newestAtStart + started.elapsedNow().inWholeSeconds / SECONDS_PER_ARRIVAL
@@ -69,13 +65,19 @@ fun main() {
     }
 }
 
+/**
+ * The newest pet's id. Its own function, not inline in `main`: the shop has no call for one pet, so this reads every
+ * pet, and an inlined read leaves the whole list in a slot of the frame that runs for the day.
+ */
+private fun newestPet(client: ApiClient): Long =
+    Schedule.spaced<Throwable>(2.seconds).retry { client.call(listPets, Unit) }.maxOf { it.id }
+
 private const val DEFAULT_RATE = 5
 private const val ADOPT_ONE_IN = 4
 
 /** The arrivals' pace in the demo's application.conf: one pet every five seconds. */
 private const val SECONDS_PER_ARRIVAL = 5
 
-/** How far back from the newest pet visitors look and adopt. */
 private const val RECENT_PETS = 300L
 
 /** One adoption in twenty for a pet that is not there, and one in twenty for Mrs Peel, who has no chip. */

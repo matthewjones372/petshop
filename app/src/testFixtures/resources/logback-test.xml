@@ -1,10 +1,4 @@
-<!--
-  Tests log at WARN and above. Without this file logback's default is DEBUG for everything, and one run of
-  the app tests printed about eleven thousand lines, most of them Kafka, Hikari and Testcontainers'
-  Docker client.
-
-  In test fixtures, so the load test gets it too.
--->
+<!-- Tests log at WARN and above. In test fixtures so the load test gets it too. -->
 <configuration>
     <statusListener class="ch.qos.logback.core.status.NopStatusListener"/>
 
@@ -17,11 +11,8 @@
     <!-- Kafka's clients warn about every topic they create on first use. -->
     <logger name="org.apache.kafka" level="ERROR"/>
 
-    <!--
-      The service's own lines stay at INFO, because LoggingSpec reads them through an appender of its own,
-      but they are not printed: the tests provoke refusals on purpose, and a story already says what each
-      test did.
-    -->
+    <!-- At INFO for LoggingSpec's appender, but not printed: the tests provoke refusals on purpose. -->
+    <logger name="petshop" level="INFO" additivity="false"/>
     <logger name="lark" level="INFO" additivity="false"/>
 
     <root level="WARN">

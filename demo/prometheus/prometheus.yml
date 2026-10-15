@@ -1,10 +1,8 @@
-# Every two seconds, because the arrivals stream ticks every five and a demo
-# that waits fifteen for its first point looks broken.
+# Every two seconds: arrivals tick every five, and a fifteen second wait for a first point looks broken.
 global:
   scrape_interval: 2s
   evaluation_interval: 2s
 
-# The demo's alerts, sent to its Alertmanager, where Estate reads them.
 rule_files:
   - /etc/prometheus/rules.yml
 
@@ -17,16 +15,13 @@ scrape_configs:
   - job_name: petshop
     metrics_path: /metrics
     static_configs:
-      # The app runs on the host, not in this compose file. On Linux this name is the Docker
-      # bridge, so the app has to be listening there: HOST=0.0.0.0 ./gradlew :app:run.
+      # On Linux this is the Docker bridge, so the app must listen on it: HOST=0.0.0.0 ./gradlew :app:run.
       - targets: ["host.docker.internal:8080"]
 
-  # The outbox's Postgres, through its exporter: pg_up is 0 when the database does not answer.
   - job_name: postgres
     static_configs:
       - targets: ["postgres-exporter:9187"]
 
-  # The bus, through its exporter: offsets per partition and the projection's lag.
   - job_name: kafka
     static_configs:
       - targets: ["kafka-exporter:9308"]

@@ -5,6 +5,7 @@ POST /pets/404/adoption
 
 404
 Content-Type: application/json
+Content-Length: 33
 
 {
   "id": 404,

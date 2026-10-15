@@ -1,6 +1,4 @@
 pluginManagement {
-    // The wiring plugin ships from the same build as the library, at the same version, so it is pinned here to
-    // larkVersion rather than in a build script, where it would drift.
     val larkVersion = providers.gradleProperty("larkVersion").get()
     repositories {
         mavenCentral()
@@ -10,9 +8,7 @@ pluginManagement {
             mavenLocal()
         }
     }
-    plugins {
-        id("io.github.matthewjones372.lark.wiring") version larkVersion
-    }
+    plugins { id("io.github.matthewjones372.lark.wiring") version larkVersion }
 }
 
 plugins { id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0" }
@@ -25,5 +21,5 @@ include("api")
 include("app")
 include("loadtest")
 
-// The outbox's SQL, on the Kotlin its ExoQuery plugin is built for: see its settings.gradle.kts.
+// A separate build for ExoQuery's Kotlin version: see its settings.gradle.kts.
 includeBuild("outbox-table")
