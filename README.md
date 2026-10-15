@@ -597,6 +597,11 @@ record each rung rather than assert a latency, so a rate the shop cannot keep
 up with is measured rather than failed. [docs/performance.md](docs/performance.md)
 has what they found.
 
+`loadtest/heavy.sh` ramps a shop of its own to 50,000 requests a second against a
+running process rather than in-process, with a mix of reads and adoptions, and
+samples the shop, the generator and Postgres while it does.
+[docs/heavy-load.md](docs/heavy-load.md) has what it found, and what limits it.
+
 The report says whether the load generator kept to its own schedule, which
 tells you whether a p99 reflects the shop or the tool, so the test asserts the
 shop's service time rather than the response time. The load tests run as
