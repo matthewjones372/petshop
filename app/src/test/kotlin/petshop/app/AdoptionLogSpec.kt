@@ -21,7 +21,7 @@ class AdoptionLogSpec {
     fun `an adoption names the pet and the adopter in pairs, not in prose`() = story {
         val lines = When("Ada adopts Nibbles, with the log captured") {
             capturingLogs { logs ->
-                testApp<PetShop, Unit>(settled) { shop -> shop.adopt(PetId(1), "Ada"); Unit }
+                testApp<PetShop, Unit>(settled) { shop -> shop.adopt(PetId(1), "Ada") }
                 logs.all()
             }
         }
@@ -39,7 +39,7 @@ class AdoptionLogSpec {
     fun `an adoption that cannot happen is a warning saying why`() = story {
         val lines = When("Ada asks for a pet the shop never had, with the log captured") {
             capturingLogs { logs ->
-                testApp<PetShop, Unit>(settled) { shop -> shop.adopt(PetId(404), "Ada"); Unit }
+                testApp<PetShop, Unit>(settled) { shop -> shop.adopt(PetId(404), "Ada") }
                 logs.all()
             }
         }

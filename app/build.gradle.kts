@@ -39,6 +39,8 @@ dependencies {
         implementation("org.apache.httpcomponents.client5:httpclient5:5.6.3")
         implementation("org.apache.httpcomponents.core5:httpcore5:5.4.3")
         implementation("org.apache.httpcomponents.core5:httpcore5-h2:5.4.3")
+        // Confluent's 32.0.1 calls sun.misc.Unsafe, which JDK 25 warns about at runtime; 33.7 uses VarHandle.
+        implementation("com.google.guava:guava:33.7.2-jre")
     }
     implementation("io.github.matthewjones372:lark-otel:$larkVersion")
     // One OpenTelemetry version for the API pelican brings and the SDK here: a mixed pair fails at start.
@@ -88,7 +90,7 @@ dependencies {
 }
 
 // The shop runs on Jetty with kotlinx: a dependency that brings Pekko, Scala or Jackson's databind back fails `check`.
-val checkRuntimeClasspath by tasks.registering {
+val checkRuntimeClasspath = tasks.register("checkRuntimeClasspath") {
     description = "Fails if the shop's runtime classpath holds Pekko, Scala, pelican-jackson or jackson-module-kotlin."
     group = "verification"
     val forbidden = listOf("org.apache.pekko", "pekko-", "scala-library", "pelican-jackson", "jackson-module-kotlin")
