@@ -461,6 +461,10 @@ reference, the registry's client, its stubs and a typed test client.
 failure, and the import for `orFail`. Redoc's theme is Redoc's own JSON, passed
 through as it is.
 
+The demo's registry stubs are generated from the same endpoints too:
+`DemoStubsSpec` writes `demo/registry/mappings/chips.json`, including recording
+a keeper, whose answer is templated from the request body.
+
 **Its limits.** Two failures can share a status only when each is `tagged`,
 which writes a `kind` field into the body: a payload with a field of that name
 has to pick another. A declared status whose body does not match the
