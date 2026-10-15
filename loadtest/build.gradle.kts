@@ -14,6 +14,8 @@ dependencies {
     testImplementation("io.github.matthewjones372:pelican-test")
     testImplementation("io.github.matthewjones372:proofload-junit5:$proofloadVersion")
     testImplementation("io.github.matthewjones372:proofload-report-html:$proofloadVersion")
+    // For Jetty's HttpClient, at the version pelican's BOM picks.
+    testImplementation("io.github.matthewjones372:pelican-client-jetty")
 }
 
 // Only run as `./gradlew loadTest`: each test busies the machine for ten seconds and measures it.
@@ -37,6 +39,17 @@ tasks.register<JavaExec>("demoTraffic") {
     group = "demo"
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass.set("petshop.load.DemoTrafficKt")
+}
+
+// Against a running shop, best through loadtest/heavy.sh; PETSHOP_URL, PEAK, RAMP, HOLD, PETS and TIMEOUT configure it.
+tasks.register<JavaExec>("heavyTraffic") {
+    description = "Ramps a running shop to fifty thousand requests a second and holds it there."
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("petshop.load.HeavyTrafficKt")
+    // Tens of thousands of requests in flight once the shop falls behind; exit rather than hang when they do not fit.
+    maxHeapSize = "4g"
+    jvmArgs("-XX:+ExitOnOutOfMemoryError")
 }
 
 // For demo/traffic/Dockerfile.
