@@ -1,7 +1,6 @@
 package petshop.app
 
 import arrow.core.Either
-import arrow.core.Option
 import arrow.core.flatMap
 import arrow.core.getOrElse
 import arrow.core.raise.either
@@ -48,14 +47,14 @@ val opening: List<Pet> = listOf(
 
 class ActorPetShop(
     private val ref: ActorRef<Shop>,
+    private val window: ShopWindow,
     private val tracer: Tracer,
     private val registry: ChipRegistry,
 ) : PetShop {
 
-    override fun all(): List<Pet> = ref.asked { reply -> Everything(reply) }
+    override fun all(): List<Pet> = window.pets()
 
-    override fun find(id: PetId): Pet? =
-        ref.asked { reply: Reply<Option<Pet>> -> Find(id, reply) }.fold({ null }, { pet -> pet })
+    override fun find(id: PetId): Pet? = window.find(id)
 
     /** OpenTelemetry's context lives in a `LarkLocal` here; a `ThreadLocal` would not survive the ask. */
     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> =
@@ -97,7 +96,8 @@ class ActorPetShop(
             .flatMap { chip -> registry.transfer(chip, to = by) }
             .onLeft { failure ->
                 logWarn("registry refused pet ${id.value}: $failure")
-                ref.tell(Returned(id))
+                ref.ask(within = 3.seconds) { reply -> Returned(id, reply) }
+                    .onLeft { unanswered -> logWarn("the return of pet ${id.value} was not confirmed: $unanswered") }
             }
             .mapLeft { failure -> failure.refusing(id) }
             .bind()
@@ -124,6 +124,9 @@ private fun PetShopError.outcome(): String = when (this) {
 
 val theShop: Module =
     actors() +
+        singleOf(::ShopWindow) +
         // shelf reads the pets table, so a restart opens the shop as it was left.
-        actor<Shop, Outbox>("shop") { outbox -> shop(outbox, outbox.shelf(opening).associateBy { it.id }) } +
+        actor<Shop, Outbox, ShopWindow>("shop") { outbox, window ->
+            shop(outbox, window, outbox.shelf(opening).associateBy { it.id })
+        } +
         singleOf(::ActorPetShop).boundTo<PetShop>()
