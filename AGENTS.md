@@ -1,5 +1,9 @@
 # Working in this repo
 
+## Skill workflows
+
+When selecting or switching skills, read [workflow selection](docs/agents/workflow.md).
+
 ## Comments
 
 Comments record what the code cannot: the reason a thing is done the way it is.
