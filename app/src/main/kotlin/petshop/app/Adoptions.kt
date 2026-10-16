@@ -12,9 +12,8 @@ import io.github.matthewjones372.lark.actor.behaviour
 import io.github.matthewjones372.lark.actor.onStart
 import io.github.matthewjones372.lark.actor.stay
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.reflect.typeOf
+import petshop.api.Catalogue
 import petshop.api.PetDto
-import petshop.api.ShopCodecs
 import petshop.api.toDto
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
@@ -45,29 +44,19 @@ class ShopWindow {
 
     fun listed(): List<PetDto> = shown.get().listed
 
-    fun json(): String = shown.get().json
-
-    fun bytes(): ByteArray = shown.get().bytes
-
     internal fun show(pets: Map<PetId, Pet>) {
         val now = shown.get()
         if (now.byId === pets) return
         val ordered = pets.values.sortedBy { it.id.value }
-        val listed = ordered.toDto()
-        val json = catalogueJson.encodeToString(listed)
-        shown.set(Shelf(ordered, pets, listed, json, json.toByteArray(Charsets.UTF_8)))
+        shown.set(Shelf(ordered, pets, Catalogue(ordered.toDto())))
     }
 }
 
 private class Shelf(
     val pets: List<Pet> = emptyList(),
     val byId: Map<PetId, Pet> = emptyMap(),
-    val listed: List<PetDto> = emptyList(),
-    val json: String = catalogueJson.encodeToString(emptyList<PetDto>()),
-    val bytes: ByteArray = json.toByteArray(Charsets.UTF_8),
+    val listed: List<PetDto> = Catalogue(emptyList()),
 )
-
-private val catalogueJson = ShopCodecs.codec<List<PetDto>>(typeOf<List<PetDto>>())
 
 private class State(val pets: Map<PetId, Pet>, private val outbox: Outbox, private val window: ShopWindow) {
 
