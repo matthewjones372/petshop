@@ -96,8 +96,6 @@ class ActorPetShop(
             .flatMap { chip -> registry.transfer(chip, to = by) }
             .onLeft { failure ->
                 logWarn("registry refused pet ${id.value}: $failure")
-                // The adoption is already on the shelf. Wait until the undo is too, so this call does not return
-                // with the pet still looking taken. A read during the registry call can still see it taken.
                 ref.ask(within = 3.seconds) { reply -> Returned(id, reply) }
                     .onLeft { unanswered -> logWarn("the return of pet ${id.value} was not confirmed: $unanswered") }
             }

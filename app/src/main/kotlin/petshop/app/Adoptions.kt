@@ -34,13 +34,8 @@ data class Arrived(val pet: Pet) : Shop
 
 data class Adopt(val id: PetId, val by: String, val reply: Reply<Either<PetShopError, Pet>>) : Shop
 
-/** Answered once the pet is back on the shelf, so the call that was refused does not return while it still looks taken. */
 data class Returned(val id: PetId, val reply: Reply<Unit>) : Shop
 
-/**
- * The shelf a read sees, swapped after a write has been recorded. A read takes this and returns, so it never queues
- * behind the actor. [json] is the `GET /pets` body for [listed], built when the shelf is published.
- */
 class ShopWindow {
     private val shown = AtomicReference(Shelf())
 
@@ -52,7 +47,6 @@ class ShopWindow {
 
     fun json(): String = shown.get().json
 
-    /** Only the shop actor calls this, and only from its own thread. The same map is the shelf already showing. */
     internal fun show(pets: Map<PetId, Pet>) {
         val now = shown.get()
         if (now.byId === pets) return
@@ -73,22 +67,14 @@ private val catalogueJson = ShopCodecs.codec<List<PetDto>>(typeOf<List<PetDto>>(
 
 private class State(val pets: Map<PetId, Pet>, private val outbox: Outbox, private val window: ShopWindow) {
 
-    /**
-     * The pet's row and its event are one transaction, so the state changes only once both are durable. The shelf is
-     * shown after that returns: a read that arrived while the write was in progress still sees the previous one, and
-     * a write that throws shows nothing.
-     */
+    /** The pet's row and its event are one transaction, so the state changes only once both are durable. */
     fun record(pet: Pet, event: (seq: Long) -> ShopEvent): Either<Throwable, State> =
         Either.catch { outbox.record(pet, event) }.map {
             State(pets + (pet.id to pet), outbox, window).also { next -> window.show(next.pets) }
         }
 }
 
-/**
- * Every write is caught where it is made: a throw out of a step would restart the actor from its opening catalogue.
- * The window shows that catalogue before the actor takes a message, and again after a restart, which puts the actor
- * back on it.
- */
+/** Every write is caught where it is made: a throw out of a step would restart the actor from its opening catalogue. */
 fun shop(outbox: Outbox, window: ShopWindow, pets: Map<PetId, Pet> = emptyMap()): Behaviour<Shop, *, Nothing> {
     window.show(pets)
     return behaviour<Shop, State>(State(pets, outbox, window)) { _, state, message ->

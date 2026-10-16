@@ -65,10 +65,6 @@ object ShopCodecs : Codecs by KotlinxCodecs {
     })
 }
 
-/**
- * [ShopCodecs], except a `List<PetDto>` that is this shop's published list is written as [json] rather than encoded
- * again. Any other list, including another shop's, is encoded as usual. [listed] and [json] belong to one shop.
- */
 fun shopCodecs(listed: () -> List<PetDto>, json: () -> String): Codecs = object : Codecs by ShopCodecs {
     @Suppress("UNCHECKED_CAST")
     override fun <T> codec(type: KType): BodyCodec<T> =

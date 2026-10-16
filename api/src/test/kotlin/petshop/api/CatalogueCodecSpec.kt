@@ -43,7 +43,6 @@ class CatalogueCodecSpec {
 
         nibblesCodecs.codec<List<PetDto>>(pets).encodeToString(nibbles) shouldBe plantedNibbles
         barnabyCodecs.codec<List<PetDto>>(pets).encodeToString(barnaby) shouldBe plantedBarnaby
-        // A copy is not the published list, so it is encoded, and one shop does not answer with the other's json.
         nibblesCodecs.codec<List<PetDto>>(pets).encodeToString(nibbles.toList()) shouldNotBe plantedNibbles
         nibblesCodecs.codec<List<PetDto>>(pets).encodeToString(barnaby) shouldBe
             ShopCodecs.codec<List<PetDto>>(pets).encodeToString(barnaby)

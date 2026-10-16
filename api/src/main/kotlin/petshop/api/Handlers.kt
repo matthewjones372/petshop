@@ -26,7 +26,6 @@ fun petshopApi(
     /** A fresh run per caller: each connection is a subscriber of its own. */
     watch: () -> Stream<Nothing, ShopEventDto>,
     telemetry: OpenTelemetry = OpenTelemetry.noop(),
-    /** The catalogue already encoded for this shop. Callers that have none encode [PetShop.all] as before. */
     listed: () -> List<PetDto> = { shop.all().toDto() },
     codecs: Codecs = ShopCodecs,
 ) = api(
