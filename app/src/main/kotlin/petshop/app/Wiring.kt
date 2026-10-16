@@ -13,6 +13,8 @@ import io.github.matthewjones372.lark.app.typesafe.configOf
 import io.github.matthewjones372.lark.app.typesafe.layeredConfig
 import io.github.matthewjones372.lark.app.typesafe.layeredConfigOf
 import io.github.matthewjones372.lark.app.typesafe.origins
+import io.github.matthewjones372.lark.counter
+import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.StreamBackend
@@ -90,6 +92,7 @@ private val web: Module =
             sdk,
             listed = window::listed,
             codecs = shopCodecs(window::listed, window::json, window::bytes),
+            requests = { counter("petshop.requests").increment() },
         )
     } +
         single { api: Api, config: Settings, _: Arrivals, _: OutboxRelay, _: ReadinessGauges, _: JvmGcMetrics ->

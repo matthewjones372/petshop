@@ -14,9 +14,10 @@ services:
     build: { workflow: petshop.yml }
     deploy: { argo: { application: petshop } }
     runtime: { kubernetes: { namespace: shop, workloads: [ { kind: Deployment, name: petshop } ] } }
-    # A declared refusal is an answer, not an error. No p99: the adoption timer is a summary without percentiles.
+    # Requests are every call the shop served. A declared refusal is an answer, not an error.
+    # No p99: the adoption timer is a summary without percentiles.
     load:
-      requests: sum(rate(petshop_adoptions_total[1m]))
+      requests: sum(rate(petshop_requests_total[1m]))
       errors: sum(rate(petshop_adoptions_total{outcome=~"registry_down|not_recorded"}[1m])) or vector(0)
     links:
       # The front end in web/, served by compose's `web` service, or by `bun run --cwd web dev`.
@@ -32,6 +33,7 @@ services:
       preset: jvm
       selector: job="petshop"
       extra:
+        - { title: Adoption requests, query: 'sum(rate(petshop_adoptions_total[1m]))', unit: /s }
         - { title: Pets in the shop, query: max(petshop_pets_in_shop) }
         - { title: Mean adoption, query: '1000 * sum(petshop_adopt_duration_sum) / clamp_min(sum(petshop_adopt_duration_count), 1)', unit: ms }
         - { title: Events published, query: 'sum(rate(petshop_outbox_published_total[1m]))', unit: /s }

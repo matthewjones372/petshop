@@ -5,6 +5,7 @@ import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.lark.stream.toSequence
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.api
+import io.github.matthewjones372.pelican.before
 import io.github.matthewjones372.pelican.health.Health
 import io.github.matthewjones372.pelican.jetty.handledNow
 import io.github.matthewjones372.pelican.jetty.handledOrFail
@@ -28,6 +29,7 @@ fun petshopApi(
     telemetry: OpenTelemetry = OpenTelemetry.noop(),
     listed: () -> List<PetDto> = { shop.all().toDto() },
     codecs: Codecs = ShopCodecs,
+    requests: () -> Unit = {},
 ) = api(
     endpoints = listOf(
         listPets handledNow { listed() },
@@ -56,6 +58,7 @@ fun petshopApi(
 ) {
     title = "Petshop"
     version = "1.0.0"
+    filter(before { requests() })
     filter(openTelemetry(telemetry))
     description = """
         A small shop of tortoises, dogs, cats and parrots. An adoption records the new keeper with the chip

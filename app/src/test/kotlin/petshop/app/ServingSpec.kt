@@ -39,6 +39,25 @@ class ServingSpec {
     }
 
     @Test
+    fun `a request is a line in the scrape`() = story {
+        val served = Given("the service on any free port") {
+            Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() })
+                .onAFreshDatabase()
+                .overridingConfig("petshop.port = 0")
+        }
+        val scrape = When("somebody asks what is on the shelf, and Prometheus scrapes") {
+            served.use { server: PelicanServer ->
+                apiClient(server.baseUrl, ShopCodecs).use { shop -> shop.call(listPets, Unit) }
+                HttpClient.newHttpClient().send(
+                    HttpRequest.newBuilder(URI.create(server.baseUrl + "/metrics")).build(),
+                    HttpResponse.BodyHandlers.ofString(),
+                ).body()
+            }
+        }.shouldBeRight()
+        Then("the scrape counts that request") { scrape shouldContain "petshop_requests_total" }
+    }
+
+    @Test
     fun `the reference is served beside Swagger, in the shop's colours, over the same document`() = story {
         val served = Given("the service on any free port") {
             Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() })
