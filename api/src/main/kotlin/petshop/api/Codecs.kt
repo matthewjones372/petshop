@@ -64,3 +64,29 @@ object ShopCodecs : Codecs by KotlinxCodecs {
         results.map { CheckResult(it.status, it.observedValue, it.observedUnit, it.time, it.componentType, it.output) }
     })
 }
+
+/**
+ * [ShopCodecs], except a `List<PetDto>` that is this shop's published list is written as [json] rather than encoded
+ * again. Any other list, including another shop's, is encoded as usual. [listed] and [json] belong to one shop.
+ */
+fun shopCodecs(listed: () -> List<PetDto>, json: () -> String): Codecs = object : Codecs by ShopCodecs {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T> codec(type: KType): BodyCodec<T> =
+        if (type.describesPets()) listing as BodyCodec<T> else ShopCodecs.codec(type)
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T> codec(type: KType, mediaType: String): BodyCodec<T> =
+        if (type.describesPets()) codec(type) else ShopCodecs.codec(type, mediaType)
+
+    private val listing = object : BodyCodec<List<PetDto>> {
+        private val plain = ShopCodecs.codec<List<PetDto>>(typeOf<List<PetDto>>())
+
+        override fun encodeToString(value: List<PetDto>): String =
+            if (value === listed()) json() else plain.encodeToString(value)
+
+        override fun decodeFromString(text: String): List<PetDto> = plain.decodeFromString(text)
+    }
+}
+
+private fun KType.describesPets(): Boolean =
+    classifier == List::class && arguments.singleOrNull()?.type?.classifier == PetDto::class

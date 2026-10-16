@@ -1,7 +1,6 @@
 package petshop.app
 
 import arrow.core.Either
-import arrow.core.Option
 import arrow.core.left
 import arrow.core.right
 import io.github.matthewjones372.lark.logWarn
@@ -10,7 +9,13 @@ import io.github.matthewjones372.lark.actor.Next
 import io.github.matthewjones372.lark.actor.Reply
 import io.github.matthewjones372.lark.actor.become
 import io.github.matthewjones372.lark.actor.behaviour
+import io.github.matthewjones372.lark.actor.onStart
 import io.github.matthewjones372.lark.actor.stay
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.reflect.typeOf
+import petshop.api.PetDto
+import petshop.api.ShopCodecs
+import petshop.api.toDto
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.NotRecorded
@@ -27,35 +32,75 @@ sealed interface Shop
 
 data class Arrived(val pet: Pet) : Shop
 
-data class Everything(val reply: Reply<List<Pet>>) : Shop
-
-/** An [Option] because a reply is never null: `Reply<A : Any>` will not take a `Pet?`. */
-data class Find(val id: PetId, val reply: Reply<Option<Pet>>) : Shop
-
 data class Adopt(val id: PetId, val by: String, val reply: Reply<Either<PetShopError, Pet>>) : Shop
 
-data class Returned(val id: PetId) : Shop
+/** Answered once the pet is back on the shelf, so the call that was refused does not return while it still looks taken. */
+data class Returned(val id: PetId, val reply: Reply<Unit>) : Shop
 
-private class State(val pets: Map<PetId, Pet>, private val outbox: Outbox) {
+/**
+ * The shelf a read sees, swapped after a write has been recorded. A read takes this and returns, so it never queues
+ * behind the actor. [json] is the `GET /pets` body for [listed], built when the shelf is published.
+ */
+class ShopWindow {
+    private val shown = AtomicReference(Shelf())
 
-    /** The pet's row and its event are one transaction, so the state changes only once both are durable. */
-    fun record(pet: Pet, event: (seq: Long) -> ShopEvent): Either<Throwable, State> =
-        Either.catch { outbox.record(pet, event) }.map { State(pets + (pet.id to pet), outbox) }
+    fun pets(): List<Pet> = shown.get().pets
+
+    fun find(id: PetId): Pet? = shown.get().byId[id]
+
+    fun listed(): List<PetDto> = shown.get().listed
+
+    fun json(): String = shown.get().json
+
+    /** Only the shop actor calls this, and only from its own thread. The same map is the shelf already showing. */
+    internal fun show(pets: Map<PetId, Pet>) {
+        val now = shown.get()
+        if (now.byId === pets) return
+        val ordered = pets.values.sortedBy { it.id.value }
+        val listed = ordered.toDto()
+        shown.set(Shelf(ordered, pets, listed, catalogueJson.encodeToString(listed)))
+    }
 }
 
-/** Every write is caught where it is made: a throw out of a step would restart the actor from its opening catalogue. */
-fun shop(outbox: Outbox, pets: Map<PetId, Pet> = emptyMap()): Behaviour<Shop, *, Nothing> =
-    behaviour<Shop, State>(State(pets, outbox)) { _, state, message ->
+private class Shelf(
+    val pets: List<Pet> = emptyList(),
+    val byId: Map<PetId, Pet> = emptyMap(),
+    val listed: List<PetDto> = emptyList(),
+    val json: String = catalogueJson.encodeToString(emptyList<PetDto>()),
+)
+
+private val catalogueJson = ShopCodecs.codec<List<PetDto>>(typeOf<List<PetDto>>())
+
+private class State(val pets: Map<PetId, Pet>, private val outbox: Outbox, private val window: ShopWindow) {
+
+    /**
+     * The pet's row and its event are one transaction, so the state changes only once both are durable. The shelf is
+     * shown after that returns: a read that arrived while the write was in progress still sees the previous one, and
+     * a write that throws shows nothing.
+     */
+    fun record(pet: Pet, event: (seq: Long) -> ShopEvent): Either<Throwable, State> =
+        Either.catch { outbox.record(pet, event) }.map {
+            State(pets + (pet.id to pet), outbox, window).also { next -> window.show(next.pets) }
+        }
+}
+
+/**
+ * Every write is caught where it is made: a throw out of a step would restart the actor from its opening catalogue.
+ * The window shows that catalogue before the actor takes a message, and again after a restart, which puts the actor
+ * back on it.
+ */
+fun shop(outbox: Outbox, window: ShopWindow, pets: Map<PetId, Pet> = emptyMap()): Behaviour<Shop, *, Nothing> {
+    window.show(pets)
+    return behaviour<Shop, State>(State(pets, outbox, window)) { _, state, message ->
         when (message) {
             is Arrived -> recorded("the arrival of ${message.pet.name}") {
                 state.record(message.pet) { seq -> PetArrived(seq, message.pet) }
             }
             is Adopt -> adopt(state, message)
-            is Returned -> returned(state, message.id)
-            is Everything -> stay().also { message.reply(state.pets.values.sortedBy { it.id.value }) }
-            is Find -> stay().also { message.reply(Option.fromNullable(state.pets[message.id])) }
+            is Returned -> returned(state, message.id).also { message.reply(Unit) }
         }
-    }
+    }.onStart { window.show(pets) }
+}
 
 private fun adopt(state: State, asked: Adopt): Next<State> {
     val pet = state.pets[asked.id]

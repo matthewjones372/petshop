@@ -13,8 +13,11 @@ import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import java.sql.SQLTransientConnectionException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
+import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.ChipRegistry
@@ -86,6 +89,52 @@ class AdoptionSpec {
             after?.adopted shouldBe false
             asked.get() shouldBe 0
         }
+    }
+
+    @Test
+    fun `a read during a write sees the shelf as it was, and does not wait for the write`() = story {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val blocking = object : Outbox {
+            override fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent {
+                entered.countDown()
+                check(release.await(5, TimeUnit.SECONDS)) { "the write was never released" }
+                return numbered(1)
+            }
+
+            override fun shelf(opening: List<Pet>): List<Pet> = opening
+
+            override fun claim(limit: Int, publish: (List<Claimed>) -> List<ShopEvent>): List<ShopEvent> =
+                emptyList()
+        }
+        val held = Given("an outbox that holds a write until the test lets it finish") {
+            Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() })
+                .overriding(single<Outbox> { blocking })
+                .subgraph<PetShop>()
+        }
+        val (during, after) = When("Ada's adoption is held inside the write, and someone reads the shelf") {
+            testApp(held) { shop: PetShop ->
+                val adopting = Thread { shop.adopt(PetId(1), by = "Ada") }
+                adopting.start()
+                check(entered.await(5, TimeUnit.SECONDS)) { "the write never started" }
+                val seen = try {
+                    assertTimeoutPreemptively<Pair<List<Pet>, Pet?>>(java.time.Duration.ofSeconds(1)) {
+                        shop.all() to shop.find(PetId(1))
+                    }
+                } finally {
+                    release.countDown()
+                }
+                adopting.join(5_000)
+                seen to shop.find(PetId(1))
+            }
+        }
+        Then("the read saw Nibbles still for sale, without waiting out the ask") {
+            val (all, found) = during
+            all.map { it.id.value } shouldBe opening.map { it.id.value }
+            all.single { it.id == PetId(1) }.adopted shouldBe false
+            found?.adopted shouldBe false
+        }
+        And("once the write has finished she has Nibbles") { after?.adopted shouldBe true }
     }
 
     @Test

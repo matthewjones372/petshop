@@ -31,6 +31,7 @@ import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk
 import kotlin.time.Duration
 import petshop.api.petshopApi
 import petshop.api.petshopDocs
+import petshop.api.shopCodecs
 import petshop.domain.PetShop
 
 /** [host] is loopback unless something outside this machine has to reach the port. */
@@ -77,9 +78,19 @@ private val jetty: Module =
         closingOf { -> JettyHttpTransport() }
 
 private val web: Module =
-    single { streams: StreamBackend, shop: PetShop, health: Health, registry: PrometheusMeterRegistry,
-        projection: Projection, feed: Feed, sdk: OpenTelemetrySdk ->
-        petshopApi(streams, shop, health, registry::scrape, projection::tally, feed::watch, sdk)
+    single { streams: StreamBackend, shop: PetShop, window: ShopWindow, health: Health,
+        registry: PrometheusMeterRegistry, projection: Projection, feed: Feed, sdk: OpenTelemetrySdk ->
+        petshopApi(
+            streams,
+            shop,
+            health,
+            registry::scrape,
+            projection::tally,
+            feed::watch,
+            sdk,
+            listed = window::listed,
+            codecs = shopCodecs(window::listed, window::json),
+        )
     } +
         single { api: Api, config: Settings, _: Arrivals, _: OutboxRelay, _: ReadinessGauges, _: JvmGcMetrics ->
             install({ api.startWithDocs(port = config.port, host = config.host, docs = petshopDocs) }) { server, _ ->

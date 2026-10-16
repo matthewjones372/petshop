@@ -3,6 +3,7 @@ package petshop.api
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.lark.stream.toSequence
+import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.health.Health
 import io.github.matthewjones372.pelican.jetty.handledNow
@@ -25,9 +26,12 @@ fun petshopApi(
     /** A fresh run per caller: each connection is a subscriber of its own. */
     watch: () -> Stream<Nothing, ShopEventDto>,
     telemetry: OpenTelemetry = OpenTelemetry.noop(),
+    /** The catalogue already encoded for this shop. Callers that have none encode [PetShop.all] as before. */
+    listed: () -> List<PetDto> = { shop.all().toDto() },
+    codecs: Codecs = ShopCodecs,
 ) = api(
     endpoints = listOf(
-        listPets handledNow { shop.all().toDto() },
+        listPets handledNow { listed() },
         getPet handledOrFail { id ->
             shop.find(PetId(id))?.let { pet -> ok(pet.toDto()) } ?: petMissing(NoSuchPet(id).toDto())
         },
@@ -49,7 +53,7 @@ fun petshopApi(
         stats handledNow { tally() },
         events streamedNow { watch().toSequence(streams) },
     ) + health.endpoints,
-    codecs = ShopCodecs,
+    codecs = codecs,
 ) {
     title = "Petshop"
     version = "1.0.0"
