@@ -65,7 +65,11 @@ object ShopCodecs : Codecs by KotlinxCodecs {
     })
 }
 
-fun shopCodecs(listed: () -> List<PetDto>, json: () -> String): Codecs = object : Codecs by ShopCodecs {
+fun shopCodecs(
+    listed: () -> List<PetDto>,
+    json: () -> String,
+    bytes: () -> ByteArray,
+): Codecs = object : Codecs by ShopCodecs {
     @Suppress("UNCHECKED_CAST")
     override fun <T> codec(type: KType): BodyCodec<T> =
         if (type.describesPets()) listing as BodyCodec<T> else ShopCodecs.codec(type)
@@ -81,6 +85,8 @@ fun shopCodecs(listed: () -> List<PetDto>, json: () -> String): Codecs = object 
             if (value === listed()) json() else plain.encodeToString(value)
 
         override fun decodeFromString(text: String): List<PetDto> = plain.decodeFromString(text)
+
+        override fun encoded(value: List<PetDto>): ByteArray? = if (value === listed()) bytes() else null
     }
 }
 

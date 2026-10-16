@@ -89,7 +89,7 @@ private val web: Module =
             feed::watch,
             sdk,
             listed = window::listed,
-            codecs = shopCodecs(window::listed, window::json),
+            codecs = shopCodecs(window::listed, window::json, window::bytes),
         )
     } +
         single { api: Api, config: Settings, _: Arrivals, _: OutboxRelay, _: ReadinessGauges, _: JvmGcMetrics ->
