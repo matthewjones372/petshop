@@ -47,12 +47,15 @@ class ShopWindow {
 
     fun json(): String = shown.get().json
 
+    fun bytes(): ByteArray = shown.get().bytes
+
     internal fun show(pets: Map<PetId, Pet>) {
         val now = shown.get()
         if (now.byId === pets) return
         val ordered = pets.values.sortedBy { it.id.value }
         val listed = ordered.toDto()
-        shown.set(Shelf(ordered, pets, listed, catalogueJson.encodeToString(listed)))
+        val json = catalogueJson.encodeToString(listed)
+        shown.set(Shelf(ordered, pets, listed, json, json.toByteArray(Charsets.UTF_8)))
     }
 }
 
@@ -61,6 +64,7 @@ private class Shelf(
     val byId: Map<PetId, Pet> = emptyMap(),
     val listed: List<PetDto> = emptyList(),
     val json: String = catalogueJson.encodeToString(emptyList<PetDto>()),
+    val bytes: ByteArray = json.toByteArray(Charsets.UTF_8),
 )
 
 private val catalogueJson = ShopCodecs.codec<List<PetDto>>(typeOf<List<PetDto>>())
