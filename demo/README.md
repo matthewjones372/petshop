@@ -374,7 +374,7 @@ name otherwise. Docker Desktop ignores it.
 | `alertmanager/alertmanager.yml` | routes every alert nowhere: Estate reads them, and keeps its silences there |
 | `grafana/provisioning/` | the Prometheus, Tempo and Loki datasources, Loki's lines linking to Tempo by `trace_id`, and the dashboard provider |
 | `grafana/dashboards/petshop.json` | the dashboard itself |
-| `estate/catalog.yaml` | the petshop and its front end as two services in one environment, with its Postgres and Kafka as stores: the shop's load from adoptions, its JVM and pool, the front end's from Tempo's span metrics, the stores' stats, the vitals, the map, and the adoption as a journey through them |
+| `estate/catalog.yaml` | the petshop and its front end as two services in one environment, with its Postgres and Kafka as stores: the shop's load from every request it served, adoptions as their own rate, its JVM and pool, the front end's from Tempo's span metrics, the stores' stats, the vitals, the map, and the adoption as a journey through them |
 | `estate/estate.yaml` | Estate's settings: no sign-in (every visitor is an operator), the demo's Prometheus, Alertmanager, Loki and Tempo as its sources, and `tools` as its cluster, Argo CD and GitHub Actions |
 | `estate/estate-ai.yaml` | `estate.yaml` with Ask AI turned on, read when Compose is started with `docker-compose.ai.yml` |
 | `tools/fake.ts` | the stand-in for GitHub Actions, Argo CD and Kubernetes: a release of each service on a cadence of its own, worked out from the clock |
