@@ -20,16 +20,31 @@ object ShopCodecs : Codecs by KotlinxCodecs {
 
     @Suppress("UNCHECKED_CAST")
     override fun <T> codec(type: KType): BodyCodec<T> =
-        if (type.isHealth) health as BodyCodec<T> else KotlinxCodecs.codec(type)
+        when {
+            type.isHealth -> health as BodyCodec<T>
+            type.describesPets() -> listing as BodyCodec<T>
+            else -> KotlinxCodecs.codec(type)
+        }
 
     // Delegated, this would call KotlinxCodecs' own codec(type) and miss the one above.
     override fun <T> codec(type: KType, mediaType: String): BodyCodec<T> =
-        if (type.isHealth) codec(type) else KotlinxCodecs.codec(type, mediaType)
+        if (type.isHealth || type.describesPets()) codec(type) else KotlinxCodecs.codec(type, mediaType)
 
     override fun schema(type: KType, components: SchemaComponents): JsonObj =
         KotlinxCodecs.schema(if (type.isHealth) typeOf<Report>() else type, components)
 
     private val KType.isHealth get() = classifier == HealthReport::class
+
+    private val listing = object : BodyCodec<List<PetDto>> {
+        private val plain = KotlinxCodecs.codec<List<PetDto>>(typeOf<List<PetDto>>())
+
+        override fun encodeToString(value: List<PetDto>): String =
+            if (value is Catalogue) value.json else plain.encodeToString(value)
+
+        override fun decodeFromString(text: String): List<PetDto> = plain.decodeFromString(text)
+
+        override fun encoded(value: List<PetDto>): ByteArray? = (value as? Catalogue)?.bytes
+    }
 
     private val health = object : BodyCodec<HealthReport> {
         private val report = KotlinxCodecs.codec<Report>(typeOf<Report>())
@@ -63,31 +78,6 @@ object ShopCodecs : Codecs by KotlinxCodecs {
     private fun Report.original() = HealthReport(status, checks.mapValues { (_, results) ->
         results.map { CheckResult(it.status, it.observedValue, it.observedUnit, it.time, it.componentType, it.output) }
     })
-}
-
-fun shopCodecs(
-    listed: () -> List<PetDto>,
-    json: () -> String,
-    bytes: () -> ByteArray,
-): Codecs = object : Codecs by ShopCodecs {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T> codec(type: KType): BodyCodec<T> =
-        if (type.describesPets()) listing as BodyCodec<T> else ShopCodecs.codec(type)
-
-    @Suppress("UNCHECKED_CAST")
-    override fun <T> codec(type: KType, mediaType: String): BodyCodec<T> =
-        if (type.describesPets()) codec(type) else ShopCodecs.codec(type, mediaType)
-
-    private val listing = object : BodyCodec<List<PetDto>> {
-        private val plain = ShopCodecs.codec<List<PetDto>>(typeOf<List<PetDto>>())
-
-        override fun encodeToString(value: List<PetDto>): String =
-            if (value === listed()) json() else plain.encodeToString(value)
-
-        override fun decodeFromString(text: String): List<PetDto> = plain.decodeFromString(text)
-
-        override fun encoded(value: List<PetDto>): ByteArray? = if (value === listed()) bytes() else null
-    }
 }
 
 private fun KType.describesPets(): Boolean =

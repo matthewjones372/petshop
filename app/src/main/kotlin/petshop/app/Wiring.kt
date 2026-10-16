@@ -33,7 +33,6 @@ import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk
 import kotlin.time.Duration
 import petshop.api.petshopApi
 import petshop.api.petshopDocs
-import petshop.api.shopCodecs
 import petshop.domain.PetShop
 
 /** [host] is loopback unless something outside this machine has to reach the port. */
@@ -91,7 +90,6 @@ private val web: Module =
             feed::watch,
             sdk,
             listed = window::listed,
-            codecs = shopCodecs(window::listed, window::json, window::bytes),
             requests = { counter("petshop.requests").increment() },
         )
     } +

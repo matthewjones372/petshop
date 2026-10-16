@@ -10,7 +10,6 @@ import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.kotest.matchers.should
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.beTheSameInstanceAs
 import kotlin.reflect.typeOf
 import org.junit.jupiter.api.Test
@@ -37,38 +36,52 @@ class CatalogueCodecSpec {
 
     @Test
     fun `each shop serves the json published with its own catalogue`() {
-        val plantedNibbles = """[{"planted":"nibbles"}]"""
-        val plantedBarnaby = """[{"planted":"barnaby"}]"""
-        val pets = typeOf<List<PetDto>>()
-        val nibblesCodecs = shopCodecs({ nibbles }, { plantedNibbles }, { plantedNibbles.toByteArray() })
-        val barnabyCodecs = shopCodecs({ barnaby }, { plantedBarnaby }, { plantedBarnaby.toByteArray() })
+        val nibblesJson = """[{"id":1,"name":"Nibbles","species":"Tortoise","adopted":false}]"""
+        val barnabyJson = """[{"id":2,"name":"Barnaby","species":"Dog","adopted":false}]"""
+        val one = Catalogue(nibbles)
+        val other = Catalogue(barnaby)
+        val codec = ShopCodecs.codec<List<PetDto>>(typeOf<List<PetDto>>())
 
-        nibblesCodecs.codec<List<PetDto>>(pets).encodeToString(nibbles) shouldBe plantedNibbles
-        barnabyCodecs.codec<List<PetDto>>(pets).encodeToString(barnaby) shouldBe plantedBarnaby
-        nibblesCodecs.codec<List<PetDto>>(pets).encodeToString(nibbles.toList()) shouldNotBe plantedNibbles
-        nibblesCodecs.codec<List<PetDto>>(pets).encodeToString(barnaby) shouldBe
-            ShopCodecs.codec<List<PetDto>>(pets).encodeToString(barnaby)
+        codec.encodeToString(one) shouldBe nibblesJson
+        codec.encodeToString(other) shouldBe barnabyJson
+        codec.encodeToString(one.toList()) shouldBe nibblesJson
+        codec.decodeFromString(nibblesJson) shouldBe nibbles
+        codec.decodeFrom(barnabyJson.toByteArray()) shouldBe barnaby
 
-        served({ nibbles }, { plantedNibbles }).response(listPets, Unit).body shouldBe plantedNibbles
-        served({ barnaby }, { plantedBarnaby }).response(listPets, Unit).body shouldBe plantedBarnaby
+        served { one }.response(listPets, Unit).body shouldBe nibblesJson
+        served { other }.response(listPets, Unit).body shouldBe barnabyJson
     }
 
     @Test
-    fun `each shop serves the bytes published with its own catalogue`() {
-        val nibblesBytes = byteArrayOf(1, 2, 3, 4)
-        val barnabyBytes = byteArrayOf(5, 6, 7, 8)
+    fun `each catalogue reuses its own bytes`() {
+        val one = Catalogue(nibbles)
+        val other = Catalogue(barnaby)
         val pets = typeOf<List<PetDto>>()
-        val nibblesCodec = shopCodecs({ nibbles }, { "nibbles" }, { nibblesBytes }).codec<List<PetDto>>(pets)
-        val barnabyCodec = shopCodecs({ barnaby }, { "barnaby" }, { barnabyBytes }).codec<List<PetDto>>(pets)
+        val codec = ShopCodecs.codec<List<PetDto>>(pets)
+        val typedCodec = ShopCodecs.codec<List<PetDto>>(pets, "application/json")
+        val bytes = requireNotNull(codec.encoded(one))
 
-        nibblesCodec.encoded(nibbles) should beTheSameInstanceAs<ByteArray?>(nibblesBytes)
-        nibblesCodec.encoded(nibbles.toList()) shouldBe null
-        nibblesCodec.encoded(barnaby) shouldBe null
-        barnabyCodec.encoded(barnaby) should beTheSameInstanceAs<ByteArray?>(barnabyBytes)
-        barnabyCodec.encoded(nibbles) shouldBe null
+        typedCodec.encoded(one) should beTheSameInstanceAs<ByteArray?>(bytes)
+        bytes.decodeToString() shouldBe
+            """[{"id":1,"name":"Nibbles","species":"Tortoise","adopted":false}]"""
+        codec.encoded(one.toList()) shouldBe null
+        (requireNotNull(codec.encoded(other)) === bytes) shouldBe false
     }
 
-    private fun served(listed: () -> List<PetDto>, json: () -> String) = petshopApi(
+    @Test
+    fun `a catalogue stays consistent when the list it was built from changes`() {
+        val source = mutableListOf(nibbles.single(), barnaby.single())
+        val catalogue = Catalogue(source)
+        val codec = ShopCodecs.codec<List<PetDto>>(typeOf<List<PetDto>>())
+        val bytes = requireNotNull(codec.encoded(catalogue))
+
+        source.clear()
+
+        catalogue shouldBe listOf(nibbles.single(), barnaby.single())
+        codec.decodeFrom(bytes) shouldBe catalogue
+    }
+
+    private fun served(listed: () -> List<PetDto>) = petshopApi(
         Forks(),
         shop,
         health { },
@@ -76,6 +89,5 @@ class CatalogueCodecSpec {
         tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
         watch = { Stream.empty() },
         listed = listed,
-        codecs = shopCodecs(listed, json) { json().toByteArray() },
     ).inMemory(Handlers.onVirtualThreads)
 }
