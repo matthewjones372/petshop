@@ -35,7 +35,7 @@ private fun onItsOwn(test: (Outbox) -> Unit) =
 private fun Outbox.left(): List<ShopEvent> {
     val seen = mutableListOf<ShopEvent>()
     claim(1_000) { claimed ->
-        seen += claimed.map { it.event };
+        seen += claimed.map { it.event }
         emptyList()
     }
     return seen
@@ -88,7 +88,7 @@ class PostgresOutboxSpec {
             val carried = When("a claim reads it back") {
                 val seen = mutableListOf<Claimed>()
                 outbox.claim(10) { claimed ->
-                    seen += claimed;
+                    seen += claimed
                     emptyList()
                 }
                 seen.single().carried
@@ -141,7 +141,7 @@ class PostgresOutboxSpec {
             val beside = And("a second claim runs beside it") {
                 CompletableFuture.supplyAsync {
                     outbox.claim(10) { claimed ->
-                        seenBeside += claimed.map { it.event };
+                        seenBeside += claimed.map { it.event }
                         emptyList()
                     }
                 }.get(5, TimeUnit.SECONDS)
@@ -201,8 +201,8 @@ private data class Tables(val dataSource: DataSource)
 private val migrated: Module =
     (
         Petshop.module.onAFreshDatabase() + single { source: DataSource, _: Migrated ->
-        Tables(
-            source,
-        )
-    }
-    ).subgraph<Tables>()
+            Tables(
+                source,
+            )
+        }
+        ).subgraph<Tables>()

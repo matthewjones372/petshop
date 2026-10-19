@@ -48,7 +48,7 @@ private val telemetry: Module =
     singleOf<PrometheusMeterRegistry>(
         { PrometheusMeterRegistry(PrometheusConfig.DEFAULT).also(MicrometerRegistries::addRegistry) },
         { registry ->
-            MicrometerRegistries.removeRegistry(registry);
+            MicrometerRegistries.removeRegistry(registry)
             registry.close()
         },
     ) +

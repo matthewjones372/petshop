@@ -188,13 +188,12 @@ class PetshopLoadTest {
         }
     }
 
-    private fun instance(database: DatabaseSettings, port: Int): Module =
-        (
-            calling.onDatabase(database) + single { server: PelicanServer, arrivals: Arrivals, projection: Projection ->
+    private fun instance(database: DatabaseSettings, port: Int): Module = (
+        calling.onDatabase(database) + single { server: PelicanServer, arrivals: Arrivals, projection: Projection ->
             Instance(server.baseUrl, arrivals, projection)
         }
         )
-            .overridingConfig("petshop.port = $port\npetshop.arrivalsEvery = 5ms\npetshop.outboxEvery = 20ms")
+        .overridingConfig("petshop.port = $port\npetshop.arrivalsEvery = 5ms\npetshop.outboxEvery = 20ms")
 }
 
 internal val REPORTS: Path = Path.of("build/reports/proofload")

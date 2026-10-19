@@ -73,15 +73,24 @@ object ShopCodecs : Codecs by KotlinxCodecs {
     private fun HealthReport.copied() = Report(
         status,
         checks.mapValues { (_, results) ->
-        results.map { Result(it.status, it.observedValue, it.observedUnit, it.time, it.componentType, it.output) }
-    }
+            results.map { Result(it.status, it.observedValue, it.observedUnit, it.time, it.componentType, it.output) }
+        },
     )
 
     private fun Report.original() = HealthReport(
         status,
         checks.mapValues { (_, results) ->
-        results.map { CheckResult(it.status, it.observedValue, it.observedUnit, it.time, it.componentType, it.output) }
-    }
+            results.map {
+                CheckResult(
+                    it.status,
+                    it.observedValue,
+                    it.observedUnit,
+                    it.time,
+                    it.componentType,
+                    it.output,
+                )
+            }
+        },
     )
 }
 

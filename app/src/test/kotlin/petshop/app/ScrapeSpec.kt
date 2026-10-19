@@ -61,9 +61,9 @@ class ScrapeSpec {
         val service = Given("the shop on a fresh database") {
             (
                 Petshop.module.overriding(
-                single<ChipRegistry> { FakeRegistry() },
-            ).onAFreshDatabase() + scraped
-            ).subgraph<Scraped>()
+                    single<ChipRegistry> { FakeRegistry() },
+                ).onAFreshDatabase() + scraped
+                ).subgraph<Scraped>()
         }
         testApp(service) { app: Scraped ->
             val scrape = When("Prometheus scrapes it") { app.registry.scrape() }
