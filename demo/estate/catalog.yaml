@@ -15,9 +15,10 @@ services:
     deploy: { argo: { application: petshop } }
     runtime: { kubernetes: { namespace: shop, workloads: [ { kind: Deployment, name: petshop } ] } }
     # Requests are every call the shop served. A declared refusal is an answer, not an error.
-    # No p99: the adoption timer is a summary without percentiles.
+    # p99 is the adoption's span from Tempo's span metrics: the adoption timer is a summary, which has no buckets.
     load:
       requests: sum(rate(petshop_requests_total[1m]))
+      p99: 'histogram_quantile(0.99, sum by (le) (rate(traces_spanmetrics_latency_bucket{service="petshop", span_name="adopt"}[5m])))'
       errors: sum(rate(petshop_adoptions_total{outcome=~"registry_down|not_recorded"}[1m])) or vector(0)
     links:
       # The front end in web/, served by compose's `web` service, or by `bun run --cwd web dev`.
