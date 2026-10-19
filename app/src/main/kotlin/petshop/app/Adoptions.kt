@@ -3,9 +3,12 @@ package petshop.app
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
+import io.github.matthewjones372.lark.actor.ActorRef
+import io.github.matthewjones372.lark.actor.AskFailure
 import io.github.matthewjones372.lark.actor.Behaviour
 import io.github.matthewjones372.lark.actor.Next
 import io.github.matthewjones372.lark.actor.Reply
+import io.github.matthewjones372.lark.actor.ask
 import io.github.matthewjones372.lark.actor.become
 import io.github.matthewjones372.lark.actor.behaviour
 import io.github.matthewjones372.lark.actor.onStart
@@ -25,6 +28,7 @@ import petshop.domain.PetReturned
 import petshop.domain.PetShopError
 import petshop.domain.ShopEvent
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.time.Duration
 
 /** The shop's only writer: one message at a time, so of two racing adopters the second is refused. */
 sealed interface Shop
@@ -34,6 +38,10 @@ data class Arrived(val pet: Pet) : Shop
 data class Adopt(val id: PetId, val by: String, val reply: Reply<Either<PetShopError, Pet>>) : Shop
 
 data class Returned(val id: PetId, val reply: Reply<Unit>) : Shop
+
+data class Ping(val reply: Reply<Unit>) : Shop
+
+fun ActorRef<Shop>.answers(within: Duration): Either<AskFailure, Unit> = ask(within) { reply -> Ping(reply) }
 
 class ShopWindow {
     private val shown = AtomicReference(Shelf())
@@ -79,6 +87,8 @@ fun shop(outbox: Outbox, window: ShopWindow, pets: Map<PetId, Pet> = emptyMap())
             is Adopt -> adopt(state, message)
 
             is Returned -> returned(state, message.id).also { message.reply(Unit) }
+
+            is Ping -> stay().also { message.reply(Unit) }
         }
     }.onStart { window.show(pets) }
 }
