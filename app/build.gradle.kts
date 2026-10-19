@@ -8,6 +8,9 @@ plugins {
 
 application { mainClass.set("petshop.app.MainKt") }
 
+// lark-app warns when an incremental compile cannot see a graph's source, and warnings are errors.
+tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileKotlin") { incremental = false }
+
 // LOKI_URL picks logback-loki.xml, so a run without it, and every test, never tries to reach Loki.
 tasks.named<JavaExec>("run") {
     providers.environmentVariable("LOKI_URL").orNull?.let { systemProperty("logback.configurationFile", "logback-loki.xml") }
