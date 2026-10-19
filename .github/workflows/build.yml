@@ -31,7 +31,20 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
 
       - name: Build and test
-        run: ./gradlew build --stacktrace
+        run: ./gradlew build --stacktrace koverXmlReport
+      - name: Keep the test and coverage reports for Gauntlet
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/gauntlet-reports"
+          find . \( -path '*/build/test-results/*.xml' -o -path '*/build/reports/kover/*.xml' -o -path '*/build/reports/jacoco/*.xml' -o -path '*/target/test-reports/*.xml' -o -path '*/coverage-report/cobertura.xml' \) -not -path './.git/*' | while read -r f; do mkdir -p "$RUNNER_TEMP/gauntlet-reports/$(dirname "$f")"; cp "$f" "$RUNNER_TEMP/gauntlet-reports/$f"; done
+      - name: Upload the reports for Gauntlet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gauntlet-reports-build
+          path: ${{ runner.temp }}/gauntlet-reports
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload test reports
         if: failure()
