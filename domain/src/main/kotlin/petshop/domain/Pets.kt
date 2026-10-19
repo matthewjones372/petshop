@@ -6,8 +6,6 @@ enum class Species { Cat, Dog, Parrot, Tortoise }
 
 data class Pet(val id: PetId, val name: String, val species: Species, val adopted: Boolean = false)
 
-data class Adoption(val pet: PetId, val by: String)
-
 sealed interface PetShopError {
     val message: String
 }
