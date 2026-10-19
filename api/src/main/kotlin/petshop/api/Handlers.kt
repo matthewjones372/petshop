@@ -13,6 +13,7 @@ import io.github.matthewjones372.pelican.jetty.streamedNow
 import io.github.matthewjones372.pelican.metrics.otel.openTelemetry
 import io.github.matthewjones372.pelican.ok
 import io.opentelemetry.api.OpenTelemetry
+import petshop.domain.Adopting
 import petshop.domain.NoSuchPet
 import petshop.domain.PetId
 import petshop.domain.PetShop
@@ -42,12 +43,13 @@ fun petshopApi(
                     when (val problem = failure.toDto()) {
                         is ProblemDto.NoSuchPet -> petMissing(problem)
                         is ProblemDto.AlreadyAdopted -> petTaken(problem)
+                        is ProblemDto.BeingAdopted -> petBeingAdopted(problem)
                         is ProblemDto.NotChipped -> petNotChipped(problem)
                         is ProblemDto.RegistryDown -> registryDown(problem)
                         is ProblemDto.NotRecorded -> notRecorded(problem)
                     }
                 },
-                { pet -> ok(pet.toDto()) },
+                { pet -> if (pet.standing is Adopting) adoptionPending(pet.toDto()) else ok(pet.toDto()) },
             )
         },
         metrics handledNow { scrape() },

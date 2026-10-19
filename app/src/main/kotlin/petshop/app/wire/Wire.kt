@@ -24,10 +24,6 @@ data class PetArrived(override val seq: Long, val pet: Pet) : WireEvent
 data class PetAdopted(override val seq: Long, val pet: Pet, val by: String) : WireEvent
 
 @Serializable
-@SerialName("petshop.events.PetReturned")
-data class PetReturned(override val seq: Long, val pet: Pet) : WireEvent
-
-@Serializable
 @SerialName("petshop.events.Pet")
 data class Pet(val id: Long, val name: String, val species: Species, val adopted: Boolean)
 

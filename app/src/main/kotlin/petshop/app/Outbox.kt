@@ -39,6 +39,9 @@ interface Outbox {
     /** Writes [pet] and its event, with the next `seq`, in one transaction. */
     fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent
 
+    /** Writes [pet] with no event: a change nobody outside the shop hears about. */
+    fun keep(pet: Pet)
+
     fun shelf(opening: List<Pet>): List<Pet>
 
     /** Unpublished events, oldest first, held while [publish] runs. Only what [publish] answers leaves the outbox. */

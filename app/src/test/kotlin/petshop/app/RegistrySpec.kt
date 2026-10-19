@@ -14,7 +14,9 @@ import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import petshop.domain.Adopted
 import petshop.domain.NotChipped
+import petshop.domain.OnShelf
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.RegistryDown
@@ -45,7 +47,7 @@ class RegistrySpec {
             registry.stub(recordKeeper, In2(chip.number, NewKeeper("Ada"))) answers ok(chip.copy(keeper = "Ada"))
         }
         val adopted = When("Ada adopts Nibbles") { testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") } }
-        Then("Nibbles is hers") { adopted.shouldBeRight().adopted shouldBe true }
+        Then("Nibbles is hers") { adopted.shouldBeRight().standing shouldBe Adopted("Ada") }
         And("the keeper was recorded against the chip the lookup answered with") {
             registry.verify(recordKeeper, In2(chip.number, NewKeeper("Ada")))
         }
@@ -60,7 +62,7 @@ class RegistrySpec {
             testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1)) }
         }
         Then("she is told Nibbles has no chip") { answer shouldBeLeft NotChipped(1) }
-        And("Nibbles stays in the shop") { after?.adopted shouldBe false }
+        And("Nibbles stays in the shop") { after?.standing shouldBe OnShelf }
         And("with no chip to transfer, nothing was sent") { registry.calls(recordKeeper) shouldBe 0 }
     }
 
@@ -93,7 +95,7 @@ class RegistrySpec {
         Then("Ada is told the registry is down") { refused shouldBeLeft RegistryDown(1) }
         And(
             "her adoption was undone, so Nibbles was still there for Bea",
-        ) { retried.shouldBeRight().adopted shouldBe true }
+        ) { retried.shouldBeRight().standing shouldBe Adopted("Bea") }
     }
 
     @Test

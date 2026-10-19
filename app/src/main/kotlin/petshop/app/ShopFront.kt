@@ -1,13 +1,17 @@
 package petshop.app
 
 import arrow.core.Either
+import io.github.matthewjones372.lark.actor.ActorRef
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.actor.actor
 import io.github.matthewjones372.lark.app.actor.actors
 import io.github.matthewjones372.lark.app.boundTo
+import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.stream.StreamBackend
 import io.opentelemetry.api.trace.Tracer
+import petshop.domain.ChipRegistry
 import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.PetShop
@@ -39,7 +43,9 @@ val theShop: Module =
         actor<Shop, Outbox, ShopWindow>("shop") { outbox, window ->
             shop(outbox, window, outbox.shelf(opening).associateBy { it.id })
         } +
-        singleOf(::Adoption) +
+        closingOf { ref: ActorRef<Shop>, registry: ChipRegistry, window: ShopWindow, streams: StreamBackend ->
+            Adoption(ref, registry, window, streams)
+        } +
         single { window: ShopWindow, adoption: Adoption, tracer: Tracer ->
             ObservedShop(ShopFront(window, adoption), tracer)
         }.boundTo<PetShop>()

@@ -4,6 +4,7 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.json
+import io.github.matthewjones372.pelican.or
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
 import io.github.matthewjones372.pelican.text
@@ -16,7 +17,14 @@ val petId = pathParam<Long>("petId", description = "The pet's id")
 
 val petMissing = errorJson<ProblemDto.NoSuchPet>(404, "No pet with that id")
 
-val petTaken = errorJson<ProblemDto.AlreadyAdopted>(409, "That pet has already been adopted")
+// Both are a 409, so the tag tells a client which.
+val petTaken = errorJson<ProblemDto.AlreadyAdopted>(409, "That pet has already been adopted").tagged("already_adopted")
+
+val petBeingAdopted = errorJson<ProblemDto.BeingAdopted>(
+    409,
+    "That pet is being adopted; it may come back to the shelf",
+)
+    .tagged("being_adopted")
 
 val petNotChipped = errorJson<ProblemDto.NotChipped>(422, "The registry has no chip for that pet")
 
@@ -42,11 +50,20 @@ val getPet = endpoint(petId) {
     json<PetDto>() orFail petMissing
 }
 
+val adoptionPending = json<PetDto>(202, description = "Recorded; the chip registry has yet to confirm it")
+
 val adoptPet = endpoint(petId) {
     post("pets" / petId / "adoption")
     tag("pets")
     summary = "Take a pet home"
-    json<PetDto>().orFail(petMissing, petTaken, petNotChipped, registryDown, notRecorded)
+    (json<PetDto>() or adoptionPending).orFail(
+        petMissing,
+        petTaken,
+        petBeingAdopted,
+        petNotChipped,
+        registryDown,
+        notRecorded,
+    )
 }
 
 /** `text`, not `json`: Prometheus cannot parse its exposition format wrapped in a JSON string. */

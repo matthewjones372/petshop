@@ -16,14 +16,35 @@ import org.apache.kafka.common.serialization.Deserializer
 import org.apache.kafka.common.serialization.Serializer
 import petshop.app.wire.ShopEventRecord
 import petshop.app.wire.WireEvent
+import petshop.domain.Adopted
+import petshop.domain.OnShelf
+import petshop.domain.Pet
+import petshop.domain.PetAdopted
+import petshop.domain.PetArrived
+import petshop.domain.PetId
 import petshop.domain.ShopEvent
+import petshop.domain.Standing
 import java.io.IOException
+import petshop.app.wire.Pet as WirePet
+import petshop.app.wire.PetAdopted as WirePetAdopted
+import petshop.app.wire.PetArrived as WirePetArrived
 
 val shopEventSchema: Schema = Avro.schema<ShopEventRecord>()
 
-fun ShopEvent.toWire(): WireEvent = transformInto()
+// By hand, not kimney: the wire's pet says only whether it is adopted, and the event says by whom.
+fun ShopEvent.toWire(): WireEvent = when (this) {
+    is PetArrived -> WirePetArrived(seq, pet.toWire())
+    is PetAdopted -> WirePetAdopted(seq, pet.toWire(), by)
+}
 
-fun WireEvent.toDomain(): ShopEvent = transformInto()
+fun WireEvent.toDomain(): ShopEvent = when (this) {
+    is WirePetArrived -> PetArrived(seq, pet.toDomain(OnShelf))
+    is WirePetAdopted -> PetAdopted(seq, pet.toDomain(Adopted(by)), by)
+}
+
+private fun Pet.toWire() = WirePet(id.value, name, species.transformInto(), adopted = standing !is OnShelf)
+
+private fun WirePet.toDomain(standing: Standing) = Pet(PetId(id), name, species.transformInto(), standing)
 
 class ShopEventSerializer(registry: Map<String, Any>) : Serializer<ShopEvent> {
 

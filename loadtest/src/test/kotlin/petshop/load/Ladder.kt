@@ -229,7 +229,7 @@ private fun DatabaseSettings.stocked(pets: Int): DatabaseSettings = also {
 private fun DatabaseSettings.adoptedOnTheShelf(): Long =
     DriverManager.getConnection(url, user, password.reveal()).use { connection ->
         connection.createStatement().use { statement ->
-            statement.executeQuery("SELECT count(*) FROM pets WHERE adopted").use { rows ->
+            statement.executeQuery("SELECT count(*) FROM pets WHERE standing <> 'on_shelf'").use { rows ->
                 rows.next()
                 rows.getLong(1)
             }

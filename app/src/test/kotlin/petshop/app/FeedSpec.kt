@@ -16,6 +16,7 @@ import io.github.matthewjones372.lark.test.eventually
 import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import petshop.domain.Adopted
 import petshop.domain.ChipRegistry
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
@@ -36,7 +37,7 @@ class FeedSpec {
     @Test
     fun `a watcher sees each event once, however often the bus delivers it`() = story {
         val barnaby = Given("Bea's adoption of Barnaby, and then a parrot arriving") {
-            PetAdopted(seq = 7, pet = Pet(PetId(2), "Barnaby", Species.Dog, adopted = true), by = "Bea")
+            PetAdopted(seq = 7, pet = Pet(PetId(2), "Barnaby", Species.Dog, standing = Adopted("Bea")), by = "Bea")
         }
         val pickle = PetArrived(seq = 8, pet = Pet(PetId(9), "Pickle", Species.Parrot))
         testApp(watched) { app: Watched ->
@@ -74,7 +75,7 @@ class FeedSpec {
     fun `with nobody watching, the feed holds nothing back for the first watcher`() = story {
         testApp(watched) { app: Watched ->
             When("an adoption is delivered before anyone watches") {
-                val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise, adopted = true)
+                val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise, standing = Adopted("Ada"))
                 app.bus.publish(PetAdopted(seq = 3, pet = nibbles, by = "Ada"))
             }
             Then("the projection has counted it").eventually(5.seconds) { app.projection.tally().events shouldBe 1 }

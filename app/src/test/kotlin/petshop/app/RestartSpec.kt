@@ -13,6 +13,8 @@ import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import petshop.domain.Adopted
+import petshop.domain.Adopting
 import petshop.domain.AlreadyAdopted
 import petshop.domain.ChipRegistry
 import petshop.domain.PetId
@@ -41,7 +43,7 @@ class RestartSpec {
             }
         }
         testApp(shop) { app: Running ->
-            Then("the restarted shop has Nibbles adopted") { app.shop.find(PetId(1))?.adopted shouldBe true }
+            Then("the restarted shop has Nibbles adopted") { app.shop.find(PetId(1))?.standing shouldBe Adopted("Ada") }
             And("somebody asking for her is told she is taken") {
                 app.shop.adopt(PetId(1), by = "Bea") shouldBeLeft AlreadyAdopted(1)
             }
@@ -54,4 +56,27 @@ class RestartSpec {
                 }
         }
     }
+
+    @Test
+    fun `an adoption left unconfirmed when the shop stopped is settled when it starts again`() = story {
+        val down = ScriptedRegistry(
+            transfers = { ScriptedRegistry.Transfer.RecordsButLosesTheAnswer },
+            answers = { _, n -> n == 1 },
+        )
+        When("Ada adopts Nibbles, the registry records her but cannot be read back, and the shop stops") {
+            testApp(shopCalling(down)) { app: Running ->
+                app.shop.adopt(PetId(1), by = "Ada").shouldBeRight().standing shouldBe Adopting("Ada")
+            }
+        }
+        val back = ScriptedRegistry(keepers = mapOf(PetId(1) to "Ada"))
+        testApp(shopCalling(back)) { app: Running ->
+            Then("the restarted shop asks the registry, which says Ada keeps her").eventually(5.seconds) {
+                app.shop.find(PetId(1))?.standing shouldBe Adopted("Ada")
+            }
+        }
+    }
+
+    private fun shopCalling(registry: ChipRegistry): Module =
+        (Petshop.module.overriding(single<ChipRegistry> { registry }).onDatabase(database) + running)
+            .subgraph<Running>()
 }
