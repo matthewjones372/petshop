@@ -266,7 +266,8 @@ Actions, named for a plausible commit; two minutes later Argo CD applies it and 
 `main-<n>-<sha>`. The front end does the same every fourteen minutes, with one pod. So the cards carry a running
 version and a rail, the feed reads "build passed" and then "main-199-26d8c47 applied", and an alert that fires soon
 after a release says so. None of it is real: the shop is still the process on your machine, whatever version the
-card says. There is no p99 for the shop either: the adoption timer is a summary without percentiles.
+card says. The shop's p99 is its `adopt` span's, from Tempo's span metrics, so it shows only while the shop runs with
+`OTEL_EXPORTER_OTLP_ENDPOINT` set: the adoption timer is a summary, which has no buckets.
 
 Estate reads the adoption's traces too. The catalog names it as a journey, *Adoption, click to screen*, with a stage
 for each step from the click to `live event`, and on the `petshop` and `petshop-web` pages *Show where its time goes*
