@@ -8,7 +8,7 @@ protect {
   tests    "**/src/test/**"
   fixtures "**/src/test/resources/**", "**/src/testFixtures/**"
   config   "*.gradle.kts", "**/*.gradle.kts", "gradle/**", ".github/workflows/**",
-           "web/biome.json", "web/tsconfig.json"
+           "web/biome.json", "web/tsconfig.json", "config/detekt/**"
 }
 
 // Migrations, the transactional outbox and the database credentials. A mistake here loses or
@@ -46,7 +46,7 @@ arch {
 }
 
 suites {
-  unit "**/src/test/**"
+  unit "{domain,registry,api,app}/src/test/**"
 }
 
 // Ratchets keep each file from getting worse; the floors apply to new and changed lines only, so old code doesn't block a change.
