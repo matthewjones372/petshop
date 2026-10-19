@@ -1,0 +1,67 @@
+// Petshop's Gauntlet policy, decided with the repository owner during `gauntlet-setup`.
+gauntlet "petshop"
+use jvm, typescript
+mode shadow // report only, never block. Switch to enforce once `gauntlet report shadow` looks right.
+owners @matthewjones372
+
+protect {
+  tests    "**/src/test/**"
+  fixtures "**/src/test/resources/**", "**/src/testFixtures/**"
+  config   "*.gradle.kts", "**/*.gradle.kts", "gradle/**", ".github/workflows/**",
+           "web/biome.json", "web/tsconfig.json"
+}
+
+// Migrations, the transactional outbox and the database credentials. A mistake here loses or
+// duplicates events, or leaks the adopter names the outbox stores.
+zone data {
+  paths "app/src/main/resources/db/**", "app/src/main/resources/application.conf",
+        "app/src/main/kotlin/petshop/app/Database.kt", "app/src/main/kotlin/petshop/app/Outbox.kt",
+        "app/src/main/kotlin/petshop/app/PostgresOutbox.kt", "outbox-table/**"
+  owner @matthewjones372
+  rule kotlin.no-run-catching
+}
+
+// What other systems depend on: the HTTP API and its OpenAPI document, the Avro records on the
+// bus, and the registry client generated from its contract.
+zone contracts {
+  paths "api/src/main/**", "app/src/main/kotlin/petshop/app/Avro.kt",
+        "app/src/main/kotlin/petshop/app/KafkaBus.kt", "app/src/main/kotlin/petshop/app/wire/**",
+        "registry/**"
+  owner @matthewjones372
+  rule kotlin.no-run-catching
+}
+
+// The core model: pure values and Either, never exceptions or mutation.
+zone domain {
+  paths "domain/src/main/**"
+  owner @matthewjones372
+  rule kotlin.no-throw, kotlin.no-var, kotlin.no-mutable-collections, kotlin.no-null-assertion,
+       kotlin.no-run-catching
+}
+
+arch {
+  module domain must not depend on api, app, registry, outbox-table
+  module api must not depend on app, registry
+  module registry must not depend on api, app
+}
+
+suites {
+  unit "**/src/test/**"
+}
+
+// Ratchets keep each file from getting worse; the floors apply to new and changed lines only, so old code doesn't block a change.
+gates {
+  fast   { build, lint ratchet, arch }
+  verify { unit, coverage ratchet >= 80% on changed, mutation advise on changed }
+}
+
+on fail coverage { fix "Add tests for the uncovered changed lines listed in the report." }
+
+predicate small = diff < 150 lines and no zone touched
+
+review {
+  owner  when zone touched
+  review when protected changed
+  review when dependency added
+  auto   when small and all gates pass
+}
