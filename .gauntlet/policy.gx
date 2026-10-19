@@ -45,14 +45,17 @@ arch {
   module registry must not depend on api, app
 }
 
+// loadtest's tests measure the machine and run only as `./gradlew loadTest`. domain and registry
+// get a suite of their own once they have tests.
 suites {
-  unit "{domain,registry,api,app}/src/test/**"
+  unit    "api/src/test/**"
+  service "app/src/test/**"
 }
 
 // Ratchets keep each file from getting worse; the floors apply to new and changed lines only, so old code doesn't block a change.
 gates {
   fast   { build, lint ratchet, arch }
-  verify { unit, coverage ratchet >= 80% on changed, mutation advise on changed }
+  verify { unit, service, coverage ratchet >= 80% on changed, mutation advise on changed }
 }
 
 on fail coverage { fix "Add tests for the uncovered changed lines listed in the report." }
