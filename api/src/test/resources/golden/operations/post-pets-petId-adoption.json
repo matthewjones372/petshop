@@ -30,6 +30,16 @@
               }
             }
           },
+          "202": {
+            "description": "Recorded; the chip registry has yet to confirm it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PetDto"
+                }
+              }
+            }
+          },
           "404": {
             "description": "No pet with that id",
             "content": {
@@ -41,11 +51,25 @@
             }
           },
           "409": {
-            "description": "That pet has already been adopted",
+            "description": "One of:\n\n- `already_adopted`: That pet has already been adopted\n- `being_adopted`: That pet is being adopted; it may come back to the shelf",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AlreadyAdopted"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/AlreadyAdopted"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BeingAdopted"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "already_adopted": "#/components/schemas/AlreadyAdopted",
+                      "being_adopted": "#/components/schemas/BeingAdopted"
+                    }
+                  }
                 }
               }
             }
@@ -149,6 +173,10 @@
       "AlreadyAdopted": {
         "type": "object",
         "properties": {
+          "kind": {
+            "type": "string",
+            "const": "already_adopted"
+          },
           "id": {
             "type": "integer",
             "format": "int64"
@@ -158,9 +186,33 @@
           }
         },
         "required": [
+          "kind",
           "id",
           "message"
-        ]
+        ],
+        "description": "That pet has already been adopted"
+      },
+      "BeingAdopted": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "being_adopted"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "message"
+        ],
+        "description": "That pet is being adopted; it may come back to the shelf"
       },
       "NotChipped": {
         "type": "object",

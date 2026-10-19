@@ -21,7 +21,7 @@ export class Problem extends Data.TaggedError("Problem")<{ status: number; messa
 
 const ProblemBody = Schema.Struct({ message: Schema.String });
 
-const call = <S extends Schema.Top>(schema: S, request: HttpClientRequest.HttpClientRequest) =>
+const answered = <S extends Schema.Top>(schema: S, request: HttpClientRequest.HttpClientRequest) =>
   Effect.gen(function* () {
     const res = yield* (yield* HttpClient.HttpClient).execute(request);
     if (res.status >= 400) {
@@ -30,12 +30,19 @@ const call = <S extends Schema.Top>(schema: S, request: HttpClientRequest.HttpCl
       );
       return yield* new Problem({ status: res.status, message: body.message });
     }
-    return yield* HttpClientResponse.schemaBodyJson(schema)(res);
+    return { value: yield* HttpClientResponse.schemaBodyJson(schema)(res), status: res.status };
   });
 
-/** The click's span: the client span for the POST, and the shop's spans after it, sit under this one. */
+const call = <S extends Schema.Top>(schema: S, request: HttpClientRequest.HttpClientRequest) =>
+  answered(schema, request).pipe(Effect.map(({ value }) => value));
+
+/**
+ * The click's span: the client span for the POST, and the shop's spans after it, sit under this one. A 202 is an
+ * adoption the chip registry has yet to confirm; the pet reads as taken meanwhile.
+ */
 export const adopt = (id: number) =>
-  call(Pet, HttpClientRequest.post(`/pets/${id}/adoption`)).pipe(
+  answered(Pet, HttpClientRequest.post(`/pets/${id}/adoption`)).pipe(
+    Effect.map(({ value, status }) => ({ pet: value, pending: status === 202 })),
     Effect.withSpan("adopt pet", { attributes: { "pet.id": id } }),
   );
 

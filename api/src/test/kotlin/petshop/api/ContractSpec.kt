@@ -7,6 +7,7 @@ import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.empty
 import io.github.matthewjones372.lark.stream.of
+import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.health.health
 import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.test.jetty.inMemory
@@ -19,10 +20,14 @@ import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
 import io.opentelemetry.context.propagation.ContextPropagators
 import org.junit.jupiter.api.Test
+import petshop.domain.Adopted
+import petshop.domain.Adopting
 import petshop.domain.AlreadyAdopted
+import petshop.domain.BeingAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.NotChipped
 import petshop.domain.NotRecorded
+import petshop.domain.OnShelf
 import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.PetShop
@@ -37,8 +42,8 @@ private class OnePet(private var pet: Pet) : PetShop {
 
     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = when {
         pet.id != id -> NoSuchPet(id.value).left()
-        pet.adopted -> AlreadyAdopted(id.value).left()
-        else -> pet.copy(adopted = true).also { pet = it }.right()
+        pet.standing != OnShelf -> AlreadyAdopted(id.value).left()
+        else -> pet.copy(standing = Adopted(by)).also { pet = it }.right()
     }
 }
 
@@ -77,7 +82,7 @@ class ContractSpec {
 
     @Test
     fun `adopting twice answers the failure the endpoint declared`() {
-        app.outcome(adoptPet, 1L).shouldBeOk() shouldBe nibbles.copy(adopted = true).toDto()
+        app.outcome(adoptPet, 1L).shouldBeOk() shouldBe nibbles.copy(standing = Adopted("Ada")).toDto()
 
         app.outcome(adoptPet, 1L).shouldBeError() shouldBe ProblemDto.AlreadyAdopted(1, "Pet 1 is already adopted")
     }
@@ -115,9 +120,41 @@ class ContractSpec {
     }
 
     @Test
+    fun `a pet someone else is adopting answers its own declared 409`() {
+        val busy = shopAnswering(BeingAdopted(1).left())
+
+        busy.outcome(adoptPet, 1L).shouldBeError() shouldBe ProblemDto.BeingAdopted(1, BeingAdopted(1).message)
+    }
+
+    @Test
+    fun `an adoption the registry has not yet confirmed answers the declared 202, with the pet taken`() {
+        val pending = shopAnswering(nibbles.copy(standing = Adopting("Ada")).right())
+
+        val answer = pending.outcome(adoptPet, 1L)
+
+        (answer as Outcome.Ok).declared shouldBe adoptionPending
+        answer.value shouldBe nibbles.copy(standing = Adopting("Ada")).toDto()
+    }
+
+    private fun shopAnswering(answer: Either<PetShopError, Pet>) = petshopApi(
+        streams = Forks(),
+        shop = object : PetShop {
+            override fun all(): List<Pet> = listOf(nibbles)
+
+            override fun find(id: PetId): Pet? = nibbles.takeIf { it.id == id }
+
+            override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> = answer
+        },
+        health = health { },
+        scrape = { "" },
+        tally = { Tally(events = 0, duplicates = 0, bySpecies = emptyList()) },
+        watch = { Stream.empty() },
+    ).inMemory(Handlers.onVirtualThreads)
+
+    @Test
     fun `the events endpoint streams each event the feed hands it, then ends with the feed`() {
         val arrived = ShopEventDto(1, ShopEventKind.Arrived, nibbles.toDto())
-        val adopted = ShopEventDto(2, ShopEventKind.Adopted, nibbles.copy(adopted = true).toDto())
+        val adopted = ShopEventDto(2, ShopEventKind.Adopted, nibbles.copy(standing = Adopted("Ada")).toDto())
         val watched = petshopApi(
             streams = Forks(),
             shop = OnePet(nibbles),

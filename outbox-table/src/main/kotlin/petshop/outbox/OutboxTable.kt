@@ -25,9 +25,16 @@ data class OutboxRow(
     val metadata: String? = null,
 )
 
+/** `standing` is `on_shelf`, `adopting` or `adopted`; [adoptedBy] is set for the last two and only them. */
 @Serializable
 @SerialName("pets")
-data class PetRow(val id: Long, val name: String, val species: String, val adopted: Boolean)
+data class PetRow(
+    val id: Long,
+    val name: String,
+    val species: String,
+    val standing: String,
+    @SerialName("adopted_by") val adoptedBy: String?,
+)
 
 /** ExoQuery has no locking clause of its own, so a free block adds one. */
 @SqlFragment
@@ -43,20 +50,27 @@ class OutboxTable(dataSource: DataSource) {
     /** One transaction, so no event is recorded for a change the pets table does not hold. */
     fun record(pet: PetRow, event: OutboxRow): Long = runBlocking {
         db.transaction {
-            sql {
-                insert<PetRow> {
-                    setParams(pet).onConflictUpdate(id) { excluded ->
-                        set(name to excluded.name, species to excluded.species, adopted to excluded.adopted)
-                    }
-                }
-            }
-                .buildFor.Postgres()
-                .runOnTransaction()
+            upsert(pet).runOnTransaction()
             sql { insert<OutboxRow> { setParams(event).excluding(seq) }.returning { it.seq } }
                 .buildFor.Postgres()
                 .runOnTransaction()
         }
     }
+
+    fun keep(pet: PetRow): Unit = runBlocking { upsert(pet).runOn(db) }
+
+    private fun upsert(pet: PetRow) = sql {
+        insert<PetRow> {
+            setParams(pet).onConflictUpdate(id) { excluded ->
+                set(
+                    name to excluded.name,
+                    species to excluded.species,
+                    standing to excluded.standing,
+                    adoptedBy to excluded.adoptedBy,
+                )
+            }
+        }
+    }.buildFor.Postgres()
 
     fun stock(pets: List<PetRow>): Unit = runBlocking {
         db.transaction {

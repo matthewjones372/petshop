@@ -12,7 +12,9 @@ import io.github.matthewjones372.lark.otel.tracedSpan
 import io.github.matthewjones372.lark.timed
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.Tracer
+import petshop.domain.Adopting
 import petshop.domain.AlreadyAdopted
+import petshop.domain.BeingAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.NotChipped
 import petshop.domain.NotRecorded
@@ -51,8 +53,9 @@ class ObservedShop(private val front: ShopFront, private val tracer: Tracer) : P
                                         }
                                     },
                                     { pet ->
-                                        logInfo("adopted ${pet.name}")
-                                        metricTagged("outcome" to "taken") {
+                                        val pending = pet.standing is Adopting
+                                        logInfo(if (pending) "${pet.name} is being adopted" else "adopted ${pet.name}")
+                                        metricTagged("outcome" to if (pending) "pending" else "taken") {
                                             counter("petshop.adoptions").increment()
                                         }
                                     },
@@ -68,6 +71,7 @@ class ObservedShop(private val front: ShopFront, private val tracer: Tracer) : P
 private fun PetShopError.outcome(): String = when (this) {
     is NoSuchPet -> "no_such_pet"
     is AlreadyAdopted -> "already_adopted"
+    is BeingAdopted -> "being_adopted"
     is NotChipped -> "not_chipped"
     is RegistryDown -> "registry_down"
     is NotRecorded -> "not_recorded"

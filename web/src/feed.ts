@@ -5,7 +5,7 @@ import { Pet } from "./api";
 
 export const ShopEvent = Schema.Struct({
   seq: Schema.Number,
-  kind: Schema.Literals(["Arrived", "Adopted", "Returned"]),
+  kind: Schema.Literals(["Arrived", "Adopted"]),
   pet: Pet,
   // The trace the shop handled the event in: the adoption's, or the arrival's.
   traceparent: Schema.optional(Schema.NullOr(Schema.String)),

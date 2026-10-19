@@ -28,3 +28,11 @@ CREATE TABLE outbox (
 --changeset petshop:3-outbox-metadata
 --comment: What the write carried (Carriers.capture()), as JSON: a trace's traceparent, so the relay continues it.
 ALTER TABLE outbox ADD COLUMN metadata TEXT;
+
+--changeset petshop:4-pets-standing
+--comment: A pet can be adopted, or being adopted until the registry confirms it (ADR 0001), so a flag cannot say which.
+ALTER TABLE pets ADD COLUMN standing TEXT NOT NULL DEFAULT 'on_shelf' CHECK (standing IN ('on_shelf', 'adopting', 'adopted'));
+ALTER TABLE pets ADD COLUMN adopted_by TEXT;
+UPDATE pets SET standing = 'adopted', adopted_by = 'unrecorded' WHERE adopted;
+ALTER TABLE pets ADD CONSTRAINT pets_adopter_with_adoption CHECK ((standing = 'on_shelf') = (adopted_by IS NULL));
+ALTER TABLE pets DROP COLUMN adopted;

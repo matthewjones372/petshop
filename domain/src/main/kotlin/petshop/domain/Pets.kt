@@ -4,7 +4,17 @@ package petshop.domain
 
 enum class Species { Cat, Dog, Parrot, Tortoise }
 
-data class Pet(val id: PetId, val name: String, val species: Species, val adopted: Boolean = false)
+/** Where a pet is in its life at the shop. The adopter exists only where an adoption does. */
+sealed interface Standing
+
+data object OnShelf : Standing
+
+/** Recorded, and the chip registry has not yet confirmed the new keeper. */
+data class Adopting(val by: String) : Standing
+
+data class Adopted(val by: String) : Standing
+
+data class Pet(val id: PetId, val name: String, val species: Species, val standing: Standing = OnShelf)
 
 sealed interface PetShopError {
     val message: String
@@ -13,6 +23,9 @@ sealed interface PetShopError {
 data class NoSuchPet(val id: Long, override val message: String = "No pet $id") : PetShopError
 
 data class AlreadyAdopted(val id: Long, override val message: String = "Pet $id is already adopted") : PetShopError
+
+/** Another adoption of this pet is waiting on the chip registry; it may yet come back to the shelf. */
+data class BeingAdopted(val id: Long, override val message: String = "Pet $id is being adopted") : PetShopError
 
 data class NotChipped(val id: Long, override val message: String = "Pet $id has no registered chip") : PetShopError
 

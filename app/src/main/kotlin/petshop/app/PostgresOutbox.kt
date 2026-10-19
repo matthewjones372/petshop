@@ -5,13 +5,16 @@ import io.github.matthewjones372.lark.otel.span
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.Tracer
 import kotlinx.serialization.json.Json
+import petshop.domain.Adopted
+import petshop.domain.Adopting
+import petshop.domain.OnShelf
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
 import petshop.domain.PetId
-import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
+import petshop.domain.Standing
 import petshop.outbox.OutboxRow
 import petshop.outbox.OutboxTable
 import petshop.outbox.PetRow
@@ -32,9 +35,11 @@ class PostgresOutbox(dataSource: DataSource, private val tracer: Tracer) : Outbo
         numbered(table.record(pet.row(), numbered(0).row(Carriers.capture())))
     }
 
+    override fun keep(pet: Pet) = table.keep(pet.row())
+
     override fun shelf(opening: List<Pet>): List<Pet> {
         table.stock(opening.map { it.row() })
-        return table.pets().map { Pet(PetId(it.id), it.name, Species.valueOf(it.species), it.adopted) }
+        return table.pets().map { Pet(PetId(it.id), it.name, Species.valueOf(it.species), it.standing()) }
     }
 
     override fun claim(limit: Int, publish: (List<Claimed>) -> List<ShopEvent>): List<ShopEvent> {
@@ -46,7 +51,18 @@ class PostgresOutbox(dataSource: DataSource, private val tracer: Tracer) : Outbo
     }
 }
 
-private fun Pet.row(): PetRow = PetRow(id.value, name, species.name, adopted)
+private fun Pet.row(): PetRow = when (val now = standing) {
+    OnShelf -> PetRow(id.value, name, species.name, "on_shelf", null)
+    is Adopting -> PetRow(id.value, name, species.name, "adopting", now.by)
+    is Adopted -> PetRow(id.value, name, species.name, "adopted", now.by)
+}
+
+private fun PetRow.standing(): Standing = when (standing) {
+    "on_shelf" -> OnShelf
+    "adopting" -> Adopting(checkNotNull(adoptedBy) { "pet $id is being adopted by nobody" })
+    "adopted" -> Adopted(checkNotNull(adoptedBy) { "pet $id is adopted by nobody" })
+    else -> error("pet $id stands $standing, which the shop never writes")
+}
 
 private fun ShopEvent.row(carried: Map<String, String>): OutboxRow {
     val metadata = carried.takeIf { it.isNotEmpty() }?.let { Json.encodeToString(it) }
@@ -57,23 +73,12 @@ private fun ShopEvent.row(carried: Map<String, String>): OutboxRow {
             pet.id.value,
             pet.name,
             pet.species.name,
-            pet.adopted,
+            false,
             null,
             metadata,
         )
 
-        is PetAdopted -> OutboxRow(seq, "adopted", pet.id.value, pet.name, pet.species.name, pet.adopted, by, metadata)
-
-        is PetReturned -> OutboxRow(
-            seq,
-            "returned",
-            pet.id.value,
-            pet.name,
-            pet.species.name,
-            pet.adopted,
-            null,
-            metadata,
-        )
+        is PetAdopted -> OutboxRow(seq, "adopted", pet.id.value, pet.name, pet.species.name, true, by, metadata)
     }
 }
 
@@ -81,11 +86,14 @@ private fun OutboxRow.carried(): Map<String, String> =
     metadata?.let { Json.decodeFromString<Map<String, String>>(it) } ?: emptyMap()
 
 private fun OutboxRow.event(): ShopEvent {
-    val pet = Pet(PetId(petId), petName, Species.valueOf(species), adopted)
+    fun pet(standing: Standing) = Pet(PetId(petId), petName, Species.valueOf(species), standing)
     return when (kind) {
-        "arrived" -> PetArrived(seq, pet)
-        "adopted" -> PetAdopted(seq, pet, checkNotNull(adoptedBy) { "adoption $seq names nobody" })
-        "returned" -> PetReturned(seq, pet)
+        "arrived" -> PetArrived(seq, pet(OnShelf))
+
+        "adopted" -> checkNotNull(
+            adoptedBy,
+        ) { "adoption $seq names nobody" }.let { by -> PetAdopted(seq, pet(Adopted(by)), by) }
+
         else -> error("outbox row $seq is a $kind, which the shop never writes")
     }
 }

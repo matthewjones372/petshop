@@ -13,11 +13,11 @@ import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import petshop.domain.Adopted
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
 import petshop.domain.PetId
-import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
 import java.sql.SQLTransientConnectionException
@@ -38,6 +38,8 @@ private class Recorded(
 
     override fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent =
         synchronized(waiting) { numbered(waiting.size + 1L).also { waiting += it } }
+
+    override fun keep(pet: Pet) = Unit
 
     override fun shelf(opening: List<Pet>): List<Pet> = opening
 
@@ -76,8 +78,8 @@ private class Taking(private val refuses: (ShopEvent) -> Boolean = { false }) : 
 
 private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 private val arrived = PetArrived(seq = 1, pet = nibbles)
-private val adopted = PetAdopted(seq = 2, pet = nibbles.copy(adopted = true), by = "Ada")
-private val returned = PetReturned(seq = 3, pet = nibbles)
+private val adopted = PetAdopted(seq = 2, pet = nibbles.copy(standing = Adopted("Ada")), by = "Ada")
+private val barnabyArrived = PetArrived(seq = 3, pet = Pet(PetId(2), "Barnaby", Species.Dog))
 
 /** Each `adjust` returns once every tick due by then has run. */
 class RelaySpec {
@@ -108,11 +110,11 @@ class RelaySpec {
             outbox.left.shouldBeEmpty()
         }
 
-        When("Nibbles is returned, and the clock moves one tick") {
-            outbox.record(returned)
+        When("Barnaby arrives, and the clock moves one tick") {
+            outbox.record(barnabyArrived)
             clock.adjust(every)
         }
-        Then("the return went on that tick") { bus.took shouldBe listOf(1L, 2L, 3L) }
+        Then("his arrival went on that tick") { bus.took shouldBe listOf(1L, 2L, 3L) }
         And("stopped, the relay answers with how many it published") { relay.stopped shouldBe Exit.Done(3L) }
     }
 

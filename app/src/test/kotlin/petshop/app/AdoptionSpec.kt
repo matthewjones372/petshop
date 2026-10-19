@@ -14,9 +14,12 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
 import org.junit.jupiter.api.Test
+import petshop.domain.Adopted
 import petshop.domain.AlreadyAdopted
+import petshop.domain.BeingAdopted
 import petshop.domain.ChipRegistry
 import petshop.domain.NotRecorded
+import petshop.domain.OnShelf
 import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.PetShop
@@ -43,8 +46,8 @@ class AdoptionSpec {
         Then("exactly one gets her, because an actor handles one message at a time") {
             outcomes.count { it.isRight() } shouldBe 1
         }
-        And("the other nineteen are told she is taken") {
-            outcomes.count { it.leftOrNull() == AlreadyAdopted(1) } shouldBe 19
+        And("the other nineteen are told she is taken, or being adopted while her transfer is in flight") {
+            outcomes.count { it.leftOrNull() == AlreadyAdopted(1) || it.leftOrNull() == BeingAdopted(1) } shouldBe 19
         }
     }
 
@@ -58,7 +61,7 @@ class AdoptionSpec {
         }
         Then("she is told the registry is down") { first shouldBeLeft RegistryDown(1) }
         And("Nibbles is back on the shelf: the actor said yes before the registry said no, and the no undid it") {
-            after?.adopted shouldBe false
+            after?.standing shouldBe OnShelf
         }
     }
 
@@ -71,6 +74,8 @@ class AdoptionSpec {
         val down = object : Outbox {
             override fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent =
                 throw SQLTransientConnectionException("the pool had nothing to lend")
+
+            override fun keep(pet: Pet): Unit = throw SQLTransientConnectionException("the pool had nothing to lend")
 
             override fun shelf(opening: List<Pet>): List<Pet> = opening
 
@@ -86,7 +91,7 @@ class AdoptionSpec {
         }
         Then("she is told it was not recorded") { answer shouldBeLeft NotRecorded(1) }
         And("a sale nobody could write down did not happen: Nibbles is on the shelf, and the registry was not asked") {
-            after?.adopted shouldBe false
+            after?.standing shouldBe OnShelf
             asked.get() shouldBe 0
         }
     }
@@ -95,11 +100,13 @@ class AdoptionSpec {
     fun `a read during a write sees the shelf as it was, and does not wait for the write`() = story {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
+        // An adoption's first write is the one that takes the pet off the shelf, so that is the one held.
         val blocking = object : Outbox {
-            override fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent {
+            override fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent = numbered(1)
+
+            override fun keep(pet: Pet) {
                 entered.countDown()
                 check(release.await(5, TimeUnit.SECONDS)) { "the write was never released" }
-                return numbered(1)
             }
 
             override fun shelf(opening: List<Pet>): List<Pet> = opening
@@ -130,10 +137,10 @@ class AdoptionSpec {
         Then("the read saw Nibbles still for sale, without waiting out the ask") {
             val (all, found) = during
             all.map { it.id.value } shouldBe opening.map { it.id.value }
-            all.single { it.id == PetId(1) }.adopted shouldBe false
-            found?.adopted shouldBe false
+            all.single { it.id == PetId(1) }.standing shouldBe OnShelf
+            found?.standing shouldBe OnShelf
         }
-        And("once the write has finished she has Nibbles") { after?.adopted shouldBe true }
+        And("once the write has finished she has Nibbles") { after?.standing shouldBe Adopted("Ada") }
     }
 
     @Test
