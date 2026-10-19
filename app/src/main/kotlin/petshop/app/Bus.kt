@@ -30,16 +30,16 @@ data class BusRefused(val seq: Long, val why: String)
 /** Refuses when a reader's queue is full or after close. Events published before any reader are held for the first. */
 class HubBus(private val hub: Hub<Claimed>) : EventBus {
 
-    override fun publish(event: ShopEvent): Either<BusRefused, ShopEvent> =
-        hub.publish(Claimed(event, Carriers.capture())).mapLeft { refused -> BusRefused(event.seq, "$refused") }.map { event }
+    override fun publish(event: ShopEvent): Either<BusRefused, ShopEvent> = hub.publish(
+        Claimed(event, Carriers.capture()),
+    ).mapLeft { refused -> BusRefused(event.seq, "$refused") }.map { event }
 
-    override fun consume(each: (ShopEvent) -> Unit): Run<Nothing, Long> =
-        hub.subscribe()
-            .map { (event, carried) ->
-                Carriers.within(carried) { each(event) }
-                1L
-            }
-            .runFold(0L, Long::plus)
+    override fun consume(each: (ShopEvent) -> Unit): Run<Nothing, Long> = hub.subscribe()
+        .map { (event, carried) ->
+            Carriers.within(carried) { each(event) }
+            1L
+        }
+        .runFold(0L, Long::plus)
 }
 
 /** The hub, released by the graph after the bus that publishes to it. */

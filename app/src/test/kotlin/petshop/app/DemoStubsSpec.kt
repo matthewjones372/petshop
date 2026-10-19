@@ -5,7 +5,6 @@ import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.test.wiremock.stubFile
-import java.nio.file.Path
 import org.junit.jupiter.api.Test
 import petshop.registry.ChipRecord
 import petshop.registry.NewKeeper
@@ -13,6 +12,7 @@ import petshop.registry.Problem
 import petshop.registry.lookupChip
 import petshop.registry.noSuchChip
 import petshop.registry.recordKeeper
+import java.nio.file.Path
 
 /**
  * The demo's WireMock reads `demo/registry/mappings`, written here from the registry's endpoints, so a contract change

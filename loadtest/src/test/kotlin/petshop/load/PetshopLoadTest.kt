@@ -27,28 +27,28 @@ import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.longs.shouldBeGreaterThan
 import io.kotest.matchers.longs.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.shouldBe
-import java.nio.file.Path
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.extension.RegisterExtension
-import petshop.api.ShopCodecs
 import petshop.api.ProblemDto
+import petshop.api.ShopCodecs
 import petshop.api.adoptPet
 import petshop.api.listPets
 import petshop.api.stats
 import petshop.app.Arrivals
 import petshop.app.DatabaseSettings
+import petshop.app.Petshop
 import petshop.app.Projection
 import petshop.app.RegistrySettings
 import petshop.app.TestPostgres
 import petshop.app.onAFreshDatabase
 import petshop.app.onDatabase
-import petshop.app.Petshop
 import petshop.app.recorded
 import petshop.app.unsent
 import petshop.registry.ChipRecord
 import petshop.registry.lookupChip
 import petshop.registry.recordKeeper
+import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class PetshopLoadTest {
 
@@ -106,6 +106,7 @@ class PetshopLoadTest {
                     exec(adoptTaken) { step ->
                         when (val answer = client.outcome(adoptPet, 1L)) {
                             is Outcome.Ok -> step.fail("the tortoise was sold twice")
+
                             is Outcome.Err ->
                                 if (answer.error !is ProblemDto.AlreadyAdopted) step.fail("not the declared failure")
                         }
@@ -188,9 +189,11 @@ class PetshopLoadTest {
     }
 
     private fun instance(database: DatabaseSettings, port: Int): Module =
-        (calling.onDatabase(database) + single { server: PelicanServer, arrivals: Arrivals, projection: Projection ->
+        (
+            calling.onDatabase(database) + single { server: PelicanServer, arrivals: Arrivals, projection: Projection ->
             Instance(server.baseUrl, arrivals, projection)
-        })
+        }
+        )
             .overridingConfig("petshop.port = $port\npetshop.arrivalsEvery = 5ms\npetshop.outboxEvery = 20ms")
 }
 

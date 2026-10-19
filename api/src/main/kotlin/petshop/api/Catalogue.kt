@@ -5,7 +5,9 @@ import java.util.RandomAccess
 import kotlin.reflect.typeOf
 
 /** Keeps a response's encoding with its list after the shop publishes a newer catalogue. */
-class Catalogue(pets: List<PetDto>) : AbstractList<PetDto>(), RandomAccess {
+class Catalogue(pets: List<PetDto>) :
+    AbstractList<PetDto>(),
+    RandomAccess {
 
     private val pets = pets.toList()
 

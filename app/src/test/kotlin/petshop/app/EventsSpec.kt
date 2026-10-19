@@ -8,7 +8,6 @@ import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.shouldBe
-import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Test
 import petshop.api.Tally
 import petshop.domain.ChipRegistry
@@ -18,6 +17,7 @@ import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.Species
 import petshop.domain.Unreachable
+import kotlin.time.Duration.Companion.seconds
 
 private class Observed(val shop: PetShop, val bus: EventBus, val projection: Projection)
 

@@ -9,10 +9,6 @@ import io.github.matthewjones372.lark.test.story
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import javax.sql.DataSource
 import org.junit.jupiter.api.Test
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
@@ -24,6 +20,10 @@ import petshop.domain.Species
 import petshop.outbox.OutboxRow
 import petshop.outbox.OutboxTable
 import petshop.outbox.PetRow
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import javax.sql.DataSource
 
 private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 private val barnaby = Pet(PetId(2), "Barnaby", Species.Dog)
@@ -34,7 +34,10 @@ private fun onItsOwn(test: (Outbox) -> Unit) =
 /** Read by a claim that publishes nothing, so it takes nothing. */
 private fun Outbox.left(): List<ShopEvent> {
     val seen = mutableListOf<ShopEvent>()
-    claim(1_000) { claimed -> seen += claimed.map { it.event }; emptyList() }
+    claim(1_000) { claimed ->
+        seen += claimed.map { it.event };
+        emptyList()
+    }
     return seen
 }
 
@@ -46,7 +49,9 @@ class PostgresOutboxSpec {
             val recorded = When("Nibbles arrives, is adopted and is returned") {
                 listOf(
                     outbox.record(nibbles) { seq -> PetArrived(seq, nibbles) },
-                    outbox.record(nibbles.copy(adopted = true)) { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") },
+                    outbox.record(
+                        nibbles.copy(adopted = true),
+                    ) { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") },
                     outbox.record(nibbles) { seq -> PetReturned(seq, nibbles) },
                 )
             }
@@ -62,7 +67,9 @@ class PostgresOutboxSpec {
         onItsOwn { outbox ->
             val (arrived, adopted) = Given("Nibbles' arrival and adoption in the outbox") {
                 outbox.record(nibbles) { seq -> PetArrived(seq, nibbles) } to
-                    outbox.record(nibbles.copy(adopted = true)) { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") }
+                    outbox.record(
+                        nibbles.copy(adopted = true),
+                    ) { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") }
             }
             val taken = When("a claim's bus takes the adoption and refuses the arrival") {
                 outbox.claim(10) { claimed -> claimed.map { it.event }.filter { it.seq == adopted.seq } }
@@ -80,7 +87,10 @@ class PostgresOutboxSpec {
             }
             val carried = When("a claim reads it back") {
                 val seen = mutableListOf<Claimed>()
-                outbox.claim(10) { claimed -> seen += claimed; emptyList() }
+                outbox.claim(10) { claimed ->
+                    seen += claimed;
+                    emptyList()
+                }
                 seen.single().carried
             }
             Then("it carries that trace") { traceOf(carried["traceparent"]) shouldBe A_TRACE }
@@ -90,9 +100,15 @@ class PostgresOutboxSpec {
     @Test
     fun `a claim that throws halfway takes nothing`() = story {
         onItsOwn { outbox ->
-            val arrived = Given("Nibbles' arrival in the outbox") { outbox.record(nibbles) { seq -> PetArrived(seq, nibbles) } }
+            val arrived = Given(
+                "Nibbles' arrival in the outbox",
+            ) { outbox.record(nibbles) { seq -> PetArrived(seq, nibbles) } }
             When("a claim falls over after publishing") {
-                shouldThrow<IllegalStateException> { outbox.claim(10) { error("the process fell over after publishing") } }
+                shouldThrow<IllegalStateException> {
+                    outbox.claim(
+                        10,
+                    ) { error("the process fell over after publishing") }
+                }
             }
             Then("the claim rolled back, so the event goes again: at least once, not at most") {
                 outbox.left() shouldBe listOf(arrived)
@@ -124,7 +140,10 @@ class PostgresOutboxSpec {
             // the test rather than hanging it.
             val beside = And("a second claim runs beside it") {
                 CompletableFuture.supplyAsync {
-                    outbox.claim(10) { claimed -> seenBeside += claimed.map { it.event }; emptyList() }
+                    outbox.claim(10) { claimed ->
+                        seenBeside += claimed.map { it.event };
+                        emptyList()
+                    }
                 }.get(5, TimeUnit.SECONDS)
             }
             Then("the second saw only Barnaby's, and nothing waited: FOR UPDATE SKIP LOCKED") {
@@ -145,7 +164,9 @@ class PostgresOutboxSpec {
             val first = When("the shelf is read for the first time") { outbox.shelf(listOf(nibbles, barnaby)) }
             Then("it is the opening catalogue") { first shouldBe listOf(nibbles, barnaby) }
             When("Nibbles' adoption is recorded") {
-                outbox.record(nibbles.copy(adopted = true)) { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") }
+                outbox.record(
+                    nibbles.copy(adopted = true),
+                ) { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") }
             }
             Then("the shelf has her adopted, and the opening catalogue does not put her back") {
                 outbox.shelf(listOf(nibbles, barnaby)) shouldBe listOf(nibbles.copy(adopted = true), barnaby)
@@ -178,4 +199,10 @@ class PostgresOutboxSpec {
 private data class Tables(val dataSource: DataSource)
 
 private val migrated: Module =
-    (Petshop.module.onAFreshDatabase() + single { source: DataSource, _: Migrated -> Tables(source) }).subgraph<Tables>()
+    (
+        Petshop.module.onAFreshDatabase() + single { source: DataSource, _: Migrated ->
+        Tables(
+            source,
+        )
+    }
+    ).subgraph<Tables>()

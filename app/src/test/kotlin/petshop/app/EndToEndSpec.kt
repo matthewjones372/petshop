@@ -16,7 +16,6 @@ import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
-import kotlin.time.Duration.Companion.seconds
 import org.apache.kafka.common.serialization.LongDeserializer
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
@@ -36,6 +35,7 @@ import petshop.registry.Problem
 import petshop.registry.lookupChip
 import petshop.registry.noSuchChip
 import petshop.registry.recordKeeper
+import kotlin.time.Duration.Companion.seconds
 
 /** Arrivals are an hour apart, so no new pet lands between reading the table and reading /stats. */
 class EndToEndSpec {

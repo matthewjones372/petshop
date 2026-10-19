@@ -14,11 +14,9 @@ sealed interface PetShopError {
 
 data class NoSuchPet(val id: Long, override val message: String = "No pet $id") : PetShopError
 
-data class AlreadyAdopted(val id: Long, override val message: String = "Pet $id is already adopted") :
-    PetShopError
+data class AlreadyAdopted(val id: Long, override val message: String = "Pet $id is already adopted") : PetShopError
 
-data class NotChipped(val id: Long, override val message: String = "Pet $id has no registered chip") :
-    PetShopError
+data class NotChipped(val id: Long, override val message: String = "Pet $id has no registered chip") : PetShopError
 
 data class RegistryDown(val id: Long, override val message: String = "The chip registry could not be reached") :
     PetShopError

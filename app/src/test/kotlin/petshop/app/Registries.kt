@@ -7,12 +7,12 @@ import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
+import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMock
 import petshop.domain.Chip
 import petshop.domain.ChipRegistry
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.RegistryError
-import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 

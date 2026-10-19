@@ -15,8 +15,6 @@ import io.github.matthewjones372.lark.stream.take
 import io.github.matthewjones372.lark.test.eventually
 import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.TimeUnit
-import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Test
 import petshop.domain.ChipRegistry
 import petshop.domain.Pet
@@ -24,6 +22,8 @@ import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
 import petshop.domain.PetId
 import petshop.domain.Species
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 private class Watched(val bus: EventBus, val feed: Feed, val projection: Projection, val streams: StreamBackend)
 

@@ -23,17 +23,17 @@ import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
 import io.github.matthewjones372.pelican.health.Health
 import io.github.matthewjones372.pelican.jetty.PelicanServer
 import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
-import io.micrometer.core.instrument.Metrics as MicrometerRegistries
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk
-import kotlin.time.Duration
 import petshop.api.petshopApi
 import petshop.api.petshopDocs
 import petshop.domain.PetShop
+import kotlin.time.Duration
+import io.micrometer.core.instrument.Metrics as MicrometerRegistries
 
 /** [host] is loopback unless something outside this machine has to reach the port. */
 data class Settings(val host: String, val port: Int, val arrivalsEvery: Duration, val outboxEvery: Duration)
@@ -47,9 +47,12 @@ private val telemetry: Module =
     // Added to Micrometer's global composite, which is where lark-micrometer writes by default.
     singleOf<PrometheusMeterRegistry>(
         { PrometheusMeterRegistry(PrometheusConfig.DEFAULT).also(MicrometerRegistries::addRegistry) },
-        { registry -> MicrometerRegistries.removeRegistry(registry); registry.close() },
+        { registry ->
+            MicrometerRegistries.removeRegistry(registry);
+            registry.close()
+        },
     ) +
-    closingOf<OpenTelemetrySdk> { tracing() } +
+        closingOf<OpenTelemetrySdk> { tracing() } +
         // boundTo because `getTracer` returns the platform type `Tracer!`, which no key matches.
         single { sdk: OpenTelemetrySdk -> sdk.getTracer("petshop") }.boundTo<Tracer>()
 
@@ -57,21 +60,20 @@ private val telemetry: Module =
  * Spans go out over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` names a collector, and nowhere otherwise, which is every
  * test. The rest of `OTEL_*` is read as OpenTelemetry documents it.
  */
-private fun tracing(): OpenTelemetrySdk =
-    AutoConfiguredOpenTelemetrySdk.builder()
-        .addPropertiesSupplier {
-            val exporting = System.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != null
-            mapOf(
-                "otel.service.name" to "petshop",
-                "otel.traces.exporter" to if (exporting) "otlp" else "none",
-                // OTLP over HTTP, on 4318: the SDK's default is gRPC, on 4317.
-                "otel.exporter.otlp.protocol" to "http/protobuf",
-                "otel.metrics.exporter" to "none",
-                "otel.logs.exporter" to "none",
-            )
-        }
-        .build()
-        .openTelemetrySdk
+private fun tracing(): OpenTelemetrySdk = AutoConfiguredOpenTelemetrySdk.builder()
+    .addPropertiesSupplier {
+        val exporting = System.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != null
+        mapOf(
+            "otel.service.name" to "petshop",
+            "otel.traces.exporter" to if (exporting) "otlp" else "none",
+            // OTLP over HTTP, on 4318: the SDK's default is gRPC, on 4317.
+            "otel.exporter.otlp.protocol" to "http/protobuf",
+            "otel.metrics.exporter" to "none",
+            "otel.logs.exporter" to "none",
+        )
+    }
+    .build()
+    .openTelemetrySdk
 
 /** Lark's streams run on virtual threads, and Jetty's client calls the registry. */
 private val jetty: Module =
@@ -79,8 +81,16 @@ private val jetty: Module =
         closingOf { -> JettyHttpTransport() }
 
 private val web: Module =
-    single { streams: StreamBackend, shop: PetShop, window: ShopWindow, health: Health,
-        registry: PrometheusMeterRegistry, projection: Projection, feed: Feed, sdk: OpenTelemetrySdk ->
+    single {
+            streams: StreamBackend,
+            shop: PetShop,
+            window: ShopWindow,
+            health: Health,
+            registry: PrometheusMeterRegistry,
+            projection: Projection,
+            feed: Feed,
+            sdk: OpenTelemetrySdk,
+        ->
         petshopApi(
             streams,
             shop,

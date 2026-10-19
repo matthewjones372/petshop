@@ -2,7 +2,6 @@ package petshop.app
 
 import io.github.matthewjones372.lark.LogLevel
 import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.capturingLogs
 import io.github.matthewjones372.lark.test.story

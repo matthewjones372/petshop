@@ -12,9 +12,6 @@ import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.measureTimedValue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import petshop.domain.NotChipped
@@ -27,6 +24,9 @@ import petshop.registry.Problem
 import petshop.registry.lookupChip
 import petshop.registry.noSuchChip
 import petshop.registry.recordKeeper
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.measureTimedValue
 
 class RegistrySpec {
 
@@ -53,7 +53,9 @@ class RegistrySpec {
 
     @Test
     fun `a pet with no chip on record stays in the shop`() = story {
-        Given("a registry with no chip for Nibbles") { registry.stub(lookupChip, 1L) answers noSuchChip(Problem("never chipped")) }
+        Given(
+            "a registry with no chip for Nibbles",
+        ) { registry.stub(lookupChip, 1L) answers noSuchChip(Problem("never chipped")) }
         val (answer, after) = When("Ada adopts Nibbles") {
             testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1)) }
         }
@@ -73,7 +75,9 @@ class RegistrySpec {
             }
         }
         Then("she is told the registry is down") { answer shouldBeLeft RegistryDown(1) }
-        And("she was not kept waiting: the shop's timeout decides that, not the registry") { took shouldBeLessThan 2.seconds }
+        And(
+            "she was not kept waiting: the shop's timeout decides that, not the registry",
+        ) { took shouldBeLessThan 2.seconds }
     }
 
     @Test
@@ -87,12 +91,16 @@ class RegistrySpec {
             testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") to shop.adopt(PetId(1), by = "Bea") }
         }
         Then("Ada is told the registry is down") { refused shouldBeLeft RegistryDown(1) }
-        And("her adoption was undone, so Nibbles was still there for Bea") { retried.shouldBeRight().adopted shouldBe true }
+        And(
+            "her adoption was undone, so Nibbles was still there for Bea",
+        ) { retried.shouldBeRight().adopted shouldBe true }
     }
 
     @Test
     fun `a status the contract never declared is an outage too`() = story {
-        Given("a registry that answers 500, which its contract never declared") { registry.stub(lookupChip, 1L) breaksWith 500 }
+        Given(
+            "a registry that answers 500, which its contract never declared",
+        ) { registry.stub(lookupChip, 1L) breaksWith 500 }
         val answer = When("Ada adopts Nibbles") { testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") } }
         Then("she is told the registry is down") { answer shouldBeLeft RegistryDown(1) }
     }
@@ -116,7 +124,9 @@ class RegistrySpec {
             registry.stub(recordKeeper) { (number, keeper) -> ok(ChipRecord(number, keeper.keeper)) }
         }
         val outcomes = When("twenty people ask for Nibbles at once") {
-            testApp(shop) { shop: PetShop -> parMap((1..20).toList()) { who -> shop.adopt(PetId(1), by = "adopter $who") } }
+            testApp(
+                shop,
+            ) { shop: PetShop -> parMap((1..20).toList()) { who -> shop.adopt(PetId(1), by = "adopter $who") } }
         }
         Then("one of them gets her") { outcomes.count { it.isRight() } shouldBe 1 }
         And("the registry heard from that one only: the actor settles the race before anybody calls out") {

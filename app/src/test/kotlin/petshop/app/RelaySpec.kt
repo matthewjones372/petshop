@@ -7,15 +7,11 @@ import io.github.matthewjones372.lark.TestClock
 import io.github.matthewjones372.lark.stream.Exit
 import io.github.matthewjones372.lark.stream.Run
 import io.github.matthewjones372.lark.stream.Running
-import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.TestStreams
 import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
-import java.sql.SQLTransientConnectionException
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Test
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
@@ -24,6 +20,8 @@ import petshop.domain.PetId
 import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
+import java.sql.SQLTransientConnectionException
+import kotlin.time.Duration.Companion.milliseconds
 
 /** [claiming] runs before each claim, so a test can make one throw. */
 private class Recorded(
@@ -134,7 +132,9 @@ class RelaySpec {
     fun `an event the bus refused stays in the outbox, and each refusal costs it exactly one tick`() = story {
         val refusals = java.util.concurrent.atomic.AtomicInteger(3)
         val outbox = Given("Nibbles' arrival in the outbox") { Recorded(arrived) }
-        val bus = And("a bus that refuses the first three offers") { Taking(refuses = { refusals.getAndDecrement() > 0 }) }
+        val bus = And(
+            "a bus that refuses the first three offers",
+        ) { Taking(refuses = { refusals.getAndDecrement() > 0 }) }
         val relay = relaying(outbox, bus)
 
         When("three ticks pass") { clock.adjust(every * 3) }
@@ -162,7 +162,9 @@ class RelaySpec {
         val relay = relaying(outbox, bus)
 
         When("one tick passes") { clock.adjust(every) }
-        Then("the adoption went, and the refused arrival stayed: at least once, in order unless the bus turns one away") {
+        Then(
+            "the adoption went, and the refused arrival stayed: at least once, in order unless the bus turns one away",
+        ) {
             bus.took shouldBe listOf(2L)
             outbox.left shouldBe listOf(arrived)
         }
@@ -206,7 +208,9 @@ class RelaySpec {
     fun `an hour of an empty outbox is one claim a tick and nothing published, without waiting the hour`() = story {
         val asks = java.util.concurrent.atomic.AtomicInteger()
         val bus = Taking()
-        val relay = Given("a relay over an empty outbox that counts its claims") { relaying(Recorded { asks.incrementAndGet() }, bus) }
+        val relay = Given(
+            "a relay over an empty outbox that counts its claims",
+        ) { relaying(Recorded { asks.incrementAndGet() }, bus) }
 
         When("an hour passes on the test's clock") { clock.adjust(every * 72_000) }
         Then("it claimed once a tick") { asks.get() shouldBe 72_000 }

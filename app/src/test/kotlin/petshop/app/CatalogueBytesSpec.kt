@@ -3,13 +3,13 @@ package petshop.app
 import io.kotest.matchers.should
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.beTheSameInstanceAs
-import kotlin.reflect.typeOf
 import org.junit.jupiter.api.Test
 import petshop.api.PetDto
 import petshop.api.ShopCodecs
 import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.Species
+import kotlin.reflect.typeOf
 
 class CatalogueBytesSpec {
 

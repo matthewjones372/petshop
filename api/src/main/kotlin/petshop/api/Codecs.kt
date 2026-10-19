@@ -7,10 +7,10 @@ import io.github.matthewjones372.pelican.SchemaComponents
 import io.github.matthewjones372.pelican.health.CheckResult
 import io.github.matthewjones372.pelican.health.HealthReport
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
-import kotlin.reflect.KType
-import kotlin.reflect.typeOf
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.reflect.KType
+import kotlin.reflect.typeOf
 
 /**
  * KotlinxCodecs, with pelican-health's HealthReport, a plain data class kotlinx refuses, read and described through a
@@ -19,12 +19,11 @@ import kotlinx.serialization.Serializable
 object ShopCodecs : Codecs by KotlinxCodecs {
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T> codec(type: KType): BodyCodec<T> =
-        when {
-            type.isHealth -> health as BodyCodec<T>
-            type.describesPets() -> listing as BodyCodec<T>
-            else -> KotlinxCodecs.codec(type)
-        }
+    override fun <T> codec(type: KType): BodyCodec<T> = when {
+        type.isHealth -> health as BodyCodec<T>
+        type.describesPets() -> listing as BodyCodec<T>
+        else -> KotlinxCodecs.codec(type)
+    }
 
     // Delegated, this would call KotlinxCodecs' own codec(type) and miss the one above.
     override fun <T> codec(type: KType, mediaType: String): BodyCodec<T> =
@@ -71,13 +70,19 @@ object ShopCodecs : Codecs by KotlinxCodecs {
         val output: String? = null,
     )
 
-    private fun HealthReport.copied() = Report(status, checks.mapValues { (_, results) ->
+    private fun HealthReport.copied() = Report(
+        status,
+        checks.mapValues { (_, results) ->
         results.map { Result(it.status, it.observedValue, it.observedUnit, it.time, it.componentType, it.output) }
-    })
+    }
+    )
 
-    private fun Report.original() = HealthReport(status, checks.mapValues { (_, results) ->
+    private fun Report.original() = HealthReport(
+        status,
+        checks.mapValues { (_, results) ->
         results.map { CheckResult(it.status, it.observedValue, it.observedUnit, it.time, it.componentType, it.output) }
-    })
+    }
+    )
 }
 
 private fun KType.describesPets(): Boolean =

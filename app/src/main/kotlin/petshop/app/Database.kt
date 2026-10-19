@@ -13,19 +13,18 @@ import javax.sql.DataSource
 
 data class DatabaseSettings(val url: String, val user: String, val password: Secret)
 
-private fun pool(settings: DatabaseSettings): HikariDataSource =
-    HikariDataSource(
-        HikariConfig().apply {
-            jdbcUrl = settings.url
-            username = settings.user
-            password = settings.password.reveal()
-            poolName = "petshop"
-            // Two seconds, not Hikari's thirty, so a down Postgres fails adoptions and readiness promptly.
-            connectionTimeout = 2_000
-            // The global composite, where /metrics reads the pool's hikaricp_* meters.
-            metricRegistry = Metrics.globalRegistry
-        },
-    )
+private fun pool(settings: DatabaseSettings): HikariDataSource = HikariDataSource(
+    HikariConfig().apply {
+        jdbcUrl = settings.url
+        username = settings.user
+        password = settings.password.reveal()
+        poolName = "petshop"
+        // Two seconds, not Hikari's thirty, so a down Postgres fails adoptions and readiness promptly.
+        connectionTimeout = 2_000
+        // The global composite, where /metrics reads the pool's hikaricp_* meters.
+        metricRegistry = Metrics.globalRegistry
+    },
+)
 
 val database: Module =
     config<DatabaseSettings>("petshop.database") {

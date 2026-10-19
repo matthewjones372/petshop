@@ -4,13 +4,13 @@ import io.github.matthewjones372.pelican.div
 import io.github.matthewjones372.pelican.endpoint
 import io.github.matthewjones372.pelican.errorJson
 import io.github.matthewjones372.pelican.json
-import io.github.matthewjones372.pelican.text
 import io.github.matthewjones372.pelican.orFail
 import io.github.matthewjones372.pelican.pathParam
-import kotlin.time.Duration.Companion.seconds
+import io.github.matthewjones372.pelican.text
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import petshop.domain.Species
+import kotlin.time.Duration.Companion.seconds
 
 val petId = pathParam<Long>("petId", description = "The pet's id")
 

@@ -5,10 +5,10 @@ import arrow.core.left
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.empty
-import io.github.matthewjones372.pelican.test.golden.Golden
-import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.github.matthewjones372.pelican.health.health
 import io.github.matthewjones372.pelican.jetty.Handlers
+import io.github.matthewjones372.pelican.test.golden.Golden
+import io.github.matthewjones372.pelican.test.jetty.inMemory
 import org.junit.jupiter.api.Test
 import petshop.domain.NoSuchPet
 import petshop.domain.Pet

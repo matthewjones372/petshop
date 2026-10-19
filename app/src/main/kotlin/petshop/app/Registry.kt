@@ -17,9 +17,6 @@ import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.metrics.otel.traced
 import io.opentelemetry.sdk.OpenTelemetrySdk
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.toJavaDuration
 import petshop.domain.Chip
 import petshop.domain.ChipRegistry
 import petshop.domain.NotRegistered
@@ -30,6 +27,9 @@ import petshop.registry.client.ChipRecord
 import petshop.registry.client.NewKeeper
 import petshop.registry.client.Outcome
 import petshop.registry.client.RegistryClient
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.toJavaDuration
 
 data class RegistrySettings(val baseUrl: String, val timeout: Duration)
 
@@ -50,34 +50,37 @@ class HttpChipRegistry(settings: RegistrySettings, transport: JettyHttpTransport
             CircuitBreaker(
                 name = "chip-registry",
                 maxFailures = 5,
-                resetAfter = Schedule.exponential<Unit>(1.seconds).jittered(0.8, 1.2).delayed { _, wait -> minOf(wait, 30.seconds) },
+                resetAfter = Schedule.exponential<Unit>(
+                    1.seconds,
+                ).jittered(0.8, 1.2).delayed { _, wait -> minOf(wait, 30.seconds) },
             ),
         )
     }
 
-    override fun lookup(id: PetId): Either<RegistryError, Chip> =
-        asking { client.lookupChip(id.value) }
+    override fun lookup(id: PetId): Either<RegistryError, Chip> = asking { client.lookupChip(id.value) }
 
     override fun transfer(chip: Chip, to: String): Either<RegistryError, Chip> =
         asking { client.recordKeeper(chip.number, NewKeeper(to)) }
 
     /** Only a declared 404 means no chip; anything else that is not a chip means the registry did not answer. */
-    private fun asking(call: () -> Outcome<*, ChipRecord>): Either<RegistryError, Chip> =
-        Either.catch {
-            either<RegistryError, Outcome<*, ChipRecord>> {
-                guarded(calls, ifRejected = { refused -> Unreachable("${refused.guard} refused: ${refused.message}") }) {
-                    call()
-                }
+    private fun asking(call: () -> Outcome<*, ChipRecord>): Either<RegistryError, Chip> = Either.catch {
+        either<RegistryError, Outcome<*, ChipRecord>> {
+            guarded(
+                calls,
+                ifRejected = { refused -> Unreachable("${refused.guard} refused: ${refused.message}") },
+            ) {
+                call()
             }
         }
-            .mapLeft { failed -> Unreachable(failed.message ?: failed.toString()) }
-            .flatMap { it }
-            .flatMap { answer ->
-                when (answer) {
-                    is Outcome.Ok -> Chip(answer.value.number, answer.value.keeper).right()
-                    is Outcome.Err -> NotRegistered.left()
-                }
+    }
+        .mapLeft { failed -> Unreachable(failed.message ?: failed.toString()) }
+        .flatMap { it }
+        .flatMap { answer ->
+            when (answer) {
+                is Outcome.Ok -> Chip(answer.value.number, answer.value.keeper).right()
+                is Outcome.Err -> NotRegistered.left()
             }
+        }
 }
 
 val registry: Module =

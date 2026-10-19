@@ -4,7 +4,6 @@ import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.logger
 import io.github.matthewjones372.lark.slf4j.Slf4jLogger
@@ -48,7 +47,9 @@ class LoggingSpec {
 
     @Test
     fun `nothing in main binds a logger, and the classpath still answers`() = story {
-        Then("the logger lark writes to is SLF4J's, found on the classpath; StderrLogger would mean the dependency does nothing") {
+        Then(
+            "the logger lark writes to is SLF4J's, found on the classpath; StderrLogger would mean the dependency does nothing",
+        ) {
             logger.get().shouldBeInstanceOf<Slf4jLogger>()
         }
     }

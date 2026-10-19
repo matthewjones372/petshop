@@ -12,8 +12,6 @@ import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.test.story
 import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
-import java.util.concurrent.ConcurrentLinkedQueue
-import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Test
 import petshop.api.Tally
 import petshop.domain.ChipRegistry
@@ -23,6 +21,8 @@ import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.ShopEvent
 import petshop.domain.Species
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.time.Duration.Companion.seconds
 
 private class Served(val shop: PetShop, val projection: Projection)
 
@@ -82,7 +82,9 @@ abstract class EventBusContract {
                 When("Waffle's arrival is published inside a trace") {
                     inATrace { bus.publish(arrival(1, "Waffle")).shouldBeRight() }
                 }
-                Then("the reader handled it in that trace").eventually(30.seconds) { traces.toList() shouldBe listOf(A_TRACE) }
+                Then(
+                    "the reader handled it in that trace",
+                ).eventually(30.seconds) { traces.toList() shouldBe listOf(A_TRACE) }
             }
         }
     }
@@ -123,7 +125,9 @@ class HubBusSpec : EventBusContract() {
     @Test
     fun `a closed bus turns an event away, and says so`() = story {
         val bus = Given("a bus whose hub has closed") { HubBus(Hub<Claimed>(1).apply { close() }) }
-        val answer = When("an arrival is published to it") { bus.publish(PetArrived(1, Pet(PetId(9), "Waffle", Species.Dog))) }
+        val answer = When(
+            "an arrival is published to it",
+        ) { bus.publish(PetArrived(1, Pet(PetId(9), "Waffle", Species.Dog))) }
         Then("it is refused, so the outbox keeps it") { answer.isLeft() shouldBe true }
     }
 }

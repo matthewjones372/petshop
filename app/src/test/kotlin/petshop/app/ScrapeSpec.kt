@@ -12,18 +12,22 @@ import io.kotest.matchers.string.shouldContain
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
-import javax.sql.DataSource
-import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Test
 import petshop.domain.ChipRegistry
 import petshop.domain.PetId
 import petshop.domain.PetShop
+import javax.sql.DataSource
+import kotlin.time.Duration.Companion.seconds
 
 /** A registry of this test's own, not the global one, so tests running together cannot read each other's numbers. */
 private class Scraped(val registry: PrometheusMeterRegistry)
 
 private val scraped: Module =
-    single { registry: PrometheusMeterRegistry, _: ReadinessGauges, _: JvmGcMetrics, _: PetShop, _: DataSource -> Scraped(registry) }
+    single { registry: PrometheusMeterRegistry, _: ReadinessGauges, _: JvmGcMetrics, _: PetShop, _: DataSource ->
+        Scraped(
+            registry,
+        )
+    }
 
 class ScrapeSpec {
 
@@ -31,7 +35,9 @@ class ScrapeSpec {
 
     @Test
     fun `an adoption is a line in the scrape, with the outcome as a label`() = story {
-        val registry = Given("a Prometheus registry of this test's own") { PrometheusMeterRegistry(PrometheusConfig.DEFAULT) }
+        val registry = Given(
+            "a Prometheus registry of this test's own",
+        ) { PrometheusMeterRegistry(PrometheusConfig.DEFAULT) }
         val scrape = When("Ada adopts Nibbles, and Bea asks for her too") {
             metrics.locally(MicrometerMetrics(registry)) {
                 testApp<PetShop, Unit>(settled) { shop ->
@@ -53,7 +59,11 @@ class ScrapeSpec {
     @Test
     fun `the scrape says how the JVM, the pool and every health check are`() = story {
         val service = Given("the shop on a fresh database") {
-            (Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() }).onAFreshDatabase() + scraped).subgraph<Scraped>()
+            (
+                Petshop.module.overriding(
+                single<ChipRegistry> { FakeRegistry() },
+            ).onAFreshDatabase() + scraped
+            ).subgraph<Scraped>()
         }
         testApp(service) { app: Scraped ->
             val scrape = When("Prometheus scrapes it") { app.registry.scrape() }

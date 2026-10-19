@@ -12,10 +12,6 @@ import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
-import java.nio.ByteBuffer
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.TimeUnit
-import kotlin.time.Duration.Companion.seconds
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
@@ -30,6 +26,10 @@ import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
 import petshop.domain.PetId
 import petshop.domain.Species
+import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 /** The registry is Confluent's in-process `mock://`: real serializers and wire format, no server. */
 class KafkaBusSpec : EventBusContract() {
@@ -68,7 +68,9 @@ class KafkaBusSpec : EventBusContract() {
         val record = Then("one record is on the topic").eventually(30.seconds) {
             kafka.records("wire", LongDeserializer(), ByteArrayDeserializer()).single()
         }
-        And("its key is the event's seq, as a number, so a partition keeps one event's copies in order") { record.key() shouldBe 3L }
+        And(
+            "its key is the event's seq, as a number, so a partition keeps one event's copies in order",
+        ) { record.key() shouldBe 3L }
         val body = ByteBuffer.wrap(record.value())
         And("it is Confluent's wire format: a zero magic byte, then the id the registry gave the schema") {
             body.get() shouldBe 0.toByte()
@@ -82,7 +84,9 @@ class KafkaBusSpec : EventBusContract() {
     @Test
     fun `a record that is not the shop's Avro goes to dead letters, and the projection reads on past it`() = story {
         Given("a record on the topic that is not the shop's Avro") { junkOn("mixed") }
-        val waffle = And("Waffle's arrival behind it") { PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog)) }
+        val waffle = And(
+            "Waffle's arrival behind it",
+        ) { PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog)) }
         val dead = ConcurrentLinkedQueue<DecodeError>()
         val seen = ConcurrentLinkedQueue<Any>()
 
@@ -134,7 +138,11 @@ class KafkaBusSpec : EventBusContract() {
     }
 
     private fun junkOn(topic: String) {
-        KafkaProducer(mapOf<String, Any>("bootstrap.servers" to kafka.bootstrap), StringSerializer(), ByteArraySerializer())
+        KafkaProducer(
+            mapOf<String, Any>("bootstrap.servers" to kafka.bootstrap),
+            StringSerializer(),
+            ByteArraySerializer(),
+        )
             .use { it.send(ProducerRecord(topic, "junk", "not avro".toByteArray())).get(30, TimeUnit.SECONDS) }
     }
 }

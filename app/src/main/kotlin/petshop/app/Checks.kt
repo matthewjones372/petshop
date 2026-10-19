@@ -4,14 +4,13 @@ import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.stream.Running
 import io.github.matthewjones372.pelican.health.Check
-import io.github.matthewjones372.pelican.health.Health
 import io.github.matthewjones372.pelican.health.Status
 import io.github.matthewjones372.pelican.health.health
 import io.github.matthewjones372.pelican.health.jdbc
 import io.github.matthewjones372.pelican.health.noDeadlockedThreads
+import petshop.domain.PetShop
 import javax.sql.DataSource
 import kotlin.time.Duration.Companion.seconds
-import petshop.domain.PetShop
 
 /** A failing [critical] check answers 503; a failing [background] one is a warning, still a 200. */
 class Readiness(val critical: Map<String, Check>, val background: Map<String, Check> = emptyMap()) {
@@ -22,12 +21,11 @@ class Readiness(val critical: Map<String, Check>, val background: Map<String, Ch
     fun failing(): Set<String> = checks.filterValues { check -> !passes(check) }.keys
 
     @Suppress("TooGenericExceptionCaught")
-    private fun passes(check: Check): Boolean =
-        try {
-            check.check() !is Status.Fail
-        } catch (_: Exception) {
-            false
-        }
+    private fun passes(check: Check): Boolean = try {
+        check.check() !is Status.Fail
+    } catch (_: Exception) {
+        false
+    }
 }
 
 private fun still(running: Running<*, *>): Check = Check {
