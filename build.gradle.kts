@@ -9,8 +9,7 @@ plugins {
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
-    // Kover runs every Test task for its report, so loadtest, which has no main code, keeps its load tests out of `build`.
-    if (name != "loadtest") apply(plugin = "org.jetbrains.kotlinx.kover")
+    apply(plugin = "org.jetbrains.kotlinx.kover")
     apply(plugin = "dev.detekt")
     apply(plugin = "info.solidsoft.pitest")
 

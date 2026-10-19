@@ -26,6 +26,8 @@ tasks.register<Test>("loadTest") {
     group = "verification"
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
+    // Coverage reports depend on every Test task, so this runs only when `loadTest` is asked for by name.
+    onlyIf { gradle.startParameter.taskNames.any { it == "loadTest" || it.endsWith(":loadTest") } }
     // A cached pass says nothing about this machine now.
     outputs.upToDateWhen { false }
     // Gradle's 512 MB default runs out under a rung the shop cannot keep up with; exit rather than hang when it does.
