@@ -37,6 +37,7 @@ subprojects {
 
     extensions.configure<dev.detekt.gradle.extensions.DetektExtension> {
         buildUponDefaultConfig.set(true)
+        config.setFrom(rootProject.file("config/detekt/detekt.yml"))
         // Gauntlet's lint ratchet decides which findings block, so findings from before it don't fail `build`.
         ignoreFailures.set(true)
         // `-Pdetekt.autoCorrect=true` lets the ktlint rules rewrite the layout they report.
