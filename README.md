@@ -229,6 +229,7 @@ the batches interleave.
 Running it needs a Postgres. `demo/docker-compose.yml` starts one with the
 credentials `application.conf` expects, and every test that builds the shop
 starts its own through Testcontainers, with a fresh schema per graph.
+The first such test in a JVM waits 25 to 35 seconds for the containers to start, so time a slow test on its second run.
 
 ### The Kafka bus
 
