@@ -1,5 +1,6 @@
 package petshop.app
 
+import io.github.matthewjones372.lark.actor.ActorRef
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.stream.Running
@@ -8,7 +9,6 @@ import io.github.matthewjones372.pelican.health.Status
 import io.github.matthewjones372.pelican.health.health
 import io.github.matthewjones372.pelican.health.jdbc
 import io.github.matthewjones372.pelican.health.noDeadlockedThreads
-import petshop.domain.PetShop
 import javax.sql.DataSource
 import kotlin.time.Duration.Companion.seconds
 
@@ -34,12 +34,17 @@ private fun still(running: Running<*, *>): Check = Check {
 }
 
 val checks: Module =
-    single { pool: DataSource, shop: PetShop, relay: OutboxRelay, projection: Projection, arrivals: Arrivals ->
+    single { pool: DataSource, ref: ActorRef<Shop>, relay: OutboxRelay, projection: Projection, arrivals: Arrivals ->
         Readiness(
             critical = mapOf(
                 "database" to Check { jdbc(pool, timeout = 2.seconds) },
-                // An ask that times out throws, and Pelican counts a throw as a fail.
-                "shop" to Check { if (shop.all().isNotEmpty()) Status.Pass else Status.Fail("the shelf is empty") },
+                // Within Pelican's 3s check timeout, so the check answers with its own reason.
+                "shop" to Check {
+                    ref.answers(within = 2.seconds).fold(
+                        { failure -> Status.Fail("the shop did not answer: $failure") },
+                        { Status.Pass },
+                    )
+                },
             ),
             background = mapOf(
                 "relay" to still(relay.running),
