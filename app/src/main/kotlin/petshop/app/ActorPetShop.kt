@@ -23,7 +23,6 @@ import io.github.matthewjones372.lark.otel.tracedSpan
 import io.github.matthewjones372.lark.timed
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.Tracer
-import kotlin.time.Duration.Companion.seconds
 import petshop.domain.AlreadyAdopted
 import petshop.domain.ChipRegistry
 import petshop.domain.NoSuchPet
@@ -38,6 +37,7 @@ import petshop.domain.RegistryDown
 import petshop.domain.RegistryError
 import petshop.domain.Species
 import petshop.domain.Unreachable
+import kotlin.time.Duration.Companion.seconds
 
 val opening: List<Pet> = listOf(
     Pet(PetId(1), "Nibbles", Species.Tortoise),

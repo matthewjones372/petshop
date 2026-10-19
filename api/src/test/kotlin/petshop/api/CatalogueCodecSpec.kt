@@ -11,7 +11,6 @@ import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.kotest.matchers.should
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.beTheSameInstanceAs
-import kotlin.reflect.typeOf
 import org.junit.jupiter.api.Test
 import petshop.domain.NoSuchPet
 import petshop.domain.Pet
@@ -19,6 +18,7 @@ import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.PetShopError
 import petshop.domain.Species
+import kotlin.reflect.typeOf
 
 class CatalogueCodecSpec {
 

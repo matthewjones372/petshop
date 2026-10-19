@@ -28,10 +28,10 @@ import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.StatusCode
 import io.opentelemetry.api.trace.Tracer
-import javax.sql.DataSource
-import kotlin.time.Duration
 import petshop.domain.Pet
 import petshop.domain.ShopEvent
+import javax.sql.DataSource
+import kotlin.time.Duration
 
 /** A claim holds its rows from every other claim until it answers, so two relays never publish the same event. */
 interface Outbox {
@@ -61,22 +61,21 @@ internal fun relay(
     outbox: Outbox,
     bus: EventBus,
     tracer: Tracer = OpenTelemetry.noop().getTracer("petshop"),
-): Run<Nothing, Long> =
-    Stream.tick(every = every, element = Unit)
-        // mapPar gives the blocking claim its own virtual thread. Publishing happens inside the
-        // claim because the rows are only held while it is open.
-        .mapPar(1) { _ -> outbox.claim(batch) { claimed -> published(claimed, bus, tracer) } }
-        .mapConcat { published -> published }
-        // A throwing claim would otherwise stop the outbox draining. Restarting is safe: the claim
-        // rolled back.
-        .restartOnDefect(Schedule.spaced(every))
-        .runFold(0L) { published, event ->
-            logAnnotated("seq" to event.seq.toString()) {
-                logInfo("published ${event::class.simpleName}")
-            }
-            counter("petshop.outbox.published").increment()
-            published + 1
+): Run<Nothing, Long> = Stream.tick(every = every, element = Unit)
+    // mapPar gives the blocking claim its own virtual thread. Publishing happens inside the
+    // claim because the rows are only held while it is open.
+    .mapPar(1) { _ -> outbox.claim(batch) { claimed -> published(claimed, bus, tracer) } }
+    .mapConcat { published -> published }
+    // A throwing claim would otherwise stop the outbox draining. Restarting is safe: the claim
+    // rolled back.
+    .restartOnDefect(Schedule.spaced(every))
+    .runFold(0L) { published, event ->
+        logAnnotated("seq" to event.seq.toString()) {
+            logInfo("published ${event::class.simpleName}")
         }
+        counter("petshop.outbox.published").increment()
+        published + 1
+    }
 
 /** Each event is published inside the trace its write carried, so the bus's consumer continues that trace. */
 private fun published(claimed: List<Claimed>, bus: EventBus, tracer: Tracer): List<ShopEvent> {

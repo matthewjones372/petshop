@@ -1,7 +1,5 @@
 package petshop.app
 
-import java.time.Duration
-import java.util.concurrent.TimeUnit
 import org.apache.kafka.clients.admin.Admin
 import org.apache.kafka.clients.admin.AdminClientConfig
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -16,6 +14,8 @@ import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.ExtensionContext
 import org.testcontainers.kafka.KafkaContainer
 import org.testcontainers.utility.DockerImageName
+import java.time.Duration
+import java.util.concurrent.TimeUnit
 
 /** One broker for the whole run. Each test uses topics and groups of its own, so classes can share it. */
 private object TestKafka {
@@ -57,7 +57,11 @@ class KafkaBroker : BeforeAllCallback {
      * group, so no offset the service sees changes.
      */
     fun <K, V> records(topic: String, key: Deserializer<K>, value: Deserializer<V>): List<ConsumerRecord<K, V>> =
-        KafkaConsumer(mapOf<String, Any>(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrap), key, value).use { reader ->
+        KafkaConsumer(
+            mapOf<String, Any>(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrap),
+            key,
+            value,
+        ).use { reader ->
             val partitions = reader.partitionsFor(topic).map { TopicPartition(topic, it.partition()) }
             reader.assign(partitions)
             reader.seekToBeginning(partitions)

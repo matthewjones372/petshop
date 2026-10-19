@@ -10,17 +10,17 @@ import io.github.matthewjones372.proofload.perSecond
 import io.github.matthewjones372.proofload.report.writeHtmlReport
 import io.github.matthewjones372.proofload.scenario
 import io.github.matthewjones372.proofload.step
+import petshop.api.ShopCodecs
+import petshop.api.adoptPet
+import petshop.api.getPet
+import petshop.api.listPets
+import petshop.api.stats
 import java.nio.file.Path
 import kotlin.random.Random
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
-import petshop.api.ShopCodecs
-import petshop.api.adoptPet
-import petshop.api.getPet
-import petshop.api.listPets
-import petshop.api.stats
 
 /** Declared refusals are answers, not failures: only an undeclared response fails a step. */
 fun main() {

@@ -22,6 +22,14 @@ import io.github.matthewjones372.proofload.sessionKey
 import io.github.matthewjones372.proofload.stages
 import io.github.matthewjones372.proofload.step
 import io.github.matthewjones372.proofload.then
+import org.eclipse.jetty.client.HttpClient
+import org.eclipse.jetty.client.StringRequestContent
+import org.eclipse.jetty.io.ByteBufferPool
+import petshop.api.ProblemDto
+import petshop.api.ShopCodecs
+import petshop.api.adoptPet
+import petshop.api.getPet
+import petshop.api.listPets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.SplittableRandom
@@ -30,14 +38,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import petshop.api.ProblemDto
-import petshop.api.ShopCodecs
-import petshop.api.adoptPet
-import petshop.api.getPet
-import org.eclipse.jetty.client.HttpClient
-import org.eclipse.jetty.client.StringRequestContent
-import org.eclipse.jetty.io.ByteBufferPool
-import petshop.api.listPets
 
 /**
  * A ramp to PEAK requests a second against a running shop, then a hold there. loadtest/heavy.sh stocks the shop with
@@ -81,9 +81,11 @@ fun main() {
                     val id = nextToAdopt.incrementAndGet().takeIf { it <= pets } ?: anyPet()
                     when (val answer = client.outcome(adoptPet, id)) {
                         is Outcome.Ok -> taken.incrementAndGet()
+
                         is Outcome.Err -> when (answer.error) {
                             is ProblemDto.AlreadyAdopted, is ProblemDto.NoSuchPet, is ProblemDto.NotChipped ->
                                 refused.incrementAndGet()
+
                             is ProblemDto.RegistryDown, is ProblemDto.NotRecorded ->
                                 step.fail("the shop could not finish: ${answer.error}")
                         }
@@ -116,7 +118,9 @@ fun main() {
  * out by walking the queue, and 40,000 of them took every core and then the heap. Not the JDK's client: it opens a
  * connection per request in flight, which takes every ephemeral port.
  */
-private class JettyTransport(target: String, private val timeout: Duration) : Transport, AutoCloseable {
+private class JettyTransport(target: String, private val timeout: Duration) :
+    Transport,
+    AutoCloseable {
 
     private val base = target.trimEnd('/')
 
@@ -181,7 +185,16 @@ private fun RunResult.seconds(peak: Int, ramp: Duration): String = buildString {
         val asked = if (second < ramp.inWholeSeconds) START + (peak - START) * second / ramp.inWholeSeconds else peak
         val inFlight = usersInFlight.getOrNull(second)?.toString() ?: "-"
         val refused = refusedPerSecond.getOrNull(second) ?: 0L
-        val row = listOf(second, asked, slot.count, slot.failed, refused, slot.p50.ms(), slot.serviceTime.p99.ms(), inFlight)
+        val row = listOf(
+            second,
+            asked,
+            slot.count,
+            slot.failed,
+            refused,
+            slot.p50.ms(),
+            slot.serviceTime.p99.ms(),
+            inFlight,
+        )
         appendLine(row.joinToString("\t"))
     }
 }

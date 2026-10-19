@@ -6,7 +6,6 @@ import io.github.matthewjones372.lark.app.choice
 import io.github.matthewjones372.lark.app.typesafe.Reading
 import io.github.matthewjones372.lark.app.typesafe.config
 import io.github.matthewjones372.lark.kafka.Topic
-import petshop.domain.ShopEvent
 
 /** Set by `petshop.bus.kind` in application.conf, overridden by `BUS`. */
 sealed interface BusSettings {
@@ -34,22 +33,25 @@ val bus: Module =
 private const val IN_PROCESS = "in-process"
 private const val KAFKA = "kafka"
 
-private fun Reading.busSettings(): BusSettings =
-    when (kind()) {
-        KAFKA -> section(KAFKA) {
-            BusSettings.OnKafka(string("bootstrap"), string("topic"), string("group"), string("registry"))
-        }
-        else -> BusSettings.InProcess
+private fun Reading.busSettings(): BusSettings = when (kind()) {
+    KAFKA -> section(KAFKA) {
+        BusSettings.OnKafka(string("bootstrap"), string("topic"), string("group"), string("registry"))
     }
 
-private fun Reading.kind(): String =
-    of(IN_PROCESS) {
-        getString("kind").also { kind ->
-            if (kind != IN_PROCESS && kind != KAFKA) {
-                throw ConfigException.BadValue(getValue("kind").origin(), "kind", "'$kind' is not $IN_PROCESS or $KAFKA")
-            }
+    else -> BusSettings.InProcess
+}
+
+private fun Reading.kind(): String = of(IN_PROCESS) {
+    getString("kind").also { kind ->
+        if (kind != IN_PROCESS && kind != KAFKA) {
+            throw ConfigException.BadValue(
+                getValue("kind").origin(),
+                "kind",
+                "'$kind' is not $IN_PROCESS or $KAFKA",
+            )
         }
     }
+}
 
 private fun onKafka(on: BusSettings.OnKafka): Module =
     kafkaBus(Topic(on.topic), on.bootstrap, on.group, mapOf("schema.registry.url" to on.registry))

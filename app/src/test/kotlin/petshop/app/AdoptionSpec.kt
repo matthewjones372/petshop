@@ -12,11 +12,6 @@ import io.github.matthewjones372.lark.test.story
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import java.sql.SQLTransientConnectionException
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
@@ -28,6 +23,11 @@ import petshop.domain.PetShop
 import petshop.domain.RegistryDown
 import petshop.domain.ShopEvent
 import petshop.domain.Unreachable
+import java.sql.SQLTransientConnectionException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration.Companion.seconds
 
 class AdoptionSpec {
 
@@ -104,8 +104,7 @@ class AdoptionSpec {
 
             override fun shelf(opening: List<Pet>): List<Pet> = opening
 
-            override fun claim(limit: Int, publish: (List<Claimed>) -> List<ShopEvent>): List<ShopEvent> =
-                emptyList()
+            override fun claim(limit: Int, publish: (List<Claimed>) -> List<ShopEvent>): List<ShopEvent> = emptyList()
         }
         val held = Given("an outbox that holds a write until the test lets it finish") {
             Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() })

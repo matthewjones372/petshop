@@ -13,7 +13,10 @@ dependencies {
     implementation("io.exoquery:exoquery-runner-jdbc:2.0.4.PL")
 }
 
-kotlin { jvmToolchain(21) }
+kotlin {
+    jvmToolchain(21)
+    compilerOptions { allWarningsAsErrors.set(true) }
+}
 
 // ExoQuery prints each compiled query as a compiler warning by default.
 exoQuery { queryPrintingEnabled.set(false) }

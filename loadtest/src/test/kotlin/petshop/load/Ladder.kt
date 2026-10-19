@@ -14,7 +14,6 @@ import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.HttpClientTransport
 import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
 import io.github.matthewjones372.proofload.RunResult
-import io.github.matthewjones372.proofload.Scenario
 import io.github.matthewjones372.proofload.StepName
 import io.github.matthewjones372.proofload.Tail
 import io.github.matthewjones372.proofload.at
@@ -30,16 +29,6 @@ import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.longs.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.longs.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
-import java.net.http.HttpClient
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardOpenOption.APPEND
-import java.nio.file.StandardOpenOption.CREATE
-import java.sql.DriverManager
-import java.util.concurrent.atomic.AtomicLong
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.extension.RegisterExtension
 import petshop.api.ShopCodecs
 import petshop.api.adoptPet
@@ -52,6 +41,16 @@ import petshop.app.onDatabase
 import petshop.registry.ChipRecord
 import petshop.registry.lookupChip
 import petshop.registry.recordKeeper
+import java.net.http.HttpClient
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption.APPEND
+import java.nio.file.StandardOpenOption.CREATE
+import java.sql.DriverManager
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The ladder behind docs/performance.md, climbed until the shop falls behind. Each rung is written to
@@ -68,11 +67,10 @@ class Ladder {
     }
 
     // No arrivals, so every rung browses the same catalogue and adopts from the shelf it was stocked with.
-    private fun shop(database: DatabaseSettings): Module =
-        Petshop.module
-            .overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
-            .onDatabase(database)
-            .overridingConfig("petshop.arrivalsEvery = 1h")
+    private fun shop(database: DatabaseSettings): Module = Petshop.module
+        .overriding(single<RegistrySettings> { RegistrySettings(registry.baseUrl, 2.seconds) })
+        .onDatabase(database)
+        .overridingConfig("petshop.arrivalsEvery = 1h")
 
     private val browse = step("browse the shop")
 
@@ -135,11 +133,7 @@ class Ladder {
         }
     }
 
-    private fun climb(
-        name: String,
-        measured: StepName,
-        rung: (rate: Int, warming: Duration) -> RunResult,
-    ) {
+    private fun climb(name: String, measured: StepName, rung: (rate: Int, warming: Duration) -> RunResult) {
         val reports = Files.createDirectories(REPORTS)
         var table: Path? = null
         for ((index, rate) in LADDER.withIndex()) {
@@ -155,17 +149,16 @@ class Ladder {
     }
 
     // HTTP/1.1: the JDK client's default asks the server for an h2c upgrade on every connection.
-    private fun client(server: PelicanServer): ApiClient =
-        ApiClient(
-            HttpClientTransport(
-                server.baseUrl,
-                HttpClient.newBuilder()
-                    .version(HttpClient.Version.HTTP_1_1)
-                    .connectTimeout(java.time.Duration.ofSeconds(5))
-                    .build(),
-            ),
-            ShopCodecs,
-        )
+    private fun client(server: PelicanServer): ApiClient = ApiClient(
+        HttpClientTransport(
+            server.baseUrl,
+            HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(java.time.Duration.ofSeconds(5))
+                .build(),
+        ),
+        ShopCodecs,
+    )
 }
 
 private val LADDER = listOf(100, 250, 500, 1000, 2000, 3000, 4000, 5000, 6000, 8000, 10000, 12000)

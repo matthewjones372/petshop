@@ -17,11 +17,11 @@ import io.github.matthewjones372.lark.stream.runFold
 import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.stream.tick
 import io.opentelemetry.api.trace.Tracer
-import java.util.concurrent.atomic.AtomicLong
 import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.PetShop
 import petshop.domain.Species
+import java.util.concurrent.atomic.AtomicLong
 
 class Arrivals internal constructor(val running: Running<Nothing, Long>) : AutoCloseable by running
 

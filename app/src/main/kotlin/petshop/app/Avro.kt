@@ -51,6 +51,5 @@ class ShopEventDeserializer(registry: Map<String, Any>) : Deserializer<ShopEvent
  * Confluent throws the same `SerializationException` for a down registry and an unreadable record; the
  * cause says which. A 5xx is a `RestClientException`, and missing it would dead-letter every record.
  */
-fun registryDown(thrown: Throwable): Boolean =
-    generateSequence(thrown) { it.cause }
-        .any { it is IOException || (it is RestClientException && it.status >= 500) }
+fun registryDown(thrown: Throwable): Boolean = generateSequence(thrown) { it.cause }
+    .any { it is IOException || (it is RestClientException && it.status >= 500) }

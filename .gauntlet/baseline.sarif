@@ -1,0 +1,634 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "properties": {
+        "gauntlet": {
+          "baseline": {
+            "commit": "3f6918ad4d8054978638369af840640d5fe29b00",
+            "gauntletVersion": "0.1.0-rc.35",
+            "irHash": "09fc57ab890f671c4c4584eb1e2f02a5614b8eec5148e06459fcb942b6d64c1b"
+          },
+          "legacy": [],
+          "metrics": {
+            "coverage": {
+              "higherIsBetter": true,
+              "perFile": {
+                "api/src/main/kotlin/petshop/api/Catalogue.kt": 100,
+                "api/src/main/kotlin/petshop/api/Codecs.kt": 100,
+                "api/src/main/kotlin/petshop/api/Docs.kt": 0,
+                "api/src/main/kotlin/petshop/api/Dtos.kt": 85.19,
+                "api/src/main/kotlin/petshop/api/Endpoints.kt": 95.24,
+                "api/src/main/kotlin/petshop/api/Handlers.kt": 100,
+                "app/src/main/kotlin/petshop/app/ActorPetShop.kt": 100,
+                "app/src/main/kotlin/petshop/app/Adoptions.kt": 95.35,
+                "app/src/main/kotlin/petshop/app/Arrivals.kt": 100,
+                "app/src/main/kotlin/petshop/app/Avro.kt": 85.71,
+                "app/src/main/kotlin/petshop/app/Bus.kt": 100,
+                "app/src/main/kotlin/petshop/app/BusChoice.kt": 100,
+                "app/src/main/kotlin/petshop/app/Checks.kt": 100,
+                "app/src/main/kotlin/petshop/app/Database.kt": 93.75,
+                "app/src/main/kotlin/petshop/app/Feed.kt": 100,
+                "app/src/main/kotlin/petshop/app/KafkaBus.kt": 97.5,
+                "app/src/main/kotlin/petshop/app/Main.kt": 0,
+                "app/src/main/kotlin/petshop/app/Meters.kt": 100,
+                "app/src/main/kotlin/petshop/app/Outbox.kt": 100,
+                "app/src/main/kotlin/petshop/app/PostgresOutbox.kt": 97.5,
+                "app/src/main/kotlin/petshop/app/Projection.kt": 100,
+                "app/src/main/kotlin/petshop/app/Registry.kt": 100,
+                "app/src/main/kotlin/petshop/app/Wiring.kt": 93.48,
+                "app/src/main/kotlin/petshop/app/wire/Wire.kt": 100,
+                "domain/src/main/kotlin/petshop/domain/Chips.kt": 0,
+                "domain/src/main/kotlin/petshop/domain/Events.kt": 0,
+                "domain/src/main/kotlin/petshop/domain/Pets.kt": 0
+              },
+              "perFileTotal": {
+                "api/src/main/kotlin/petshop/api/Catalogue.kt": 7,
+                "api/src/main/kotlin/petshop/api/Codecs.kt": 45,
+                "api/src/main/kotlin/petshop/api/Docs.kt": 13,
+                "api/src/main/kotlin/petshop/api/Dtos.kt": 27,
+                "api/src/main/kotlin/petshop/api/Endpoints.kt": 42,
+                "api/src/main/kotlin/petshop/api/Handlers.kt": 30,
+                "app/src/main/kotlin/petshop/app/ActorPetShop.kt": 55,
+                "app/src/main/kotlin/petshop/app/Adoptions.kt": 43,
+                "app/src/main/kotlin/petshop/app/Arrivals.kt": 19,
+                "app/src/main/kotlin/petshop/app/Avro.kt": 14,
+                "app/src/main/kotlin/petshop/app/Bus.kt": 12,
+                "app/src/main/kotlin/petshop/app/BusChoice.kt": 21,
+                "app/src/main/kotlin/petshop/app/Checks.kt": 25,
+                "app/src/main/kotlin/petshop/app/Database.kt": 16,
+                "app/src/main/kotlin/petshop/app/Feed.kt": 7,
+                "app/src/main/kotlin/petshop/app/KafkaBus.kt": 40,
+                "app/src/main/kotlin/petshop/app/Main.kt": 2,
+                "app/src/main/kotlin/petshop/app/Meters.kt": 23,
+                "app/src/main/kotlin/petshop/app/Outbox.kt": 29,
+                "app/src/main/kotlin/petshop/app/PostgresOutbox.kt": 40,
+                "app/src/main/kotlin/petshop/app/Projection.kt": 25,
+                "app/src/main/kotlin/petshop/app/Registry.kt": 35,
+                "app/src/main/kotlin/petshop/app/Wiring.kt": 46,
+                "app/src/main/kotlin/petshop/app/wire/Wire.kt": 13,
+                "domain/src/main/kotlin/petshop/domain/Chips.kt": 3,
+                "domain/src/main/kotlin/petshop/domain/Events.kt": 3,
+                "domain/src/main/kotlin/petshop/domain/Pets.kt": 9
+              },
+              "unit": "%",
+              "value": 92.86
+            },
+            "integrity/assertions-per-test": {
+              "higherIsBetter": true,
+              "unit": "count",
+              "value": 0
+            },
+            "integrity/executed-tests": {
+              "higherIsBetter": true,
+              "unit": "count",
+              "value": 174
+            },
+            "integrity/property-tests": {
+              "higherIsBetter": true,
+              "unit": "count",
+              "value": 0
+            },
+            "integrity/quarantined-tests": {
+              "higherIsBetter": false,
+              "unit": "count",
+              "value": 0
+            },
+            "integrity/skipped-tests": {
+              "higherIsBetter": false,
+              "unit": "count",
+              "value": 0
+            },
+            "integrity/suppressions": {
+              "higherIsBetter": false,
+              "unit": "count",
+              "value": 0
+            }
+          },
+          "testIds": [
+            "petshop.api.CatalogueCodecSpec.a catalogue stays consistent when the list it was built from changes()",
+            "petshop.api.CatalogueCodecSpec.each catalogue reuses its own bytes()",
+            "petshop.api.CatalogueCodecSpec.each shop serves the json published with its own catalogue()",
+            "petshop.api.ContractSpec.a missing pet answers the declared 404, with the domain's own message()",
+            "petshop.api.ContractSpec.a request arriving with a traceparent is handled inside the caller's trace()",
+            "petshop.api.ContractSpec.a test names the endpoint, not the URL()",
+            "petshop.api.ContractSpec.adopting twice answers the failure the endpoint declared()",
+            "petshop.api.ContractSpec.and then pins the URL on purpose, because callers hold it()",
+            "petshop.api.ContractSpec.the DTO carries the id inside PetId, so the JSON id is a plain number()",
+            "petshop.api.ContractSpec.the events endpoint streams each event the feed hands it, then ends with the feed()",
+            "petshop.api.ContractSpec.the registry's refusals, and a sale the shop could not record, reach the caller as declared failures()",
+            "petshop.api.GoldenSpec.a pet, and a refusal, look on the wire the way they did()",
+            "petshop.api.GoldenSpec.every endpoint publishes what it published()",
+            "petshop.api.HealthCodecSpec.a health report is written with pelican-health's field names()",
+            "petshop.api.HealthCodecSpec.a health report reads back as the report that was written()",
+            "petshop.api.HealthCodecSpec.the json media type serves the same health codec()",
+            "petshop.app.AdoptionLogSpec.an adoption names the pet and the adopter in pairs, not in prose()",
+            "petshop.app.AdoptionLogSpec.an adoption that cannot happen is a warning saying why()",
+            "petshop.app.AdoptionSpec.a keeper the registry will not record puts the pet back on the shelf()",
+            "petshop.app.AdoptionSpec.a read during a write sees the shelf as it was, and does not wait for the write()",
+            "petshop.app.AdoptionSpec.an adoption the outbox could not record is refused, and the pet stays on the shelf()",
+            "petshop.app.AdoptionSpec.the subgraph binds no port and serves no documents()",
+            "petshop.app.AdoptionSpec.twenty people adopt one tortoise and one of them gets it()",
+            "petshop.app.BusChoiceSpec.a kind that is neither refuses the start, and says what it was given()",
+            "petshop.app.BusChoiceSpec.kind kafka puts the bus on the broker the section names()",
+            "petshop.app.BusChoiceSpec.left as application conf has it, the bus is in the process()",
+            "petshop.app.CatalogueBytesSpec.a new catalogue is a new array()",
+            "petshop.app.CatalogueBytesSpec.a published catalogue reuses its bytes across codecs()",
+            "petshop.app.CatalogueBytesSpec.a response keeps its catalogue bytes after another catalogue is published()",
+            "petshop.app.DemoStubsSpec.the demo registry's stubs are the contract's()",
+            "petshop.app.EndToEndSpec.somebody adopts a tortoise, and every part of the service hears about it()",
+            "petshop.app.EventsSpec.an adoption reaches a consumer through the outbox and the bus()",
+            "petshop.app.EventsSpec.an adoption the registry refused reaches the consumer as a return()",
+            "petshop.app.EventsSpec.an event delivered twice is counted once()",
+            "petshop.app.FeedSpec.a watcher is told the trace each event was published in()",
+            "petshop.app.FeedSpec.a watcher sees each event once, however often the bus delivers it()",
+            "petshop.app.FeedSpec.with nobody watching, the feed holds nothing back for the first watcher()",
+            "petshop.app.HubBusSpec.a closed bus turns an event away, and says so()",
+            "petshop.app.HubBusSpec.a reader handles an event inside the trace it was published in()",
+            "petshop.app.HubBusSpec.a reader reads events in the order they were published()",
+            "petshop.app.HubBusSpec.an event published before anyone reads it reaches the first reader()",
+            "petshop.app.HubBusSpec.the whole service runs on it, and an adoption reaches the projection()",
+            "petshop.app.KafkaBusSpec.a reader handles an event inside the trace it was published in()",
+            "petshop.app.KafkaBusSpec.a reader reads events in the order they were published()",
+            "petshop.app.KafkaBusSpec.a record that is not the shop's Avro goes to dead letters, and the projection reads on past it()",
+            "petshop.app.KafkaBusSpec.an event on the wire is the registry's Avro, and reads back as the domain event it was()",
+            "petshop.app.KafkaBusSpec.an event published before anyone reads it reaches the first reader()",
+            "petshop.app.KafkaBusSpec.by default an unreadable record is written to the dead-letter topic as it was read()",
+            "petshop.app.KafkaBusSpec.the whole service runs on it, and an adoption reaches the projection()",
+            "petshop.app.LoggingSpec.an adoption reaches the backend with the pet on it, not in it()",
+            "petshop.app.LoggingSpec.nothing in main binds a logger, and the classpath still answers()",
+            "petshop.app.PostgresOutboxSpec.Postgres numbers each event, and a claim reads them back oldest first()",
+            "petshop.app.PostgresOutboxSpec.a claim that throws halfway takes nothing()",
+            "petshop.app.PostgresOutboxSpec.a pet's change and its event are one transaction, so an event that fails leaves the pet as it was()",
+            "petshop.app.PostgresOutboxSpec.a second claim skips the rows the first is holding, rather than waiting for them()",
+            "petshop.app.PostgresOutboxSpec.an event keeps the trace it was recorded in, for the relay to publish it in()",
+            "petshop.app.PostgresOutboxSpec.the shelf starts as the opening catalogue, and keeps every change written to it()",
+            "petshop.app.PostgresOutboxSpec.what the bus took leaves the table, and what it refused stays for the next claim()",
+            "petshop.app.RegistrySpec.a connection reset while recording the keeper puts the pet back on the shelf()",
+            "petshop.app.RegistrySpec.a pet with no chip on record stays in the shop()",
+            "petshop.app.RegistrySpec.a registry that keeps failing stops being asked()",
+            "petshop.app.RegistrySpec.a registry that takes too long is an outage, not a hang()",
+            "petshop.app.RegistrySpec.a status the contract never declared is an outage too()",
+            "petshop.app.RegistrySpec.an adoption looks the chip up and records the new keeper()",
+            "petshop.app.RegistrySpec.twenty adopters race for one tortoise and the registry hears from one of them()",
+            "petshop.app.RelaySpec.a claim that throws restarts the relay one interval later, and nothing recorded is lost()",
+            "petshop.app.RelaySpec.an event behind a refused one goes on the same tick, and the refused one on the next()",
+            "petshop.app.RelaySpec.an event is published inside the trace it was recorded in()",
+            "petshop.app.RelaySpec.an event the bus refused stays in the outbox, and each refusal costs it exactly one tick()",
+            "petshop.app.RelaySpec.an hour of an empty outbox is one claim a tick and nothing published, without waiting the hour()",
+            "petshop.app.RelaySpec.nothing leaves before the first tick, and each tick carries what was recorded, in order()",
+            "petshop.app.RestartSpec.a restarted shop remembers who adopted what, and numbers new arrivals on()",
+            "petshop.app.SchemaSpec.a reader on the committed schema can read what the shop writes()",
+            "petshop.app.SchemaSpec.the schema the wire classes derive is the one committed()",
+            "petshop.app.ScrapeSpec.an adoption is a line in the scrape, with the outcome as a label()",
+            "petshop.app.ScrapeSpec.the scrape says how the JVM, the pool and every health check are()",
+            "petshop.app.ServingSpec.a request is a line in the scrape()",
+            "petshop.app.ServingSpec.the reference is served beside Swagger, in the shop's colours, over the same document()",
+            "petshop.app.ServingSpec.the whole shop starts on Jetty and answers()",
+            "petshop.app.SettingsSpec.a test changes one setting and the file keeps the rest()",
+            "petshop.app.SettingsSpec.every node that takes the settings uses them()",
+            "petshop.app.SettingsSpec.the settings come from the file rather than a default()",
+            "petshop.load.Ladder.adoption, stepped up until the shop falls behind(Proofload)",
+            "petshop.load.Ladder.browsing, stepped up until the shop falls behind(Proofload)",
+            "petshop.load.PetshopLoadTest.a pet already adopted is never sold again(Proofload)",
+            "petshop.load.PetshopLoadTest.browsing holds up at two hundred a second(Proofload)",
+            "petshop.load.PetshopLoadTest.two relays on one outbox publish every event once between them(Proofload)"
+          ]
+        }
+      },
+      "results": [],
+      "tool": {
+        "driver": {
+          "name": "gauntlet"
+        }
+      }
+    },
+    {
+      "results": [
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "api/src/main/kotlin/petshop/api/Codecs.kt"
+                },
+                "region": {
+                  "endColumn": 1,
+                  "endLine": 1,
+                  "startColumn": 1,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "File 'Codecs.kt' contains a single top level declaration and should be named 'ShopCodecs.kt'"
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1/nosym": "9bdc0e0afa04240ed54ef548fd46ad8b4b1b625e51239336af91044010b3a573",
+            "gauntlet/line/v1": "2e92d64ce42f319e2ca1cfdc9baa63e3008e871638a2fae60d0c8427e8318972",
+            "signature/v1": "7637080c1b49b4d3ea1e94b118d89276d9b8cd80"
+          },
+          "ruleId": "detekt.ktlint.Filename"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "api/src/main/kotlin/petshop/api/Codecs.kt"
+                },
+                "region": {
+                  "endColumn": 18,
+                  "endLine": 19,
+                  "startColumn": 8,
+                  "startLine": 19
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The file name 'Codecs' does not match the name of the single top-level declaration 'ShopCodecs'."
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1": "23c50cabcaa34f06ced1691968021d9660b8a9e36cbed012a5894ea7a54ccaad",
+            "gauntlet/line/v1": "6e614cc45c2e77807f1f2d757d002762ae1c784d00162b7a3ff0081522f3783a",
+            "gauntlet/symbol/v1": "2cbe0f1c5f88a22b0e1f05d3f67b208d3f2d6b2fffddc78a9e0c2f39c3633fd4",
+            "signature/v1": "2bd10bdc7ed03c9d90416336925eebdee9a0e409"
+          },
+          "ruleId": "detekt.naming.MatchingDeclarationName"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/src/main/kotlin/petshop/app/Avro.kt"
+                },
+                "region": {
+                  "endColumn": 79,
+                  "endLine": 55,
+                  "startColumn": 76,
+                  "startLine": 55
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "This expression contains a magic number. Consider defining it to a well named constant."
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1": "064186a2ca690b5bdb68e0151a11b74e45c053afcdde8abe99d5e98237b26dbd",
+            "gauntlet/line/v1": "03dc09cb562c2e4c9f24da1b447ad94c1c7842e0aafdabcfda7d3858ffba3265",
+            "gauntlet/symbol/v1": "ac1acb8cb7dd85fe9eeace03fec46b1bed869f072679b0beef36b1a504728369",
+            "signature/v1": "f83a383c0fa81f295d057f8f5ed0ba4610947817"
+          },
+          "ruleId": "detekt.style.MagicNumber"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/src/main/kotlin/petshop/app/BusChoice.kt"
+                },
+                "region": {
+                  "endColumn": 29,
+                  "endLine": 11,
+                  "startColumn": 18,
+                  "startLine": 11
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The file name 'BusChoice' does not match the name of the single top-level declaration 'BusSettings'."
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1": "5385676b00e16bbda6bfc398e07c3064841efbeee9ff28f7b485690a63c40985",
+            "gauntlet/line/v1": "cde9cb3fb94a84e6eb8e49d92b32a99d6b3604e0a7d235b3bb1d1e268ba18295",
+            "gauntlet/symbol/v1": "3343a33a080059c6185f1fd55b5a5f2cb09aad6909de94b50ee554ad56e8c13a",
+            "signature/v1": "004c13ecdefb179e4febefd106b043d318034a09"
+          },
+          "ruleId": "detekt.naming.MatchingDeclarationName"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/src/main/kotlin/petshop/app/Checks.kt"
+                },
+                "region": {
+                  "endColumn": 16,
+                  "endLine": 16,
+                  "startColumn": 7,
+                  "startLine": 16
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The file name 'Checks' does not match the name of the single top-level declaration 'Readiness'."
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1": "c83a3de96f009117c56e767c2ffcdbc8a65e733e40e612dc1d8c96f736492e3e",
+            "gauntlet/line/v1": "26af8c071adfc9c44f25d3e567f15cfbf7e284e0060af651e47f4698ea236a99",
+            "gauntlet/symbol/v1": "094df890238ca108f6cc872d217c9c191bcc284c9198f8d6fc9c5be43f595f9f",
+            "signature/v1": "6dc1222c378c134d68cc85937cc8b2b54316ee49"
+          },
+          "ruleId": "detekt.naming.MatchingDeclarationName"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/src/main/kotlin/petshop/app/Database.kt"
+                },
+                "region": {
+                  "endColumn": 28,
+                  "endLine": 14,
+                  "startColumn": 12,
+                  "startLine": 14
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The file name 'Database' does not match the name of the single top-level declaration 'DatabaseSettings'."
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1": "5edd3f89830d7ad00f78f13f77c8c4e0d27d2e2b2574a78b9567e1515394fa2f",
+            "gauntlet/line/v1": "bce44b61772d04e7dbf7a63d440122e3a729c57822bfbff724417bad76bb44f0",
+            "gauntlet/symbol/v1": "f343d6955d0a9965da02b0933651d4db84baa6b3bdfcb7d51b03a56f3db9e6ea",
+            "signature/v1": "1232a62eace472269974f709158320c551bc4644"
+          },
+          "ruleId": "detekt.naming.MatchingDeclarationName"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/src/main/kotlin/petshop/app/Database.kt"
+                },
+                "region": {
+                  "endColumn": 34,
+                  "endLine": 23,
+                  "startColumn": 29,
+                  "startLine": 23
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "This expression contains a magic number. Consider defining it to a well named constant."
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1": "2970ecf5216982d24b636edb37a5a162cf635b114637ab73cb401ce78b53e224",
+            "gauntlet/line/v1": "443daed64e0b14cf50ea77453d0975e762be766a7c4a0622ee32cc2f33c360cc",
+            "gauntlet/symbol/v1": "fe8804fbadce9729dc63144a365c12444d82b3600bb6dfb4598f47409a3dc47e",
+            "signature/v1": "fca6912c03fec269c67081883569af3d5458095d"
+          },
+          "ruleId": "detekt.style.MagicNumber"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/src/main/kotlin/petshop/app/KafkaBus.kt"
+                },
+                "region": {
+                  "endColumn": 71,
+                  "endLine": 105,
+                  "startColumn": 66,
+                  "startLine": 105
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "This expression contains a magic number. Consider defining it to a well named constant."
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1": "fc68a57bb3577d4cac70a3136bdc8633de542c02e8f34ad760827720fbbbf49e",
+            "gauntlet/line/v1": "4ecdab4af7553bc90bde182636ba0f9fa7cd178308b194943a014e1b3f324196",
+            "gauntlet/symbol/v1": "9dd66bb1e81e8dad2a2099fad0720429042fe452674d34d5b10614a1d8a539f4",
+            "signature/v1": "2fa19442267447cc7926580b958633b6e8dfcedf"
+          },
+          "ruleId": "detekt.style.MagicNumber"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/src/main/kotlin/petshop/app/Meters.kt"
+                },
+                "region": {
+                  "endColumn": 122,
+                  "endLine": 22,
+                  "startColumn": 1,
+                  "startLine": 22
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Line detected, which is longer than the defined maximum line length in the code style."
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1/nosym": "4655e4d8a977de5151215417f9290a8bf90bbb68ab74b8f13aebf23ba8ceef91",
+            "gauntlet/line/v1": "a86f310608bcf42653ba63bdddf141b2ecb9bde81a8947e210ac261ec2da7e5c",
+            "signature/v1": "a782d8d225c5e02ed97838edca33cf98cc4094d0"
+          },
+          "ruleId": "detekt.style.MaxLineLength"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/src/main/kotlin/petshop/app/Outbox.kt"
+                },
+                "region": {
+                  "endColumn": 19,
+                  "endLine": 53,
+                  "startColumn": 19,
+                  "startLine": 53
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Property name should use the screaming snake case notation when the value can not be changed"
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1/nosym": "553efa2dcf969b8d8821f9704bec01149178625f7a824eab9009ab17cd5a6c8c",
+            "gauntlet/line/v1": "54c2beaec83e87e6400bc20d70a2716fc32032f4102e1407c5be9bf139443d80",
+            "signature/v1": "b21f09e4350e2d1593b0647c0ca038af71c5abf4"
+          },
+          "ruleId": "detekt.ktlint.PropertyName"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/src/main/kotlin/petshop/app/Outbox.kt"
+                },
+                "region": {
+                  "endColumn": 24,
+                  "endLine": 53,
+                  "startColumn": 19,
+                  "startLine": 53
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Top level constant names should match the pattern: [A-Z][_A-Z0-9]*"
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1/nosym": "3d6071ec3444130e61496afaaea0c2250ed0b0295bb301ec04b3a325dfd05883",
+            "gauntlet/line/v1": "560383cc1ce1c8445dd36aa64180e23a790f8f7b937c5c41d7a91541a929be3f",
+            "signature/v1": "b21f09e4350e2d1593b0647c0ca038af71c5abf4"
+          },
+          "ruleId": "detekt.naming.TopLevelPropertyNaming"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/src/test/kotlin/petshop/app/EndToEndSpec.kt"
+                },
+                "region": {
+                  "endColumn": 125,
+                  "endLine": 124,
+                  "startColumn": 1,
+                  "startLine": 124
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Line detected, which is longer than the defined maximum line length in the code style."
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1": "8e6c1a5f4d0603bffe3ab80dd4fe39a8d80450dfc83a161a7098068a1ee426a4",
+            "gauntlet/line/v1": "04ad24841f6e00f61676975922f29f12b2d77e5db352a4258ee7383b26cfa689",
+            "gauntlet/symbol/v1": "3d9675b3b7dfa10b564639f24174791f6916d0e1b0fcd248a857246a46535372",
+            "signature/v1": "836a45a34f8cb4aa5d0959272813b52ae34b333a"
+          },
+          "ruleId": "detekt.style.MaxLineLength"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/src/test/kotlin/petshop/app/LoggingSpec.kt"
+                },
+                "region": {
+                  "endColumn": 129,
+                  "endLine": 51,
+                  "startColumn": 1,
+                  "startLine": 51
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Line detected, which is longer than the defined maximum line length in the code style."
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1": "90f0b68651bc512b0451667dcfaa67c2c351614b07203d79bdad7ab5b39cf55e",
+            "gauntlet/line/v1": "720cad3fe3f7b171cbd605662772493e24d2dd8bc0f1d13f462d02fa0d185efe",
+            "gauntlet/symbol/v1": "34e8dc8a623f172772ef9734ae6d51f63f688afac306f215ccf43d2ee90d5699",
+            "signature/v1": "b19abb1fb05eb923f59a016ae95bbd0d7e46be1c"
+          },
+          "ruleId": "detekt.style.MaxLineLength"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/src/test/kotlin/petshop/app/Registries.kt"
+                },
+                "region": {
+                  "endColumn": 19,
+                  "endLine": 19,
+                  "startColumn": 7,
+                  "startLine": 19
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The file name 'Registries' does not match the name of the single top-level declaration 'FakeRegistry'."
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1": "31586e311281bc36ae1430e7bd04f52eba7af861abdb4a4a81af6c5c9563843c",
+            "gauntlet/line/v1": "02bba37fecaf81a25ba2da87ea0aa0dd09ecfc101097f044d9f28588a29c0ccd",
+            "gauntlet/symbol/v1": "414df92cf9b5a3a819b81cf3523e6860b02386531d8a192d10e89f7ebd99b8ef",
+            "signature/v1": "3b6492ba1a77475310728070c13d6500f130f507"
+          },
+          "ruleId": "detekt.naming.MatchingDeclarationName"
+        },
+        {
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "loadtest/src/test/kotlin/petshop/load/HeavyTraffic.kt"
+                },
+                "region": {
+                  "endColumn": 9,
+                  "endLine": 46,
+                  "startColumn": 5,
+                  "startLine": 46
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The function main appears to be too complex based on Cyclomatic Complexity (complexity: 18). The maximum allowed complexity for methods is set to '14'"
+          },
+          "partialFingerprints": {
+            "gauntlet/ctx/v1": "32233d193731adc14ade064499c51a081801c3ff15328196b58af80cb092da09",
+            "gauntlet/line/v1": "7f3c42dfc3d6f039ec277685391555b9185cdf2739d32f1b302d5654862cc4c8",
+            "gauntlet/symbol/v1": "3602a62dc362c6c945353df93b1716f80cb1f588cf864a34c9bcfb2e5c488910",
+            "signature/v1": "df536add5138eb860f9e241943cba384216ed85a"
+          },
+          "ruleId": "detekt.complexity.CyclomaticComplexMethod"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "name": "detekt"
+        }
+      }
+    },
+    {
+      "results": [],
+      "tool": {
+        "driver": {
+          "name": "kotlin-arch"
+        }
+      }
+    },
+    {
+      "results": [],
+      "tool": {
+        "driver": {
+          "name": "kotlin-rules"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

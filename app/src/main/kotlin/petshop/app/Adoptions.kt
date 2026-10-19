@@ -3,7 +3,6 @@ package petshop.app
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
-import io.github.matthewjones372.lark.logWarn
 import io.github.matthewjones372.lark.actor.Behaviour
 import io.github.matthewjones372.lark.actor.Next
 import io.github.matthewjones372.lark.actor.Reply
@@ -11,7 +10,7 @@ import io.github.matthewjones372.lark.actor.become
 import io.github.matthewjones372.lark.actor.behaviour
 import io.github.matthewjones372.lark.actor.onStart
 import io.github.matthewjones372.lark.actor.stay
-import java.util.concurrent.atomic.AtomicReference
+import io.github.matthewjones372.lark.logWarn
 import petshop.api.Catalogue
 import petshop.api.PetDto
 import petshop.api.toDto
@@ -25,6 +24,7 @@ import petshop.domain.PetId
 import petshop.domain.PetReturned
 import petshop.domain.PetShopError
 import petshop.domain.ShopEvent
+import java.util.concurrent.atomic.AtomicReference
 
 /** The shop's only writer: one message at a time, so of two racing adopters the second is refused. */
 sealed interface Shop
@@ -75,7 +75,9 @@ fun shop(outbox: Outbox, window: ShopWindow, pets: Map<PetId, Pet> = emptyMap())
             is Arrived -> recorded("the arrival of ${message.pet.name}") {
                 state.record(message.pet) { seq -> PetArrived(seq, message.pet) }
             }
+
             is Adopt -> adopt(state, message)
+
             is Returned -> returned(state, message.id).also { message.reply(Unit) }
         }
     }.onStart { window.show(pets) }
@@ -85,7 +87,9 @@ private fun adopt(state: State, asked: Adopt): Next<State> {
     val pet = state.pets[asked.id]
     return when {
         pet == null -> stay().also { asked.reply(NoSuchPet(asked.id.value).left()) }
+
         pet.adopted -> stay().also { asked.reply(AlreadyAdopted(asked.id.value).left()) }
+
         else -> {
             val taken = pet.copy(adopted = true)
             state.record(taken) { seq -> PetAdopted(seq, taken, asked.by) }.fold(
@@ -100,14 +104,12 @@ private fun adopt(state: State, asked: Adopt): Next<State> {
 }
 
 /** The adoption may already be on the bus, so the undo is its own event and consumers hear it reversed. */
-private fun returned(state: State, id: PetId): Next<State> =
-    state.pets[id]?.let { pet ->
-        val back = pet.copy(adopted = false)
-        recorded("the return of pet ${id.value}") { state.record(back) { seq -> PetReturned(seq, back) } }
-    } ?: stay()
+private fun returned(state: State, id: PetId): Next<State> = state.pets[id]?.let { pet ->
+    val back = pet.copy(adopted = false)
+    recorded("the return of pet ${id.value}") { state.record(back) { seq -> PetReturned(seq, back) } }
+} ?: stay()
 
-private fun recorded(what: String, write: () -> Either<Throwable, State>): Next<State> =
-    write().fold(
-        { failed -> stay().also { logWarn("$what could not be recorded: $failed") } },
-        { next -> become(next) },
-    )
+private fun recorded(what: String, write: () -> Either<Throwable, State>): Next<State> = write().fold(
+    { failed -> stay().also { logWarn("$what could not be recorded: $failed") } },
+    { next -> become(next) },
+)

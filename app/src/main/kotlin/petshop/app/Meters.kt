@@ -24,7 +24,14 @@ private val jvmMeters: Module =
     closingOf(
         { registry: PrometheusMeterRegistry ->
             JvmGcMetrics().also { gc ->
-                listOf(JvmMemoryMetrics(), gc, JvmThreadMetrics(), ClassLoaderMetrics(), ProcessorMetrics(), UptimeMetrics())
+                listOf(
+                    JvmMemoryMetrics(),
+                    gc,
+                    JvmThreadMetrics(),
+                    ClassLoaderMetrics(),
+                    ProcessorMetrics(),
+                    UptimeMetrics(),
+                )
                     .forEach { it.bindTo(registry) }
             }
         },

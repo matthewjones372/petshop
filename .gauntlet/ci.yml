@@ -1,0 +1,13 @@
+# How Gauntlet's GitHub check builds this project, drafted from its own CI workflows by
+# `gauntlet connect github`. `setup` runs before the checks; `builds` says how each build
+# runs its tool there. Locally Gauntlet builds as usual. It's protected: an owner changes it,
+# then runs `gauntlet connect github` again.
+setup: 
+  - uses: actions/setup-java@v6
+    with: 
+      distribution: temurin
+      java-version: "21\n25\n"
+  - uses: gradle/actions/setup-gradle@v6
+builds: 
+  ".": 
+    {}

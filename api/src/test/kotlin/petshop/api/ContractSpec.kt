@@ -7,6 +7,8 @@ import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.empty
 import io.github.matthewjones372.lark.stream.of
+import io.github.matthewjones372.pelican.health.health
+import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.test.jetty.inMemory
 import io.github.matthewjones372.pelican.test.shouldBeError
 import io.github.matthewjones372.pelican.test.shouldBeOk
@@ -16,8 +18,6 @@ import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
 import io.opentelemetry.context.propagation.ContextPropagators
-import io.github.matthewjones372.pelican.health.health
-import io.github.matthewjones372.pelican.jetty.Handlers
 import org.junit.jupiter.api.Test
 import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet

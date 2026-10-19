@@ -9,7 +9,6 @@ import io.github.matthewjones372.lark.stream.Running
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.lark.stream.start
 import io.opentelemetry.api.trace.Tracer
-import java.util.concurrent.atomic.AtomicReference
 import petshop.api.SpeciesTally
 import petshop.api.Tally
 import petshop.domain.PetAdopted
@@ -17,6 +16,7 @@ import petshop.domain.PetArrived
 import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
+import java.util.concurrent.atomic.AtomicReference
 
 class Projection internal constructor(
     private val latest: AtomicReference<Seen>,

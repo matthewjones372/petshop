@@ -11,15 +11,15 @@ import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import org.junit.jupiter.api.Test
 import petshop.api.ShopCodecs
 import petshop.api.listPets
 import petshop.api.toDto
 import petshop.domain.ChipRegistry
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
 
 class ServingSpec {
 
