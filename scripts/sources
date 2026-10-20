@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Unpacks one of lark's or pelican's sources jars, at the version the build uses, and prints where.
+# Usage: scripts/sources <artifact>, e.g. scripts/sources lark-stream or scripts/sources pelican-core
+set -euo pipefail
+
+artifact=${1:?"usage: scripts/sources <artifact>, e.g. lark-actor or pelican-core"}
+root=$(cd "$(dirname "$0")/.." && pwd)
+case $artifact in
+    lark*) key=larkVersion ;;
+    pelican*) key=pelicanVersion ;;
+    *) echo "only lark-* and pelican-* artifacts are known" >&2; exit 1 ;;
+esac
+version=$(sed -n "s/^$key=//p" "$root/gradle.properties")
+jar=$(find "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1/io.github.matthewjones372/$artifact/$version" \
+    -name '*-sources.jar' 2>/dev/null | head -1)
+[ -n "$jar" ] || { echo "no sources jar for $artifact $version; build once so Gradle fetches it" >&2; exit 1; }
+
+out="${TMPDIR:-/tmp}"; out="${out%/}/petshop-sources/$artifact-$version"
+[ -d "$out" ] || { mkdir -p "$out" && unzip -qo "$jar" -d "$out"; }
+echo "$out"
