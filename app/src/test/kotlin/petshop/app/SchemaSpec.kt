@@ -5,6 +5,11 @@ import io.kotest.matchers.shouldBe
 import org.apache.avro.Schema
 import org.apache.avro.SchemaCompatibility
 import org.junit.jupiter.api.Test
+import petshop.domain.OnShelf
+import petshop.domain.Pet
+import petshop.domain.PetId
+import petshop.domain.PetReturned
+import petshop.domain.Species
 
 class SchemaSpec {
 
@@ -24,5 +29,13 @@ class SchemaSpec {
             SchemaCompatibility.checkReaderWriterCompatibility(golden, shopEventSchema).type
         }
         Then("it can read it") { compatibility shouldBe SchemaCompatibility.SchemaCompatibilityType.COMPATIBLE }
+    }
+
+    @Test
+    fun `a return from the topic's history reads back as a return`() = story {
+        val returned = Given("Nibbles' return, from before ADR 0001") {
+            PetReturned(seq = 3, pet = Pet(PetId(1), "Nibbles", Species.Tortoise, OnShelf))
+        }
+        Then("the wire carries it and reads it back unchanged") { returned.toWire().toDomain() shouldBe returned }
     }
 }

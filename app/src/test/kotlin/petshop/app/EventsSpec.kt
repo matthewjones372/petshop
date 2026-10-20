@@ -14,9 +14,11 @@ import petshop.app.ScriptedRegistry.Transfer.LosesTheRequest
 import petshop.app.ScriptedRegistry.Transfer.Records
 import petshop.domain.Adopted
 import petshop.domain.ChipRegistry
+import petshop.domain.OnShelf
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetId
+import petshop.domain.PetReturned
 import petshop.domain.PetShop
 import petshop.domain.Species
 import kotlin.time.Duration.Companion.seconds
@@ -69,6 +71,23 @@ class EventsSpec {
                 tally.adopted(Species.Dog) shouldBe 1
                 tally.events shouldBe 1
             }
+        }
+    }
+
+    @Test
+    fun `a return from before ADR 0001 still takes its adoption off the count`() = story {
+        val barnaby = Given("Barnaby, adopted by Bea and then returned, as the topic's history holds him") {
+            Pet(PetId(2), "Barnaby", Species.Dog, standing = Adopted("Bea"))
+        }
+        testApp(settled) { app: Observed ->
+            When("the bus delivers the adoption and then the return") {
+                app.bus.publish(PetAdopted(seq = 7, pet = barnaby, by = "Bea"))
+                app.bus.publish(PetReturned(seq = 8, pet = barnaby.copy(standing = OnShelf)))
+            }
+            val tally = Then("the consumer counts both events").eventually(5.seconds) {
+                app.projection.tally().also { it.events shouldBe 2 }
+            }
+            And("no dog is counted adopted") { tally.adopted(Species.Dog) shouldBe 0 }
         }
     }
 

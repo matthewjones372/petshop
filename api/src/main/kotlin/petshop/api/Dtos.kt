@@ -9,6 +9,7 @@ import petshop.domain.OnShelf
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
+import petshop.domain.PetReturned
 import petshop.domain.PetShopError
 import petshop.domain.ShopEvent
 
@@ -75,7 +76,9 @@ fun NoSuchPet.toDto(): ProblemDto.NoSuchPet = transformInto()
 
 fun AlreadyAdopted.toDto(): ProblemDto.AlreadyAdopted = transformInto()
 
-fun ShopEvent.toDto(): ShopEventDto = when (this) {
+/** Null for a return: the feed shows what happens now, and a return only comes from history before ADR 0001. */
+fun ShopEvent.toDto(): ShopEventDto? = when (this) {
     is PetArrived -> ShopEventDto(seq, ShopEventKind.Arrived, pet.toDto())
     is PetAdopted -> ShopEventDto(seq, ShopEventKind.Adopted, pet.toDto())
+    is PetReturned -> null
 }

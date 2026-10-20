@@ -1,6 +1,6 @@
 # An adoption is confirmed by the chip registry
 
-An adoption records the pet as being adopted before the chip registry is asked, and becomes an adoption only when the registry confirms the new keeper. The registry is the source of truth: whatever it says about the keeper is what the shop records. Only confirmed adoptions are published, so consumers never hear an adoption that is later undone, and there is no returned event.
+An adoption records the pet as being adopted before the chip registry is asked, and becomes an adoption only when the registry confirms the new keeper. The registry is the source of truth: whatever it says about the keeper is what the shop records. Only confirmed adoptions are published, so consumers never hear an adoption that is later undone, and the shop writes no returned event. The schema keeps its PetReturned record, read but never written, so the topic's history and an outbox left unpublished across the upgrade stay readable.
 
 When the shop cannot finish an adoption within the request (the registry's answer is unknown, or a write fails), the adoption is settled later by asking the registry again, with backoff, until the outcome is known and recorded. Settling starts from the request that could not finish, and at start-up for every pet still being adopted, since nothing is in flight then.
 

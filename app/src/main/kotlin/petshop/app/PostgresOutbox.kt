@@ -12,6 +12,7 @@ import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
 import petshop.domain.PetId
+import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
 import petshop.domain.Standing
@@ -79,6 +80,8 @@ private fun ShopEvent.row(carried: Map<String, String>): OutboxRow {
         )
 
         is PetAdopted -> OutboxRow(seq, "adopted", pet.id.value, pet.name, pet.species.name, true, by, metadata)
+
+        is PetReturned -> OutboxRow(seq, "returned", pet.id.value, pet.name, pet.species.name, false, null, metadata)
     }
 }
 

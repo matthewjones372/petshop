@@ -24,7 +24,7 @@ class Feed internal constructor(private val hub: Hub<ShopEventDto>) : AutoClosea
     fun offer(event: ShopEvent) {
         if (hub.subscribers == 0) return
         // The trace the event is handled in, so a page that shows it can continue that trace.
-        val dto = event.toDto().copy(traceparent = Carriers.capture()["traceparent"])
+        val dto = event.toDto()?.copy(traceparent = Carriers.capture()["traceparent"]) ?: return
         hub.publish(dto).onLeft { counter("petshop.feed.dropped").increment() }
     }
 
