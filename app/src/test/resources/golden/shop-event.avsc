@@ -47,6 +47,16 @@
         "name" : "pet",
         "type" : "Pet"
       } ]
+    }, {
+      "type" : "record",
+      "name" : "PetReturned",
+      "fields" : [ {
+        "name" : "seq",
+        "type" : "long"
+      }, {
+        "name" : "pet",
+        "type" : "Pet"
+      } ]
     } ]
   } ]
 }
