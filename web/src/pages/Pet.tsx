@@ -4,9 +4,11 @@ import { Problem, adoptPet, getPet, look } from "../api";
 
 type Outcome = { ok: boolean; text: string };
 
+const beingAdopted = "Someone is adopting this pet right now. It may come back to the shelf.";
+
 const explain: Record<number, string> = {
   404: "That pet isn't in the shop.",
-  409: "Someone got there first, or is adopting this pet right now.",
+  409: "Someone got there first.",
   422: "The chip registry has no chip for this pet, so it can't go home yet.",
   503: "The adoption couldn't be finished just now. Try again in a moment.",
 };
@@ -31,7 +33,8 @@ export default function PetPage() {
       });
     } catch (e) {
       if (!(e instanceof Problem)) throw e;
-      setOutcome({ ok: false, text: `${explain[e.status] ?? "Something went wrong."} (${e.status}: ${e.message})` });
+      const why = e.kind === "being_adopted" ? beingAdopted : (explain[e.status] ?? "Something went wrong.");
+      setOutcome({ ok: false, text: `${why} (${e.status}: ${e.message})` });
     } finally {
       setBusy(false);
     }
