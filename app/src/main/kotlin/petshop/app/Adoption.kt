@@ -61,7 +61,12 @@ class Adoption(
         close = {},
     )
         .flatMapMerge(breadth = SETTLING_AT_ONCE) { unfinished ->
-            Stream.fromStage(CompletableFuture.supplyAsync({ settle(unfinished) }, VirtualThreads))
+            // Caught here: a throw would fail the whole stream, and no other pet would settle until a restart.
+            val settled = {
+                Either.catch { settle(unfinished) }
+                    .onLeft { thrown -> logError("settling pet ${unfinished.id.value} threw: $thrown") }
+            }
+            Stream.fromStage(CompletableFuture.supplyAsync(settled, VirtualThreads))
         }
         .runFold(0L) { settled, _ -> settled + 1 }
         .start(streams)
