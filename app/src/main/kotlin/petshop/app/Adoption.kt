@@ -75,7 +75,13 @@ class Adoption(
     fun adopt(id: PetId, by: String): AdoptionReport {
         val attempt = Attempt(Unfinished(id, by))
         val answer = either {
-            val adopting = ref.asked { reply -> Adopt(id, by, reply) }.bind()
+            // Throws when the actor stopped or timed out: that is a fault (a 500), not a declared refusal.
+            val adopting = ref.ask(within = 3.seconds) { reply -> Adopt(id, by, reply) }.getOrElse { failure ->
+                // The actor may still record the pet as being adopted after the ask gave up. The registry was never
+                // asked, so settling finds the shop still keeps the pet and puts it back on the shelf.
+                waiting.put(attempt.adoption)
+                error("the shop did not answer: $failure")
+            }.bind()
             val chip = registry.lookup(id).getOrElse { failure ->
                 attempt.warn("the registry could not look up pet ${id.value}: $failure")
                 refuse(attempt, failure.refusing(id))
@@ -170,10 +176,6 @@ private fun RegistryError.refusing(id: PetId): PetShopError = when (this) {
     NotRegistered -> NotChipped(id.value)
     is Unreachable -> RegistryDown(id.value)
 }
-
-/** Throws when the actor stopped or timed out: that is a fault (a 500), not a declared refusal. */
-private fun <A : Any> ActorRef<Shop>.asked(message: (Reply<A>) -> Shop): A =
-    ask(within = 3.seconds, message).getOrElse { failure -> error("the shop did not answer: $failure") }
 
 /** An actor that does not answer leaves the pet as unsettled as a write that failed. */
 private fun ActorRef<Shop>.settled(message: (Reply<Either<Unsettled, Pet>>) -> Shop): Either<Unsettled, Pet> =

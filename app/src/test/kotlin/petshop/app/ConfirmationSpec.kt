@@ -9,6 +9,7 @@ import io.github.matthewjones372.lark.test.eventually
 import io.github.matthewjones372.lark.test.story
 import io.kotest.assertions.arrow.core.shouldBeLeft
 import io.kotest.assertions.arrow.core.shouldBeRight
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -141,6 +142,23 @@ class ConfirmationSpec {
     }
 
     @Test
+    fun `an adoption the shop answered too late for is settled back onto the shelf`() = story {
+        val outbox = Given("an outbox that holds its first row write") { HeldFirstKeep() }
+        val shop = Petshop.module.overriding(single<ChipRegistry> { ScriptedRegistry() })
+            .overriding(single<Outbox> { outbox })
+            .subgraph<PetShop>()
+        testApp(shop) { shop: PetShop ->
+            When("Ada adopts Nibbles, the shop gives up waiting for the actor, and then the write lands") {
+                shouldThrow<IllegalStateException> { shop.adopt(PetId(1), by = "Ada") }
+                outbox.release.countDown()
+            }
+            Then("settling puts Nibbles back on the shelf, since the registry was never asked").eventually(10.seconds) {
+                shop.find(PetId(1))?.standing shouldBe OnShelf
+            }
+        }
+    }
+
+    @Test
     fun `a pet that cannot be settled does not hold up another`() = story {
         val registry = Given("a registry that loses every answer, and never answers about Nibbles again") {
             ScriptedRegistry(
@@ -169,6 +187,22 @@ private class FailingKeep(private val number: Int) : Outbox {
 
     override fun keep(pet: Pet) {
         if (keeps.incrementAndGet() == number) throw SQLTransientConnectionException("the pool had nothing to lend")
+    }
+
+    override fun shelf(opening: List<Pet>): List<Pet> = opening
+
+    override fun claim(limit: Int, publish: (List<Claimed>) -> List<ShopEvent>): List<ShopEvent> = emptyList()
+}
+
+/** Holds the first row write until the test lets it through, so it can land after the ask has given up. */
+private class HeldFirstKeep : Outbox {
+    val release = CountDownLatch(1)
+    private val keeps = AtomicInteger()
+
+    override fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent = numbered(1)
+
+    override fun keep(pet: Pet) {
+        if (keeps.incrementAndGet() == 1) check(release.await(10, TimeUnit.SECONDS)) { "the write was never released" }
     }
 
     override fun shelf(opening: List<Pet>): List<Pet> = opening
