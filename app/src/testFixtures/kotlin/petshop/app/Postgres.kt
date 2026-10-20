@@ -10,8 +10,10 @@ import org.testcontainers.postgresql.PostgreSQLContainer
 
 object TestPostgres {
 
+    // With TESTCONTAINERS_REUSE_ENABLE=true every JVM shares one container. Pitest starts a JVM per batch of
+    // mutants, and each fresh schema keeps tests apart, so only the first JVM pays for the start.
     private val container: PostgreSQLContainer by lazy {
-        PostgreSQLContainer("postgres:17-alpine").apply { start() }
+        PostgreSQLContainer("postgres:17-alpine").withReuse(true).apply { start() }
     }
 
     private val schemas = AtomicInteger()
