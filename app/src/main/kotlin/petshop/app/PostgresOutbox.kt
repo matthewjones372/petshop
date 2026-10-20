@@ -97,6 +97,9 @@ private fun OutboxRow.event(): ShopEvent {
             adoptedBy,
         ) { "adoption $seq names nobody" }.let { by -> PetAdopted(seq, pet(Adopted(by)), by) }
 
+        // Written before ADR 0001 and maybe unpublished across the upgrade, so it still goes out.
+        "returned" -> PetReturned(seq, pet(OnShelf))
+
         else -> error("outbox row $seq is a $kind, which the shop never writes")
     }
 }

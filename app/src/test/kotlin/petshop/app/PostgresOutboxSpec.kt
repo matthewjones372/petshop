@@ -15,6 +15,7 @@ import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
 import petshop.domain.PetId
+import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
 import petshop.outbox.OutboxRow
@@ -59,6 +60,18 @@ class PostgresOutboxSpec {
                 recorded.map { it.seq } shouldBe listOf(1L, 2L, 3L)
             }
             And("a claim reads them back oldest first") { outbox.left() shouldBe recorded }
+        }
+    }
+
+    @Test
+    fun `a return written before the registry had to confirm adoptions is still claimed`() = story {
+        onItsOwn { outbox ->
+            val returned = Given("Nibbles' return, as the shop wrote it before ADR 0001, still unpublished") {
+                outbox.record(nibbles) { seq -> PetReturned(seq, nibbles) }
+            }
+            Then("a claim reads it back as a return, so the upgrade does not stop the relay on it") {
+                outbox.left() shouldBe listOf(returned)
+            }
         }
     }
 
