@@ -1,5 +1,6 @@
 package petshop.api
 
+import io.github.matthewjones372.kimney.into
 import io.github.matthewjones372.kimney.transformInto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -65,7 +66,7 @@ enum class ShopEventKind { Arrived, Adopted }
 data class ShopEventDto(val seq: Long, val kind: ShopEventKind, val pet: PetDto, val traceparent: String? = null)
 
 /** A pet being adopted reads as taken: nobody browsing needs to know a transfer is in flight. */
-fun Pet.toDto(): PetDto = PetDto(id.value, name, species.transformInto(), adopted = standing !is OnShelf)
+fun Pet.toDto(): PetDto = into<_, PetDto>().withFieldComputed(PetDto::adopted) { it.standing !is OnShelf }.transform()
 
 fun List<Pet>.toDto(): List<PetDto> = map { it.toDto() }
 
