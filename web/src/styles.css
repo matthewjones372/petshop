@@ -33,8 +33,11 @@
   --font-display: "Fredoka", "Nunito", system-ui, sans-serif;
   --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  color-scheme: light;
+  color-scheme: light dark;
 }
+
+/* Pinned light on a dark system: without this, scrollbars and form controls stay dark. */
+:root[data-theme="light"] { color-scheme: light; }
 
 :root[data-theme="dark"] {
   --bg: #14122b;

@@ -17,6 +17,7 @@ function ThemeToggle() {
     setPinned(next);
     if (next) document.documentElement.dataset.theme = next;
     else delete document.documentElement.dataset.theme;
+    document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]')?.setAttribute("content", next ?? "light dark");
   };
 
   const onSystem = (e: MediaQueryListEvent) => setSystem(e.matches ? "dark" : "light");
