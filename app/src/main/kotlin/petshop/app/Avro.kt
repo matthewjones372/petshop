@@ -47,7 +47,8 @@ fun WireEvent.toDomain(): ShopEvent = when (this) {
     is WirePetReturned -> PetReturned(seq, pet.toDomain(OnShelf))
 }
 
-private fun WirePet.toDomain(standing: Standing): Pet = into<_, Pet>().withFieldConst(Pet::standing, standing).transform()
+private fun WirePet.toDomain(standing: Standing): Pet =
+    into<_, Pet>().withFieldConst(Pet::standing, standing).transform()
 
 class ShopEventSerializer(registry: Map<String, Any>) : Serializer<ShopEvent> {
 

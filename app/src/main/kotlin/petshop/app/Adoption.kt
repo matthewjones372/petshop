@@ -72,7 +72,8 @@ class Adoption(
         .start(streams)
 
     init {
-        // The actor shows its shelf before it answers anything, so once it answers the window is the one it opened with.
+        // The actor shows its shelf before it answers anything, so once it answers the window is the one it
+        // opened with.
         ref.ask(within = 3.seconds) { reply -> Ping(reply) }
             .onLeft { failure -> logError("the shop did not answer before settling started: $failure") }
         // Nothing is in flight at start-up, so every pet still being adopted was left by a run that stopped.
