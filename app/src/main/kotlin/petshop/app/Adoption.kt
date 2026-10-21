@@ -81,61 +81,69 @@ class Adoption(
 
     /** The actor decides first, so a lost race never calls the registry. */
     fun adopt(id: PetId, by: String): AdoptionReport {
-        val attempt = Attempt(Unfinished(id, by))
-        val answer = either {
-            // Throws when the actor stopped or timed out: that is a fault (a 500), not a declared refusal.
-            val adopting = ref.ask(within = 3.seconds) { reply -> Adopt(id, by, reply) }.getOrElse { failure ->
-                // The actor may still record the pet as being adopted after the ask gave up. The registry was never
-                // asked, so settling finds the shop still keeps the pet and puts it back on the shelf.
-                waiting.put(attempt.adoption)
-                error("the shop did not answer: $failure")
-            }.bind()
-            val chip = registry.lookup(id).getOrElse { failure ->
-                attempt.warn("the registry could not look up pet ${id.value}: $failure")
-                refuse(attempt, failure.refusing(id))
+        val adoption = Unfinished(id, by)
+        val (warnings, answer) = warnings {
+            either {
+                // Throws when the actor stopped or timed out: that is a fault (a 500), not a declared refusal.
+                val adopting = ref.ask(within = 3.seconds) { reply -> Adopt(id, by, reply) }.getOrElse { failure ->
+                    // The actor may still record the pet as being adopted after the ask gave up. The registry was
+                    // never asked, so settling finds the shop still keeps the pet and puts it back on the shelf.
+                    waiting.put(adoption)
+                    error("the shop did not answer: $failure")
+                }.bind()
+                val chip = registry.lookup(id).getOrElse { failure ->
+                    warn("the registry could not look up pet ${id.value}: $failure")
+                    refuse(adoption, failure.refusing(id))
+                }
+                registry.transfer(chip, to = by).fold(
+                    { failure ->
+                        warn("the registry did not record $by keeping pet ${id.value}: $failure")
+                        when (failure) {
+                            NotRegistered -> refuse(adoption, NotChipped(id.value))
+                            is Unreachable -> readBack(adoption, adopting)
+                        }
+                    },
+                    { confirm(adoption, adopting) },
+                )
             }
-            registry.transfer(chip, to = by).fold(
-                { failure ->
-                    attempt.warn("the registry did not record $by keeping pet ${id.value}: $failure")
-                    when (failure) {
-                        NotRegistered -> refuse(attempt, NotChipped(id.value))
-                        is Unreachable -> readBack(attempt, adopting)
-                    }
-                },
-                { confirm(attempt, adopting) },
-            )
         }
-        return AdoptionReport(answer, attempt.warnings)
+        return AdoptionReport(answer, warnings)
     }
 
     /** The transfer may have landed before its answer was lost, so the registry is asked who keeps the pet. */
-    private fun Raise<PetShopError>.readBack(attempt: Attempt, adopting: Pet): Pet {
-        val (id, by) = attempt.adoption
+    context(_: Warnings)
+    private fun Raise<PetShopError>.readBack(adoption: Unfinished, adopting: Pet): Pet {
+        val (id, by) = adoption
         return registry.lookup(id).fold(
             { failure ->
-                adopting.also { settleLater(attempt, "the keeper of pet ${id.value} was not read back: $failure") }
+                adopting.also { settleLater(adoption, "the keeper of pet ${id.value} was not read back: $failure") }
             },
-            { chip -> if (chip.keeper == by) confirm(attempt, adopting) else refuse(attempt, RegistryDown(id.value)) },
+            { chip ->
+                if (chip.keeper == by) confirm(adoption, adopting) else refuse(adoption, RegistryDown(id.value))
+            },
         )
     }
 
-    private fun confirm(attempt: Attempt, adopting: Pet): Pet {
-        val (id, by) = attempt.adoption
+    context(_: Warnings)
+    private fun confirm(adoption: Unfinished, adopting: Pet): Pet {
+        val (id, by) = adoption
         return ref.settled { reply -> Confirm(id, by, reply) }.getOrElse { failure ->
-            adopting.also { settleLater(attempt, "the adoption of pet ${id.value} was not confirmed: $failure") }
+            adopting.also { settleLater(adoption, "the adoption of pet ${id.value} was not confirmed: $failure") }
         }
     }
 
-    private fun Raise<PetShopError>.refuse(attempt: Attempt, why: PetShopError): Nothing {
-        val (id, by) = attempt.adoption
+    context(_: Warnings)
+    private fun Raise<PetShopError>.refuse(adoption: Unfinished, why: PetShopError): Nothing {
+        val (id, by) = adoption
         ref.settled { reply -> Return(id, by, reply) }
-            .onLeft { failure -> settleLater(attempt, "the return of pet ${id.value} was not recorded: $failure") }
+            .onLeft { failure -> settleLater(adoption, "the return of pet ${id.value} was not recorded: $failure") }
         raise(why)
     }
 
-    private fun settleLater(attempt: Attempt, warning: String) {
-        attempt.warn("$warning; settling it later")
-        waiting.put(attempt.adoption)
+    context(_: Warnings)
+    private fun settleLater(adoption: Unfinished, warning: String) {
+        warn("$warning; settling it later")
+        waiting.put(adoption)
     }
 
     /** Done once the registry has answered and the actor has written what it said; only a bug or a close gives up. */
@@ -167,14 +175,21 @@ class Adoption(
             val Stop = Unfinished(PetId(-1), "")
         }
     }
+}
 
-    private class Attempt(val adoption: Unfinished) {
-        val warnings = mutableListOf<String>()
+/** The effect of noting what went wrong without changing the answer, as [Raise] is the effect of refusing. */
+private fun interface Warnings {
+    fun warn(warning: String)
+}
 
-        fun warn(warning: String) {
-            warnings += warning
-        }
-    }
+context(warnings: Warnings)
+private fun warn(warning: String) = warnings.warn(warning)
+
+/** Runs [block] with a [Warnings] in scope and returns what it noted beside what it answered. */
+private inline fun <A> warnings(block: context(Warnings) () -> A): Pair<List<String>, A> {
+    val noted = mutableListOf<String>()
+    val answer = block(Warnings { warning -> noted += warning })
+    return noted.toList() to answer
 }
 
 /** Enough for every pet a shop holds at once; a pet past it waits for one to settle. */
