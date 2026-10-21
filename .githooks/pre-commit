@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Lets detekt's ktlint rules rewrite the layout of staged Kotlin, so a commit never carries what CI's lint would refuse.
+# Enable once per clone: git config core.hooksPath .githooks
+set -euo pipefail
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR -- '*.kt' '*.kts')
+[ -z "$staged" ] && exit 0
+
+# Snapshot working-tree contents of staged Kotlin files
+snapshot() {
+    local file
+    while IFS= read -r file; do
+        [ -f "$file" ] && sha256sum "$file"
+    done <<< "$staged"
+}
+
+before=$(snapshot)
+./gradlew --quiet detekt -Pdetekt.autoCorrect=true >/dev/null 2>&1 || true
+after=$(snapshot)
+
+if [ "$before" != "$after" ]; then
+    echo "detekt rewrote the layout of staged files; look at the change, stage it, and commit again:" >&2
+    diff <(echo "$before") <(echo "$after") | grep '^>' | sed 's/^> [^ ]* */  /' >&2
+    exit 1
+fi
