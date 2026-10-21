@@ -33,8 +33,11 @@
   --font-display: "Fredoka", "Nunito", system-ui, sans-serif;
   --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  color-scheme: light;
+  color-scheme: light dark;
 }
+
+/* Pinned light on a dark system: without this, scrollbars and form controls stay dark. */
+:root[data-theme="light"] { color-scheme: light; }
 
 :root[data-theme="dark"] {
   --bg: #14122b;
@@ -201,7 +204,7 @@ code {
 }
 .btn:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--btn-shadow); color: var(--ink); }
 .btn:active { transform: translate(1px, 1px); box-shadow: 2px 2px 0 var(--btn-shadow); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: 2px 2px 0 var(--btn-shadow); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: 2px 2px 0 var(--btn-shadow); }
 .btn-small { padding: 7px 14px; font-size: 0.95rem; box-shadow: 2px 2px 0 var(--btn-shadow); }
 .btn-primary, .btn-primary:hover { background: var(--sun); color: var(--ink-fixed); }
 
@@ -328,9 +331,21 @@ code {
   color: var(--ink);
   font: inherit;
   font-weight: 600;
-  outline: none;
 }
 .search:focus { border-color: var(--grape); }
+
+/* Read by screen readers, not drawn. */
+.visually-hidden {
+  position: absolute;
+  clip-path: inset(50%);
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  white-space: nowrap;
+}
 
 /* Hero */
 .hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 48px; align-items: center; padding: 48px 0 24px; }

@@ -1,21 +1,47 @@
 import { A, type RouteSectionProps } from "@solidjs/router";
-import { createSignal } from "solid-js";
+import { createSignal, onCleanup } from "solid-js";
 
-function systemDark() {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
+type Theme = "light" | "dark";
 
+const systemScheme = window.matchMedia("(prefers-color-scheme: dark)");
+const asTheme = (value: string | null | undefined): Theme | undefined =>
+  value === "light" || value === "dark" ? value : undefined;
+
+/** No stored theme follows the system; a stored one pins the site against it, even once the system comes to match. */
 function ThemeToggle() {
-  const initial = document.documentElement.dataset.theme ?? (systemDark() ? "dark" : "light");
-  const [theme, setTheme] = createSignal(initial);
+  const [system, setSystem] = createSignal<Theme>(systemScheme.matches ? "dark" : "light");
+  const [pinned, setPinned] = createSignal(asTheme(document.documentElement.dataset.theme));
+  const theme = () => pinned() ?? system();
+
+  const pin = (next: Theme | undefined) => {
+    setPinned(next);
+    if (next) document.documentElement.dataset.theme = next;
+    else delete document.documentElement.dataset.theme;
+    document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]')?.setAttribute("content", next ?? "light dark");
+  };
+
+  const onSystem = (e: MediaQueryListEvent) => setSystem(e.matches ? "dark" : "light");
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === "theme") pin(asTheme(e.newValue));
+  };
+  systemScheme.addEventListener("change", onSystem);
+  addEventListener("storage", onStorage);
+  onCleanup(() => {
+    systemScheme.removeEventListener("change", onSystem);
+    removeEventListener("storage", onStorage);
+  });
+
+  // Flipping to what the system shows hands the choice back to it rather than pinning that.
   const flip = () => {
-    const next = theme() === "dark" ? "light" : "dark";
-    setTheme(next);
-    document.documentElement.dataset.theme = next;
+    const target: Theme = theme() === "dark" ? "light" : "dark";
+    const next = target === system() ? undefined : target;
+    pin(next);
     try {
-      localStorage.setItem("theme", next);
-    } catch {
-      // Private windows can refuse storage; the theme still applies for this visit.
+      if (next) localStorage.setItem("theme", next);
+      else localStorage.removeItem("theme");
+    } catch (e) {
+      // Private windows can refuse storage with a DOMException; the theme still applies for this visit.
+      if (!(e instanceof DOMException)) throw e;
     }
   };
   return (

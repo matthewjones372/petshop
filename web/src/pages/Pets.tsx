@@ -25,21 +25,28 @@ export default function Pets() {
   );
   const count = (s?: Species) => (pets() ?? []).filter((p) => !s || p.species === s).length;
 
-  const pick = (next: Record<string, string | undefined>) => {
+  // Typing replaces the history entry, so Back leaves the search rather than undoing it a letter at a time.
+  const pick = (next: Record<string, string | undefined>, typed = false) => {
     setShown(pageSize);
-    setParams(next);
+    setParams(next, { replace: typed });
   };
 
   return (
     <div class="shell">
       <aside class="sidebar">
         <section>
+          <label for="pet-search" class="visually-hidden">Find a pet by name</label>
           <input
+            id="pet-search"
             class="search"
             type="search"
             placeholder="Find by name…"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck={false}
             value={params.q ?? ""}
-            onInput={(e) => pick({ q: e.currentTarget.value || undefined })}
+            onInput={(e) => pick({ q: e.currentTarget.value || undefined }, true)}
           />
         </section>
         <section>
