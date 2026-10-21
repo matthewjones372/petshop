@@ -1,5 +1,5 @@
 import { A, useSearchParams } from "@solidjs/router";
-import { For, Show, createMemo, createResource, createSignal } from "solid-js";
+import { For, Show, createEffect, createMemo, createResource, createSignal, on, onCleanup } from "solid-js";
 import { allSpecies, listPets, look, type Species } from "../api";
 import { usePageTitle } from "../title";
 
@@ -23,6 +23,22 @@ export default function Pets() {
         (!species() || p.species === species()) &&
         (status() === "all" || p.adopted === (status() === "adopted")) &&
         p.name.toLowerCase().includes(query()),
+    ),
+  );
+  const matched = () => `${matches().length} ${matches().length === 1 ? "pet" : "pets"} match`;
+
+  // Read out once a filter settles, so typing a name announces one count rather than one per letter. Emptied first,
+  // so the same count after another filter is still read.
+  const [announced, setAnnounced] = createSignal("");
+  createEffect(
+    on(
+      [species, status, query],
+      () => {
+        setAnnounced("");
+        const timer = setTimeout(() => setAnnounced(matched()), 500);
+        onCleanup(() => clearTimeout(timer));
+      },
+      { defer: true },
     ),
   );
   const count = (s?: Species) => (pets() ?? []).filter((p) => !s || p.species === s).length;
@@ -99,8 +115,11 @@ export default function Pets() {
         </div>
         <p class="muted">
           <Show when={pets()} fallback="Fetching the shop…">
-            {matches().length} {matches().length === 1 ? "pet" : "pets"} match. New arrivals turn up every few seconds.
+            {matched()}. New arrivals turn up every few seconds.
           </Show>
+        </p>
+        <p class="visually-hidden" role="status">
+          {announced()}
         </p>
         <Show when={pets.error}>
           <div class="callout err">Couldn't reach the shop: {String(pets.error?.message ?? pets.error)}</div>

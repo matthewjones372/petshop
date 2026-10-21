@@ -46,7 +46,7 @@ export default function Live() {
       </div>
       <div class="toolbar">
         <h1 style={{ margin: 0 }}>Happening now</h1>
-        <span class="sticker" style={{ animation: "none" }}>
+        <span class="sticker" role="status" style={{ animation: "none" }}>
           <span class="live-dot" classList={{ paused: status() !== "live" }} style={{ margin: "0 9px" }} />
           {statusText[status()]}
         </span>
