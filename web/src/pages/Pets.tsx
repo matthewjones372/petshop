@@ -9,6 +9,8 @@ type Status = "waiting" | "adopted" | "all";
 
 export default function Pets() {
   const [pets, { refetch }] = createResource(listPets);
+  // A failed resource throws when read, which would stop the page updating, so a failure reads as nothing yet.
+  const loaded = () => (pets.error ? undefined : pets());
   const [params, setParams] = useSearchParams<{ species?: string; status?: string; q?: string }>();
   const [shown, setShown] = createSignal(pageSize);
 
@@ -18,7 +20,7 @@ export default function Pets() {
   usePageTitle(() => (species() ? `${species()}s` : "Pets"));
 
   const matches = createMemo(() =>
-    (pets() ?? []).filter(
+    (loaded() ?? []).filter(
       (p) =>
         (!species() || p.species === species()) &&
         (status() === "all" || p.adopted === (status() === "adopted")) &&
@@ -41,7 +43,7 @@ export default function Pets() {
       { defer: true },
     ),
   );
-  const count = (s?: Species) => (pets() ?? []).filter((p) => !s || p.species === s).length;
+  const count = (s?: Species) => (loaded() ?? []).filter((p) => !s || p.species === s).length;
 
   // Typing replaces the history entry, so Back leaves the search rather than undoing it a letter at a time.
   const pick = (next: Record<string, string | undefined>, typed = false) => {
@@ -114,7 +116,7 @@ export default function Pets() {
           <button class="btn btn-small" onClick={refetch}>↻ Refresh</button>
         </div>
         <p class="muted">
-          <Show when={pets()} fallback="Fetching the shop…">
+          <Show when={loaded()} fallback={pets.error ? "" : "Fetching the shop…"}>
             {matched()}. New arrivals turn up every few seconds.
           </Show>
         </p>
