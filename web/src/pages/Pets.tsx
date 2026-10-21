@@ -25,9 +25,10 @@ export default function Pets() {
   );
   const count = (s?: Species) => (pets() ?? []).filter((p) => !s || p.species === s).length;
 
-  const pick = (next: Record<string, string | undefined>) => {
+  // Typing replaces the history entry, so Back leaves the search rather than undoing it a letter at a time.
+  const pick = (next: Record<string, string | undefined>, typed = false) => {
     setShown(pageSize);
-    setParams(next);
+    setParams(next, { replace: typed });
   };
 
   return (
@@ -45,7 +46,7 @@ export default function Pets() {
             autocapitalize="off"
             spellcheck={false}
             value={params.q ?? ""}
-            onInput={(e) => pick({ q: e.currentTarget.value || undefined })}
+            onInput={(e) => pick({ q: e.currentTarget.value || undefined }, true)}
           />
         </section>
         <section>
