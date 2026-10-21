@@ -34,10 +34,16 @@ export default function Pets() {
     <div class="shell">
       <aside class="sidebar">
         <section>
+          <label for="pet-search" class="visually-hidden">Find a pet by name</label>
           <input
+            id="pet-search"
             class="search"
             type="search"
             placeholder="Find by name…"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck={false}
             value={params.q ?? ""}
             onInput={(e) => pick({ q: e.currentTarget.value || undefined })}
           />
