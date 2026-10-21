@@ -3,12 +3,13 @@ package petshop.app
 import arrow.core.Either
 import arrow.core.right
 import io.github.matthewjones372.lark.TestClock
-import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
+import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.Hub
 import io.github.matthewjones372.lark.stream.Run
+import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.lark.stream.TestStreams
 import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.test.story
@@ -22,11 +23,9 @@ import io.opentelemetry.sdk.trace.data.SpanData
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor
 import io.opentelemetry.sdk.trace.export.SpanExporter
 import org.junit.jupiter.api.Test
-import petshop.domain.ChipRegistry
 import petshop.domain.Pet
 import petshop.domain.PetArrived
 import petshop.domain.PetId
-import petshop.domain.PetShop
 import petshop.domain.ShopEvent
 import petshop.domain.Species
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -94,7 +93,7 @@ private class Placed(private val hub: HubBus) : EventBus by hub {
     }
 }
 
-private class Projected(val shop: PetShop, val projection: Projection)
+private class Projected(val bus: EventBus, val projection: Projection)
 
 class MessagingSpansSpec {
 
@@ -117,23 +116,23 @@ class MessagingSpansSpec {
     @Test
     fun `the projection handles each event in a consumer span, with where the bus read it from`() = story {
         Ended().use { ended ->
-            val service = Given("the whole service, on a bus that says where it read each event from") {
-                Petshop.module
-                    .overriding(single<ChipRegistry> { FakeRegistry() })
-                    .overriding(single<EventBus> { Placed(HubBus(Hub(16))) })
-                    .overriding(single<Tracer> { ended.tracer })
-                    .onAFreshDatabase()
-                    .let { it + single { shop: PetShop, projection: Projection -> Projected(shop, projection) } }
-                    .subgraph<Projected>()
+            val reading = Given("a projection, on a bus that says where it read each event from") {
+                (
+                    projection + feed +
+                        single<StreamBackend> { Forks() } +
+                        single<EventBus> { Placed(HubBus(Hub(16))) } +
+                        single<Tracer> { ended.tracer } +
+                        single { bus: EventBus, projection: Projection -> Projected(bus, projection) }
+                    ).subgraph<Projected>()
             }
-            testApp(service) { app: Projected ->
-                When("Ada adopts Nibbles") { app.shop.adopt(PetId(1), by = "Ada") }
+            testApp(reading) { app: Projected ->
+                When("Waffle's arrival is published") { app.bus.publish(waffle) }
                 Then(
                     "the projection's process span is a consumer's, with the bus's attributes",
                 ).eventually(30.seconds) {
                     val process = ended.named("process").single()
                     process.kind shouldBe SpanKind.CONSUMER
-                    process.attributes shouldBe Placed.where
+                    process.attributes.asMap() shouldBe Placed.where.asMap()
                 }
             }
         }
