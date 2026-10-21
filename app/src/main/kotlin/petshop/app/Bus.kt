@@ -13,6 +13,8 @@ import io.github.matthewjones372.lark.stream.runFold
 import io.opentelemetry.api.common.Attributes
 import petshop.domain.ShopEvent
 
+// No DefaultImpls bridge: nothing outside Kotlin implements the bus.
+@JvmDefaultWithoutCompatibility
 interface EventBus {
 
     /** Sends what the caller has bound (`Carriers.capture()`) with the event. */
