@@ -5,8 +5,24 @@ import { usePageTitle } from "../title";
 export default function Stats() {
   const [stats, { refetch }] = createResource(getStats);
   usePageTitle(() => "Stats");
-  const timer = setInterval(refetch, 3000);
-  onCleanup(() => clearInterval(timer));
+  // Asks again three seconds after the last answer, so a slow answer never overlaps the next question, and not at
+  // all while the tab is hidden. Coming back asks at once.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let open = true;
+  const next = () => {
+    clearTimeout(timer);
+    if (open && !document.hidden) timer = setTimeout(ask, 3000);
+  };
+  const ask = () => Promise.resolve(refetch()).then(next);
+  const onVisibility = () => (document.hidden ? clearTimeout(timer) : ask());
+  next();
+  document.addEventListener("visibilitychange", onVisibility);
+  onCleanup(() => {
+    // An answer still on its way when the page closes must not start the timer again.
+    open = false;
+    clearTimeout(timer);
+    document.removeEventListener("visibilitychange", onVisibility);
+  });
 
   const pct = (a: number, b: number) => (b === 0 ? 0 : Math.round((a / b) * 100));
 
