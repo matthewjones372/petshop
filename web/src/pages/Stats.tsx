@@ -1,25 +1,32 @@
-import { For, Show, createResource, onCleanup } from "solid-js";
+import { For, Show, createEffect, createResource, on, onCleanup } from "solid-js";
 import { getStats, look } from "../api";
 import { usePageTitle } from "../title";
 
 export default function Stats() {
   const [stats, { refetch }] = createResource(getStats);
   usePageTitle(() => "Stats");
-  // Asks again three seconds after the last answer, so a slow answer never overlaps the next question, and not at
-  // all while the tab is hidden. Coming back asks at once.
+  // Asks again three seconds after each answer settles, the first load's included, so a slow answer never overlaps
+  // the next question, and not at all while the tab is hidden. Coming back asks at once unless an answer is on its way.
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let open = true;
   const next = () => {
     clearTimeout(timer);
-    if (open && !document.hidden) timer = setTimeout(ask, 3000);
+    if (!document.hidden) timer = setTimeout(refetch, 3000);
   };
-  const ask = () => Promise.resolve(refetch()).then(next);
-  const onVisibility = () => (document.hidden ? clearTimeout(timer) : ask());
-  next();
+  // A failed answer settles too, so a shop that comes back is picked up again.
+  createEffect(
+    on(
+      () => stats.state,
+      (state) => {
+        if (state === "ready" || state === "errored") next();
+      },
+    ),
+  );
+  const onVisibility = () => {
+    clearTimeout(timer);
+    if (!document.hidden && !stats.loading) refetch();
+  };
   document.addEventListener("visibilitychange", onVisibility);
   onCleanup(() => {
-    // An answer still on its way when the page closes must not start the timer again.
-    open = false;
     clearTimeout(timer);
     document.removeEventListener("visibilitychange", onVisibility);
   });
@@ -42,7 +49,8 @@ export default function Stats() {
         <div class="callout err">Couldn't reach the shop: {String(stats.error?.message ?? stats.error)}</div>
       </Show>
 
-      <Show when={stats.latest}>
+      {/* A failed resource throws when read, which would stop the page updating, so the error is checked first. */}
+      <Show when={!stats.error && stats.latest}>
         {(t) => (
           <>
             <div class="stickers" style={{ "margin-bottom": "28px" }}>
