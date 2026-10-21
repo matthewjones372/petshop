@@ -30,13 +30,15 @@ export default function Pets() {
   const matched = () => `${matches().length} ${matches().length === 1 ? "pet" : "pets"} match`;
 
   // Read out once a filter settles, so typing a name announces one count rather than one per letter. Emptied first,
-  // so the same count after another filter is still read.
+  // so the same count after another filter is still read. Nothing is read until the pets have arrived, which would
+  // count none; their arrival, or a refresh's, reads the count.
   const [announced, setAnnounced] = createSignal("");
   createEffect(
     on(
-      [species, status, query],
+      [species, status, query, loaded],
       () => {
         setAnnounced("");
+        if (loaded() === undefined) return;
         const timer = setTimeout(() => setAnnounced(matched()), 500);
         onCleanup(() => clearTimeout(timer));
       },
