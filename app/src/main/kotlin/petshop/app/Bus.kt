@@ -10,8 +10,11 @@ import io.github.matthewjones372.lark.stream.Hub
 import io.github.matthewjones372.lark.stream.Run
 import io.github.matthewjones372.lark.stream.map
 import io.github.matthewjones372.lark.stream.runFold
+import io.opentelemetry.api.common.Attributes
 import petshop.domain.ShopEvent
 
+// No DefaultImpls bridge: nothing outside Kotlin implements the bus.
+@JvmDefaultWithoutCompatibility
 interface EventBus {
 
     /** Sends what the caller has bound (`Carriers.capture()`) with the event. */
@@ -22,6 +25,10 @@ interface EventBus {
      * offsets moves one on only after [each] returns.
      */
     fun consume(each: (ShopEvent) -> Unit): Run<Nothing, Long>
+
+    /** [consume], with where the bus read each event from as messaging attributes: none from a bus with no offsets. */
+    fun consumeFrom(each: (ShopEvent, Attributes) -> Unit): Run<Nothing, Long> =
+        consume { each(it, Attributes.empty()) }
 }
 
 /** The event is still in the outbox, so a refusal means "not yet", not "lost". */
