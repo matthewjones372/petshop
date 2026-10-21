@@ -3,6 +3,7 @@ import { Fiber, Stream } from "effect";
 import { For, Show, createSignal, onCleanup } from "solid-js";
 import { look } from "../api";
 import { runtime } from "../telemetry";
+import { usePageTitle } from "../title";
 import { shopEvents, shown, type ShopEvent, type Status } from "../feed";
 
 const kept = 60;
@@ -22,6 +23,7 @@ const statusText: Record<Status, string> = {
 export default function Live() {
   const [status, setStatus] = createSignal<Status>("connecting");
   const [events, setEvents] = createSignal<ShopEvent[]>([]);
+  usePageTitle(() => "Live");
   const [counts, setCounts] = createSignal({ Arrived: 0, Adopted: 0, Returned: 0 });
 
   const fiber = runtime.runFork(
@@ -44,7 +46,7 @@ export default function Live() {
       </div>
       <div class="toolbar">
         <h1 style={{ margin: 0 }}>Happening now</h1>
-        <span class="sticker" style={{ animation: "none" }}>
+        <span class="sticker" role="status" style={{ animation: "none" }}>
           <span class="live-dot" classList={{ paused: status() !== "live" }} style={{ margin: "0 9px" }} />
           {statusText[status()]}
         </span>
@@ -68,7 +70,7 @@ export default function Live() {
       </div>
 
       <Show when={events().length > 0} fallback={<p class="muted">Waiting for the first event…</p>}>
-        <ul class="layer-cards">
+        <ul class="layer-cards" role="list">
           <For each={events()}>
             {(e) => (
               <li class="layer-card feed-item">

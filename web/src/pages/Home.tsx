@@ -1,6 +1,7 @@
 import { A } from "@solidjs/router";
 import { For, Show, createResource } from "solid-js";
 import { allSpecies, getStats, listPets, look } from "../api";
+import { usePageTitle } from "../title";
 
 const routes = [
   { method: "get", path: "/pets", text: "Every pet in the shop" },
@@ -12,7 +13,11 @@ const routes = [
 export default function Home() {
   const [pets] = createResource(listPets);
   const [stats] = createResource(getStats);
-  const waiting = (s: string) => pets()?.filter((p) => p.species === s && !p.adopted).length ?? "…";
+  // A failed resource throws when read, which would stop the page updating, so a failure reads as nothing yet.
+  const loadedPets = () => (pets.error ? undefined : pets());
+  const loadedStats = () => (stats.error ? undefined : stats());
+  usePageTitle(() => undefined);
+  const waiting = (s: string) => loadedPets()?.filter((p) => p.species === s && !p.adopted).length ?? "…";
 
   return (
     <>
@@ -32,17 +37,21 @@ export default function Home() {
           </div>
           <div class="stickers">
             <span class="sticker"><span class="live-dot" style={{ margin: "0 9px" }} /> shop is open</span>
-            <Show when={pets()}>
-              <span class="sticker">
-                <span class="dot" style={{ background: "var(--sun)" }}>🏷️</span>
-                <code>{pets()!.filter((p) => !p.adopted).length}</code> waiting
-              </span>
+            <Show when={loadedPets()}>
+              {(list) => (
+                <span class="sticker">
+                  <span class="dot" style={{ background: "var(--sun)" }}>🏷️</span>
+                  <code>{list().filter((p) => !p.adopted).length}</code> waiting
+                </span>
+              )}
             </Show>
-            <Show when={stats()}>
-              <span class="sticker">
-                <span class="dot" style={{ background: "var(--mint)" }}>📬</span>
-                <code>{stats()!.events}</code> events
-              </span>
+            <Show when={loadedStats()}>
+              {(tally) => (
+                <span class="sticker">
+                  <span class="dot" style={{ background: "var(--mint)" }}>📬</span>
+                  <code>{tally().events}</code> events
+                </span>
+              )}
             </Show>
           </div>
         </div>
@@ -52,7 +61,7 @@ export default function Home() {
       </section>
 
       <h2 class="underline">Who's waiting</h2>
-      <ul class="pillar-cards">
+      <ul class="pillar-cards" role="list">
         <For each={allSpecies}>
           {(s) => (
             <li>
@@ -68,7 +77,7 @@ export default function Home() {
       </ul>
 
       <h2 class="underline">The routes underneath</h2>
-      <ul class="layer-cards">
+      <ul class="layer-cards" role="list">
         <For each={routes}>
           {(r) => (
             <li class="layer-card">

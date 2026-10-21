@@ -1,6 +1,7 @@
 import { A, useParams } from "@solidjs/router";
 import { Match, Show, Switch, createResource, createSignal } from "solid-js";
 import { Problem, adoptPet, getPet, look } from "../api";
+import { usePageTitle } from "../title";
 
 type Outcome = { ok: boolean; text: string };
 
@@ -16,6 +17,7 @@ export default function PetPage() {
   const [pet, { mutate }] = createResource(() => Number(params.id), getPet);
   const [busy, setBusy] = createSignal(false);
   const [outcome, setOutcome] = createSignal<Outcome>();
+  usePageTitle(() => (pet.error ? "No such pet" : pet()?.name));
 
   const adopt = async () => {
     if (busy() || pet()?.adopted) return;
