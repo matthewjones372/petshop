@@ -137,4 +137,19 @@ class MessagingSpansSpec {
             }
         }
     }
+
+    @Test
+    fun `a bus with no offsets says nothing of where it read an event from`() = story {
+        val read = ConcurrentLinkedQueue<Pair<ShopEvent, Attributes>>()
+        val bus = Given("the in-process bus, with Waffle's arrival on it") {
+            HubBus(Hub(16)).also { it.publish(waffle) }
+        }
+        When("a reader reads it with where it came from") {
+            bus.consumeFrom { event, where -> read.add(event to where) }.start(Forks())
+        }.use { _ ->
+            Then("it reads the arrival, with no attributes").eventually(30.seconds) {
+                read.toList() shouldBe listOf(waffle to Attributes.empty())
+            }
+        }
+    }
 }
