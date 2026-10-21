@@ -53,7 +53,7 @@ export default function Pets() {
         </section>
         <section>
           <h2>Species</h2>
-          <ul>
+          <ul role="list">
             <li>
               <button aria-pressed={!species()} onClick={() => pick({ species: undefined })}>
                 Everyone <span class="count">{count()}</span>
@@ -72,7 +72,7 @@ export default function Pets() {
         </section>
         <section>
           <h2>Status</h2>
-          <ul>
+          <ul role="list">
             <For each={["waiting", "adopted", "all"] as Status[]}>
               {(s) => (
                 <li>
@@ -106,7 +106,7 @@ export default function Pets() {
           <div class="callout err">Couldn't reach the shop: {String(pets.error?.message ?? pets.error)}</div>
         </Show>
 
-        <ul class="pet-grid">
+        <ul class="pet-grid" role="list">
           <For each={matches().slice(0, shown())}>
             {(p) => (
               <li>

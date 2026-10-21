@@ -54,7 +54,7 @@ export default function Home() {
       </section>
 
       <h2 class="underline">Who's waiting</h2>
-      <ul class="pillar-cards">
+      <ul class="pillar-cards" role="list">
         <For each={allSpecies}>
           {(s) => (
             <li>
@@ -70,7 +70,7 @@ export default function Home() {
       </ul>
 
       <h2 class="underline">The routes underneath</h2>
-      <ul class="layer-cards">
+      <ul class="layer-cards" role="list">
         <For each={routes}>
           {(r) => (
             <li class="layer-card">

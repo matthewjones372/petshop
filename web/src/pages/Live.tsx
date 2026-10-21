@@ -70,7 +70,7 @@ export default function Live() {
       </div>
 
       <Show when={events().length > 0} fallback={<p class="muted">Waiting for the first event…</p>}>
-        <ul class="layer-cards">
+        <ul class="layer-cards" role="list">
           <For each={events()}>
             {(e) => (
               <li class="layer-card feed-item">
