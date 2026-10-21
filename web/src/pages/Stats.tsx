@@ -1,8 +1,10 @@
 import { For, Show, createResource, onCleanup } from "solid-js";
 import { getStats, look } from "../api";
+import { usePageTitle } from "../title";
 
 export default function Stats() {
   const [stats, { refetch }] = createResource(getStats);
+  usePageTitle(() => "Stats");
   const timer = setInterval(refetch, 3000);
   onCleanup(() => clearInterval(timer));
 

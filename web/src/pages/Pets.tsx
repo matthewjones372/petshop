@@ -1,6 +1,7 @@
 import { A, useSearchParams } from "@solidjs/router";
 import { For, Show, createMemo, createResource, createSignal } from "solid-js";
 import { allSpecies, listPets, look, type Species } from "../api";
+import { usePageTitle } from "../title";
 
 const pageSize = 48;
 
@@ -14,6 +15,7 @@ export default function Pets() {
   const species = () => params.species as Species | undefined;
   const status = (): Status => (params.status as Status) ?? "waiting";
   const query = () => (params.q ?? "").toLowerCase();
+  usePageTitle(() => (species() ? `${species()}s` : "Pets"));
 
   const matches = createMemo(() =>
     (pets() ?? []).filter(

@@ -1,6 +1,7 @@
 import { A } from "@solidjs/router";
 import { For, Show, createResource } from "solid-js";
 import { allSpecies, getStats, listPets, look } from "../api";
+import { usePageTitle } from "../title";
 
 const routes = [
   { method: "get", path: "/pets", text: "Every pet in the shop" },
@@ -12,6 +13,7 @@ const routes = [
 export default function Home() {
   const [pets] = createResource(listPets);
   const [stats] = createResource(getStats);
+  usePageTitle(() => undefined);
   const waiting = (s: string) => pets()?.filter((p) => p.species === s && !p.adopted).length ?? "…";
 
   return (

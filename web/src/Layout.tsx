@@ -1,5 +1,5 @@
 import { A, type RouteSectionProps } from "@solidjs/router";
-import { createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, on, onCleanup } from "solid-js";
 
 type Theme = "light" | "dark";
 
@@ -52,6 +52,11 @@ function ThemeToggle() {
 }
 
 export default function Layout(props: RouteSectionProps) {
+  let main!: HTMLElement;
+  // A new page takes focus off the link that led there, so a screen reader starts reading the new content. A
+  // filter changing the query leaves focus where it is.
+  createEffect(on(() => props.location.pathname, () => main.focus({ preventScroll: true }), { defer: true }));
+
   return (
     <>
       <header class="topbar">
@@ -71,7 +76,9 @@ export default function Layout(props: RouteSectionProps) {
           <ThemeToggle />
         </div>
       </header>
-      <main class="page">{props.children}</main>
+      <main class="page" ref={main} tabindex="-1">
+        {props.children}
+      </main>
       <footer class="footer">
         <div class="footer-inner">
           <span>petshop · Pelican, Lark and friends, one small shop</span>

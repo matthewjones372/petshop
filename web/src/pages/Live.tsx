@@ -3,6 +3,7 @@ import { Fiber, Stream } from "effect";
 import { For, Show, createSignal, onCleanup } from "solid-js";
 import { look } from "../api";
 import { runtime } from "../telemetry";
+import { usePageTitle } from "../title";
 import { shopEvents, shown, type ShopEvent, type Status } from "../feed";
 
 const kept = 60;
@@ -22,6 +23,7 @@ const statusText: Record<Status, string> = {
 export default function Live() {
   const [status, setStatus] = createSignal<Status>("connecting");
   const [events, setEvents] = createSignal<ShopEvent[]>([]);
+  usePageTitle(() => "Live");
   const [counts, setCounts] = createSignal({ Arrived: 0, Adopted: 0, Returned: 0 });
 
   const fiber = runtime.runFork(

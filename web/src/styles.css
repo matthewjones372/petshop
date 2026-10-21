@@ -288,6 +288,8 @@ code {
 
 /* Page shells */
 .page { max-width: var(--content-w); margin: 0 auto; padding: 28px 20px 80px; }
+/* Focused only by a route change, to move the screen reader; a ring round the whole page would mark nothing to act on. */
+.page:focus { outline: none; }
 .shell { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 40px; align-items: start; }
 .sidebar { position: sticky; top: calc(var(--topbar-h) + 20px); }
 .sidebar h2 {
