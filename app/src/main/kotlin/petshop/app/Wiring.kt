@@ -4,11 +4,12 @@ import io.github.matthewjones372.lark.app.LarkApp
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.closingOf
+import io.github.matthewjones372.lark.app.kotlinx.andSecretsOf
+import io.github.matthewjones372.lark.app.kotlinx.config
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.Layered
 import io.github.matthewjones372.lark.app.typesafe.Secrets
-import io.github.matthewjones372.lark.app.typesafe.config
 import io.github.matthewjones372.lark.app.typesafe.configOf
 import io.github.matthewjones372.lark.app.typesafe.layeredConfig
 import io.github.matthewjones372.lark.app.typesafe.layeredConfigOf
@@ -29,6 +30,7 @@ import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk
+import kotlinx.serialization.Serializable
 import petshop.api.petshopApi
 import petshop.api.petshopDocs
 import petshop.domain.PetShop
@@ -36,12 +38,10 @@ import kotlin.time.Duration
 import io.micrometer.core.instrument.Metrics as MicrometerRegistries
 
 /** [host] is loopback unless something outside this machine has to reach the port. */
+@Serializable
 data class Settings(val host: String, val port: Int, val arrivalsEvery: Duration, val outboxEvery: Duration)
 
-private val settings: Module =
-    config<Settings>("petshop") {
-        Settings(string("host"), int("port"), duration("arrivalsEvery"), duration("outboxEvery"))
-    }
+private val settings: Module = config<Settings>("petshop")
 
 private val telemetry: Module =
     // Added to Micrometer's global composite, which is where lark-micrometer writes by default.
@@ -128,5 +128,5 @@ object Petshop : LarkApp<PelicanServer>() {
  */
 fun configReport(): String =
     layeredConfigOf(*layers.layers.map { it.name to it.config.withOnlyPath("petshop") }.toTypedArray())
-        .origins(Secrets.default.and("petshop.database.url"))
+        .origins(Secrets.default.and("petshop.database.url").andSecretsOf<DatabaseSettings>("petshop.database"))
         .report()

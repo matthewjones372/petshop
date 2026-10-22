@@ -9,14 +9,15 @@ import io.github.matthewjones372.lark.CircuitBreaker
 import io.github.matthewjones372.lark.Schedule
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
+import io.github.matthewjones372.lark.app.kotlinx.config
 import io.github.matthewjones372.lark.app.singleOf
-import io.github.matthewjones372.lark.app.typesafe.config
 import io.github.matthewjones372.lark.guarded
 import io.github.matthewjones372.lark.policy
 import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.metrics.otel.traced
 import io.opentelemetry.sdk.OpenTelemetrySdk
+import kotlinx.serialization.Serializable
 import petshop.domain.Chip
 import petshop.domain.ChipRegistry
 import petshop.domain.NotRegistered
@@ -31,6 +32,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
 
+@Serializable
 data class RegistrySettings(val baseUrl: String, val timeout: Duration)
 
 class HttpChipRegistry(settings: RegistrySettings, transport: JettyHttpTransport, telemetry: OpenTelemetrySdk) :
@@ -84,5 +86,5 @@ class HttpChipRegistry(settings: RegistrySettings, transport: JettyHttpTransport
 }
 
 val registry: Module =
-    config<RegistrySettings>("petshop.registry") { RegistrySettings(string("baseUrl"), duration("timeout")) } +
+    config<RegistrySettings>("petshop.registry") +
         singleOf(::HttpChipRegistry).boundTo<ChipRegistry>()

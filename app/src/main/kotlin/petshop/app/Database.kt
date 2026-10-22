@@ -5,12 +5,14 @@ import com.zaxxer.hikari.HikariDataSource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.closingOf
+import io.github.matthewjones372.lark.app.kotlinx.Secret
+import io.github.matthewjones372.lark.app.kotlinx.config
 import io.github.matthewjones372.lark.app.liquibase.migrations
-import io.github.matthewjones372.lark.app.typesafe.Secret
-import io.github.matthewjones372.lark.app.typesafe.config
 import io.micrometer.core.instrument.Metrics
+import kotlinx.serialization.Serializable
 import javax.sql.DataSource
 
+@Serializable
 data class DatabaseSettings(val url: String, val user: String, val password: Secret)
 
 private fun pool(settings: DatabaseSettings): HikariDataSource = HikariDataSource(
@@ -27,9 +29,7 @@ private fun pool(settings: DatabaseSettings): HikariDataSource = HikariDataSourc
 )
 
 val database: Module =
-    config<DatabaseSettings>("petshop.database") {
-        DatabaseSettings(string("url"), string("user"), secret("password"))
-    } +
+    config<DatabaseSettings>("petshop.database") +
         closingOf(::pool)
             .boundTo<DataSource>() +
         // Anything that reads the tables takes a Migrated, so it cannot be built before they exist.

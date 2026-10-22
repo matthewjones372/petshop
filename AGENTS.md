@@ -63,9 +63,10 @@ Before writing a scheduler, a retry, a breaker, a health check, a config reader
 or a test wait, look for it in [lark](https://github.com/matthewjones372/lark)
 (its `docs/cookbook.md` ends with a need-to-API table) and
 [pelican](https://github.com/matthewjones372/pelican) (`docs/modules.md`). Background work
-is a lark `Stream` on the graph's `StreamBackend`, settings are read with
-lark-app-typesafe's `config`/`secret`, readiness is pelican-health, and a test
-waits with lark-test's `eventually`.
+is a lark `Stream` on the graph's `StreamBackend`, settings are a `@Serializable`
+class read with lark-app-kotlinx's `config<T>(path)` (lark-app-typesafe's block
+form only for what a class cannot say, like `BusSettings`), readiness is
+pelican-health, and a test waits with lark-test's `eventually`.
 
 A mapping between a domain type and a DTO or wire type is kimney's `transformInto()`.
 Fields that differ go in the override chain:
