@@ -66,6 +66,8 @@ private class Once(vararg events: ShopEvent) : Outbox {
 
     override fun record(pet: Pet, numbered: (seq: Long) -> ShopEvent): ShopEvent = numbered(0)
 
+    override fun keep(pet: Pet) = Unit
+
     override fun shelf(opening: List<Pet>): List<Pet> = opening
 
     override fun claim(limit: Int, publish: (List<Claimed>) -> List<ShopEvent>): List<ShopEvent> =

@@ -16,26 +16,33 @@ export type SpeciesTally = typeof SpeciesTally.Type;
 const Tally = Schema.Struct({ events: Schema.Number, duplicates: Schema.Number, bySpecies: Schema.Array(SpeciesTally) });
 export type Tally = typeof Tally.Type;
 
-/** Every declared failure answers `{ id, message }`; the status says which one it is. */
-export class Problem extends Data.TaggedError("Problem")<{ status: number; message: string }> {}
+/** Every declared failure answers `{ id, message }`; the status says which one, and `kind` which of a status's. */
+export class Problem extends Data.TaggedError("Problem")<{ status: number; message: string; kind?: string }> {}
 
-const ProblemBody = Schema.Struct({ message: Schema.String });
+const ProblemBody = Schema.Struct({ message: Schema.String, kind: Schema.optional(Schema.String) });
 
-const call = <S extends Schema.Top>(schema: S, request: HttpClientRequest.HttpClientRequest) =>
+const answered = <S extends Schema.Top>(schema: S, request: HttpClientRequest.HttpClientRequest) =>
   Effect.gen(function* () {
     const res = yield* (yield* HttpClient.HttpClient).execute(request);
     if (res.status >= 400) {
       const body = yield* HttpClientResponse.schemaBodyJson(ProblemBody)(res).pipe(
-        Effect.orElseSucceed(() => ({ message: `HTTP ${res.status}` })),
+        Effect.orElseSucceed(() => ({ message: `HTTP ${res.status}`, kind: undefined })),
       );
-      return yield* new Problem({ status: res.status, message: body.message });
+      return yield* new Problem({ status: res.status, message: body.message, kind: body.kind });
     }
-    return yield* HttpClientResponse.schemaBodyJson(schema)(res);
+    return { value: yield* HttpClientResponse.schemaBodyJson(schema)(res), status: res.status };
   });
 
-/** The click's span: the client span for the POST, and the shop's spans after it, sit under this one. */
+const call = <S extends Schema.Top>(schema: S, request: HttpClientRequest.HttpClientRequest) =>
+  answered(schema, request).pipe(Effect.map(({ value }) => value));
+
+/**
+ * The click's span: the client span for the POST, and the shop's spans after it, sit under this one. A 202 is an
+ * adoption the chip registry has yet to confirm; the pet reads as taken meanwhile.
+ */
 export const adopt = (id: number) =>
-  call(Pet, HttpClientRequest.post(`/pets/${id}/adoption`)).pipe(
+  answered(Pet, HttpClientRequest.post(`/pets/${id}/adoption`)).pipe(
+    Effect.map(({ value, status }) => ({ pet: value, pending: status === 202 })),
     Effect.withSpan("adopt pet", { attributes: { "pet.id": id } }),
   );
 

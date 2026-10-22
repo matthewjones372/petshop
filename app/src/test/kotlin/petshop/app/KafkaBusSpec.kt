@@ -21,6 +21,7 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import petshop.domain.Adopted
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
@@ -62,7 +63,7 @@ class KafkaBusSpec : EventBusContract() {
     @Test
     fun `an event on the wire is the registry's Avro, and reads back as the domain event it was`() = story {
         val nibbles = Given("Ada's adoption of Nibbles, as event 3") {
-            PetAdopted(seq = 3, pet = Pet(PetId(1), "Nibbles", Species.Tortoise, adopted = true), by = "Ada")
+            PetAdopted(seq = 3, pet = Pet(PetId(1), "Nibbles", Species.Tortoise, standing = Adopted("Ada")), by = "Ada")
         }
         When("the bus publishes it") { using(busOn("wire")) { it.publish(nibbles) } }
         val record = Then("one record is on the topic").eventually(30.seconds) {

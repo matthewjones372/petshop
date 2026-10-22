@@ -11,7 +11,6 @@ const kept = 60;
 const wording: Record<ShopEvent["kind"], { verb: string; chip: string }> = {
   Arrived: { verb: "arrived at the shop", chip: "chip-sun" },
   Adopted: { verb: "went home", chip: "chip-mint" },
-  Returned: { verb: "came back: the chip registry said no", chip: "chip-coral" },
 };
 
 const statusText: Record<Status, string> = {
@@ -24,7 +23,7 @@ export default function Live() {
   const [status, setStatus] = createSignal<Status>("connecting");
   const [events, setEvents] = createSignal<ShopEvent[]>([]);
   usePageTitle(() => "Live");
-  const [counts, setCounts] = createSignal({ Arrived: 0, Adopted: 0, Returned: 0 });
+  const [counts, setCounts] = createSignal({ Arrived: 0, Adopted: 0 });
 
   const fiber = runtime.runFork(
     shopEvents(setStatus).pipe(

@@ -10,13 +10,17 @@ import io.github.matthewjones372.lark.test.story
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import petshop.api.Tally
+import petshop.app.ScriptedRegistry.Transfer.LosesTheRequest
+import petshop.app.ScriptedRegistry.Transfer.Records
+import petshop.domain.Adopted
 import petshop.domain.ChipRegistry
+import petshop.domain.OnShelf
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetId
+import petshop.domain.PetReturned
 import petshop.domain.PetShop
 import petshop.domain.Species
-import petshop.domain.Unreachable
 import kotlin.time.Duration.Companion.seconds
 
 private class Observed(val shop: PetShop, val bus: EventBus, val projection: Projection)
@@ -53,7 +57,7 @@ class EventsSpec {
     @Test
     fun `an event delivered twice is counted once`() = story {
         val barnaby = Given("Bea's adoption of Barnaby, as an event") {
-            PetAdopted(seq = 7, pet = Pet(PetId(2), "Barnaby", Species.Dog, adopted = true), by = "Bea")
+            PetAdopted(seq = 7, pet = Pet(PetId(2), "Barnaby", Species.Dog, standing = Adopted("Bea")), by = "Bea")
         }
         testApp(settled) { app: Observed ->
             When("the bus delivers it twice") {
@@ -71,15 +75,38 @@ class EventsSpec {
     }
 
     @Test
-    fun `an adoption the registry refused reaches the consumer as a return`() = story {
-        val down = Given("a registry that is down") { settledWith(FakeRegistry(refusing = Unreachable("down"))) }
-        testApp(down) { app: Observed ->
-            When("Ada adopts Nibbles") { app.shop.adopt(PetId(1), by = "Ada") }
-            val tally = Then("the consumer hears of the adoption and of its undoing").eventually(5.seconds) {
+    fun `a return from before ADR 0001 still takes its adoption off the count`() = story {
+        val barnaby = Given("Barnaby, adopted by Bea and then returned, as the topic's history holds him") {
+            Pet(PetId(2), "Barnaby", Species.Dog, standing = Adopted("Bea"))
+        }
+        testApp(settled) { app: Observed ->
+            When("the bus delivers the adoption and then the return") {
+                app.bus.publish(PetAdopted(seq = 7, pet = barnaby, by = "Bea"))
+                app.bus.publish(PetReturned(seq = 8, pet = barnaby.copy(standing = OnShelf)))
+            }
+            val tally = Then("the consumer counts both events").eventually(5.seconds) {
                 app.projection.tally().also { it.events shouldBe 2 }
             }
-            And("the adoption was already recorded, so the undo is an event and the count goes back") {
+            And("no dog is counted adopted") { tally.adopted(Species.Dog) shouldBe 0 }
+        }
+    }
+
+    @Test
+    fun `an adoption the registry refused never reaches the consumer`() = story {
+        val losing = Given("a registry that loses the first transfer and records the rest") {
+            settledWith(ScriptedRegistry(transfers = { if (it == 1) LosesTheRequest else Records }))
+        }
+        testApp(losing) { app: Observed ->
+            When("Ada's adoption of Nibbles is refused, and then Bea adopts Barnaby") {
+                app.shop.adopt(PetId(1), by = "Ada")
+                app.shop.adopt(PetId(2), by = "Bea")
+            }
+            val tally = Then("the consumer hears one event, Bea's").eventually(5.seconds) {
+                app.projection.tally().also { it.events shouldBe 1 }
+            }
+            And("no tortoise was ever counted adopted: the bus never heard Ada's adoption begin") {
                 tally.adopted(Species.Tortoise) shouldBe 0
+                tally.adopted(Species.Dog) shouldBe 1
             }
         }
     }

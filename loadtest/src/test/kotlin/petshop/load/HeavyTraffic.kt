@@ -83,8 +83,11 @@ fun main() {
                         is Outcome.Ok -> taken.incrementAndGet()
 
                         is Outcome.Err -> when (answer.error) {
-                            is ProblemDto.AlreadyAdopted, is ProblemDto.NoSuchPet, is ProblemDto.NotChipped ->
-                                refused.incrementAndGet()
+                            is ProblemDto.AlreadyAdopted,
+                            is ProblemDto.BeingAdopted,
+                            is ProblemDto.NoSuchPet,
+                            is ProblemDto.NotChipped,
+                            -> refused.incrementAndGet()
 
                             is ProblemDto.RegistryDown, is ProblemDto.NotRecorded ->
                                 step.fail("the shop could not finish: ${answer.error}")

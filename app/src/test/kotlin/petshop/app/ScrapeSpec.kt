@@ -57,6 +57,28 @@ class ScrapeSpec {
     }
 
     @Test
+    fun `an adoption the registry has yet to confirm is counted as pending`() = story {
+        val registry = Given(
+            "a Prometheus registry of this test's own",
+        ) { PrometheusMeterRegistry(PrometheusConfig.DEFAULT) }
+        val unconfirmed = shopWith(
+            ScriptedRegistry(
+                transfers = { ScriptedRegistry.Transfer.RecordsButLosesTheAnswer },
+                answers = { _, n -> n == 1 },
+            ),
+        )
+        val scrape = When("Ada adopts Nibbles, and the registry cannot be read back") {
+            metrics.locally(MicrometerMetrics(registry)) {
+                testApp<PetShop, Unit>(unconfirmed) { shop -> shop.adopt(PetId(1), "Ada") }
+                registry.scrape()
+            }
+        }
+        Then("the outcome says pending, not taken") {
+            scrape shouldContain """petshop_adoptions_total{outcome="pending""""
+        }
+    }
+
+    @Test
     fun `the scrape says how the JVM, the pool and every health check are`() = story {
         val service = Given("the shop on a fresh database") {
             (

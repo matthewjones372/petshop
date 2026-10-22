@@ -28,7 +28,6 @@ import petshop.domain.AlreadyAdopted
 import petshop.domain.NoSuchPet
 import petshop.domain.NotChipped
 import petshop.domain.PetAdopted
-import petshop.domain.PetReturned
 import petshop.domain.Species
 import petshop.registry.ChipRecord
 import petshop.registry.Problem
@@ -120,16 +119,15 @@ class EndToEndSpec {
                 Then("every event the outbox recorded is on it once, keyed by its seq") {
                     onTheTopic.map { it.key() }.sorted() shouldBe (1..database.recorded()).toList()
                 }
-                And("the adoptions read back from the Avro as Nibbles adopted, then Mrs Peel adopted and returned") {
-                    // The actor says yes before the registry says Mrs Peel has no chip, so the undo is an event of its own.
+                And("the adoptions read back from the Avro as Nibbles' alone") {
+                    // Mrs Peel's adoption waited on the registry, which refused it, so the bus never heard it begin.
                     val adoptions = onTheTopic.map { it.value() }.sortedBy { it.seq }.mapNotNull { event ->
                         when (event) {
                             is PetAdopted -> "adopted ${event.pet.name}"
-                            is PetReturned -> "returned ${event.pet.name}"
                             else -> null
                         }
                     }
-                    adoptions shouldBe listOf("adopted Nibbles", "adopted Mrs Peel", "returned Mrs Peel")
+                    adoptions shouldBe listOf("adopted Nibbles")
                 }
                 And("the projection committed every event").eventually(5.seconds) {
                     kafka.committed(GROUP, TOPIC) shouldBe database.recorded()

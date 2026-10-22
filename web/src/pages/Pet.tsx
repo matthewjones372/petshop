@@ -5,6 +5,8 @@ import { usePageTitle } from "../title";
 
 type Outcome = { ok: boolean; text: string };
 
+const beingAdopted = "Someone is adopting this pet right now. It may come back to the shelf.";
+
 const explain: Record<number, string> = {
   404: "That pet isn't in the shop.",
   409: "Someone got there first.",
@@ -24,12 +26,18 @@ export default function PetPage() {
     setBusy(true);
     setOutcome();
     try {
-      const adopted = await adoptPet(Number(params.id));
+      const { pet: adopted, pending } = await adoptPet(Number(params.id));
       mutate(adopted);
-      setOutcome({ ok: true, text: `${adopted.name} is going home with you. 🎉` });
+      setOutcome({
+        ok: true,
+        text: pending
+          ? `${adopted.name} is yours once the chip registry confirms it.`
+          : `${adopted.name} is going home with you. 🎉`,
+      });
     } catch (e) {
       if (!(e instanceof Problem)) throw e;
-      setOutcome({ ok: false, text: `${explain[e.status] ?? "Something went wrong."} (${e.status}: ${e.message})` });
+      const why = e.kind === "being_adopted" ? beingAdopted : (explain[e.status] ?? "Something went wrong.");
+      setOutcome({ ok: false, text: `${why} (${e.status}: ${e.message})` });
     } finally {
       setBusy(false);
     }

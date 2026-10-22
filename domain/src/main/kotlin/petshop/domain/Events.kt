@@ -9,5 +9,8 @@ data class PetArrived(override val seq: Long, val pet: Pet) : ShopEvent
 
 data class PetAdopted(override val seq: Long, val pet: Pet, val by: String) : ShopEvent
 
-/** An adoption undone because the chip registry would not take the new keeper. */
+/**
+ * An adoption undone, from before the registry had to confirm one (ADR 0001). The shop writes none now, but the
+ * topic's history and an outbox left unpublished across the upgrade still hold them, so they are read as they were.
+ */
 data class PetReturned(override val seq: Long, val pet: Pet) : ShopEvent

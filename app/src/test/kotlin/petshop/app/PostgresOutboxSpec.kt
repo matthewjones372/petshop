@@ -10,6 +10,7 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
+import petshop.domain.Adopted
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
@@ -46,13 +47,13 @@ class PostgresOutboxSpec {
     @Test
     fun `Postgres numbers each event, and a claim reads them back oldest first`() = story {
         onItsOwn { outbox ->
-            val recorded = When("Nibbles arrives, is adopted and is returned") {
+            val recorded = When("Nibbles arrives and is adopted, and Barnaby arrives") {
                 listOf(
                     outbox.record(nibbles) { seq -> PetArrived(seq, nibbles) },
                     outbox.record(
-                        nibbles.copy(adopted = true),
-                    ) { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") },
-                    outbox.record(nibbles) { seq -> PetReturned(seq, nibbles) },
+                        nibbles.copy(standing = Adopted("Ada")),
+                    ) { seq -> PetAdopted(seq, nibbles.copy(standing = Adopted("Ada")), by = "Ada") },
+                    outbox.record(barnaby) { seq -> PetArrived(seq, barnaby) },
                 )
             }
             Then("Postgres numbered them 1, 2 and 3: the seq is the table's, so it counts on across restarts") {
@@ -63,13 +64,25 @@ class PostgresOutboxSpec {
     }
 
     @Test
+    fun `a return written before the registry had to confirm adoptions is still claimed`() = story {
+        onItsOwn { outbox ->
+            val returned = Given("Nibbles' return, as the shop wrote it before ADR 0001, still unpublished") {
+                outbox.record(nibbles) { seq -> PetReturned(seq, nibbles) }
+            }
+            Then("a claim reads it back as a return, so the upgrade does not stop the relay on it") {
+                outbox.left() shouldBe listOf(returned)
+            }
+        }
+    }
+
+    @Test
     fun `what the bus took leaves the table, and what it refused stays for the next claim`() = story {
         onItsOwn { outbox ->
             val (arrived, adopted) = Given("Nibbles' arrival and adoption in the outbox") {
                 outbox.record(nibbles) { seq -> PetArrived(seq, nibbles) } to
                     outbox.record(
-                        nibbles.copy(adopted = true),
-                    ) { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") }
+                        nibbles.copy(standing = Adopted("Ada")),
+                    ) { seq -> PetAdopted(seq, nibbles.copy(standing = Adopted("Ada")), by = "Ada") }
             }
             val taken = When("a claim's bus takes the adoption and refuses the arrival") {
                 outbox.claim(10) { claimed -> claimed.map { it.event }.filter { it.seq == adopted.seq } }
@@ -165,11 +178,11 @@ class PostgresOutboxSpec {
             Then("it is the opening catalogue") { first shouldBe listOf(nibbles, barnaby) }
             When("Nibbles' adoption is recorded") {
                 outbox.record(
-                    nibbles.copy(adopted = true),
-                ) { seq -> PetAdopted(seq, nibbles.copy(adopted = true), by = "Ada") }
+                    nibbles.copy(standing = Adopted("Ada")),
+                ) { seq -> PetAdopted(seq, nibbles.copy(standing = Adopted("Ada")), by = "Ada") }
             }
             Then("the shelf has her adopted, and the opening catalogue does not put her back") {
-                outbox.shelf(listOf(nibbles, barnaby)) shouldBe listOf(nibbles.copy(adopted = true), barnaby)
+                outbox.shelf(listOf(nibbles, barnaby)) shouldBe listOf(nibbles.copy(standing = Adopted("Ada")), barnaby)
             }
         }
     }
@@ -178,18 +191,20 @@ class PostgresOutboxSpec {
     fun `a pet's change and its event are one transaction, so an event that fails leaves the pet as it was`() = story {
         testApp(migrated) { (dataSource): Tables ->
             val table = Given("a pets table with Nibbles on the shelf") {
-                OutboxTable(dataSource).also { it.stock(listOf(PetRow(1, "Nibbles", "Tortoise", adopted = false))) }
+                OutboxTable(
+                    dataSource,
+                ).also { it.stock(listOf(PetRow(1, "Nibbles", "Tortoise", standing = "on_shelf", adoptedBy = null))) }
             }
             When("her adoption is recorded with an event the outbox table refuses") {
                 shouldThrow<Exception> {
                     table.record(
-                        PetRow(1, "Nibbles", "Tortoise", adopted = true),
+                        PetRow(1, "Nibbles", "Tortoise", standing = "adopted", adoptedBy = "Ada"),
                         OutboxRow(0, "sold", 1, "Nibbles", "Tortoise", adopted = true, adoptedBy = "Ada"),
                     )
                 }
             }
             Then("she is still on the shelf, because the pet's row rolled back with the event") {
-                table.pets().single().adopted shouldBe false
+                table.pets().single().standing shouldBe "on_shelf"
             }
         }
     }
