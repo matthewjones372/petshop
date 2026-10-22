@@ -25,6 +25,7 @@ dependencies {
     implementation("io.github.matthewjones372:lark-actor:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-actor:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
+    implementation("io.github.matthewjones372:lark-app-kotlinx:$larkVersion")
     implementation("io.github.matthewjones372:lark-app-liquibase:$larkVersion")
     implementation("io.github.matthewjones372:lark-stream-forks:$larkVersion")
     implementation("io.github.matthewjones372:lark-kafka:$larkVersion")
