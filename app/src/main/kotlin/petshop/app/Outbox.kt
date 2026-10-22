@@ -13,7 +13,6 @@ import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.logAnnotated
 import io.github.matthewjones372.lark.logInfo
 import io.github.matthewjones372.lark.logWarn
-import io.github.matthewjones372.lark.otel.span
 import io.github.matthewjones372.lark.stream.Run
 import io.github.matthewjones372.lark.stream.Running
 import io.github.matthewjones372.lark.stream.Stream
@@ -26,6 +25,7 @@ import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.stream.tick
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.trace.Span
+import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.StatusCode
 import io.opentelemetry.api.trace.Tracer
 import petshop.domain.Pet
@@ -85,7 +85,7 @@ private fun published(claimed: List<Claimed>, bus: EventBus, tracer: Tracer): Li
     gauge("petshop.outbox.claimed").set(claimed.size.toDouble())
     return claimed.mapNotNull { (event, carried) ->
         Carriers.within(carried) {
-            tracer.span("publish") {
+            tracer.span("publish", SpanKind.PRODUCER) {
                 bus.publish(event).fold(
                     { refused ->
                         Span.current().setStatus(StatusCode.ERROR, refused.why)

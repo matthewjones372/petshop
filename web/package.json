@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "check": "biome check src && tsc --noEmit",
     "preview": "vite preview"
   },
   "dependencies": {

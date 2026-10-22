@@ -1,6 +1,7 @@
 import { A, useParams } from "@solidjs/router";
 import { Match, Show, Switch, createResource, createSignal } from "solid-js";
 import { Problem, adoptPet, getPet, look } from "../api";
+import { usePageTitle } from "../title";
 
 type Outcome = { ok: boolean; text: string };
 
@@ -18,8 +19,10 @@ export default function PetPage() {
   const [pet, { mutate }] = createResource(() => Number(params.id), getPet);
   const [busy, setBusy] = createSignal(false);
   const [outcome, setOutcome] = createSignal<Outcome>();
+  usePageTitle(() => (pet.error ? "No such pet" : pet()?.name));
 
   const adopt = async () => {
+    if (busy() || pet()?.adopted) return;
     setBusy(true);
     setOutcome();
     try {
@@ -77,12 +80,16 @@ export default function PetPage() {
                 </table>
               </div>
 
-              <Show when={outcome()}>
-                {(o) => <div class={`callout ${o().ok ? "ok" : "err"}`}>{o().text}</div>}
-              </Show>
+              {/* Rendered before any outcome, so a screen reader is listening when one arrives. */}
+              <div role="status">
+                <Show when={outcome()}>
+                  {(o) => <div class={`callout ${o().ok ? "ok" : "err"}`}>{o().text}</div>}
+                </Show>
+              </div>
 
               <div style={{ "margin-top": "24px" }}>
-                <button class="btn btn-primary" disabled={busy() || p().adopted} onClick={adopt}>
+                {/* aria-disabled rather than disabled: a disabled button drops the focus the click put on it. */}
+                <button class="btn btn-primary" aria-disabled={busy() || p().adopted} onClick={adopt}>
                   {busy() ? "Checking the chip…" : p().adopted ? "Already home" : `Adopt ${p().name}`}
                 </button>
               </div>

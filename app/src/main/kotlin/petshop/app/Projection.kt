@@ -4,10 +4,10 @@ import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.counter
 import io.github.matthewjones372.lark.increment
-import io.github.matthewjones372.lark.otel.span
 import io.github.matthewjones372.lark.stream.Running
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.lark.stream.start
+import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.Tracer
 import petshop.api.SpeciesTally
 import petshop.api.Tally
@@ -45,8 +45,8 @@ val projection: Module =
         { bus: EventBus, streams: StreamBackend, feed: Feed, tracer: Tracer ->
             val latest = AtomicReference(Seen(emptySet(), nothingYet))
             // One consumer, so nothing changes `latest` between the check and the update.
-            val consuming = bus.consume { event ->
-                tracer.span("process") {
+            val consuming = bus.consumeFrom { event, where ->
+                tracer.span("process", SpanKind.CONSUMER, where) {
                     val first = event.seq !in latest.get().seqs
                     latest.updateAndGet { it + event }
                     if (first) feed.offer(event)

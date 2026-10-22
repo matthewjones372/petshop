@@ -1,6 +1,7 @@
 import { A, useSearchParams } from "@solidjs/router";
-import { For, Show, createMemo, createResource, createSignal } from "solid-js";
+import { For, Show, createEffect, createMemo, createResource, createSignal, on, onCleanup } from "solid-js";
 import { allSpecies, listPets, look, type Species } from "../api";
+import { usePageTitle } from "../title";
 
 const pageSize = 48;
 
@@ -8,43 +9,71 @@ type Status = "waiting" | "adopted" | "all";
 
 export default function Pets() {
   const [pets, { refetch }] = createResource(listPets);
+  // A failed resource throws when read, which would stop the page updating, so a failure reads as nothing yet.
+  const loaded = () => (pets.error ? undefined : pets());
   const [params, setParams] = useSearchParams<{ species?: string; status?: string; q?: string }>();
   const [shown, setShown] = createSignal(pageSize);
 
   const species = () => params.species as Species | undefined;
   const status = (): Status => (params.status as Status) ?? "waiting";
   const query = () => (params.q ?? "").toLowerCase();
+  usePageTitle(() => (species() ? `${species()}s` : "Pets"));
 
   const matches = createMemo(() =>
-    (pets() ?? []).filter(
+    (loaded() ?? []).filter(
       (p) =>
         (!species() || p.species === species()) &&
         (status() === "all" || p.adopted === (status() === "adopted")) &&
         p.name.toLowerCase().includes(query()),
     ),
   );
-  const count = (s?: Species) => (pets() ?? []).filter((p) => !s || p.species === s).length;
+  const matched = () => `${matches().length} ${matches().length === 1 ? "pet" : "pets"} match`;
 
-  const pick = (next: Record<string, string | undefined>) => {
+  // Read out once a filter settles, so typing a name announces one count rather than one per letter. Emptied first,
+  // so the same count after another filter is still read. Nothing is read until the pets have arrived, which would
+  // count none; their arrival, or a refresh's, reads the count.
+  const [announced, setAnnounced] = createSignal("");
+  createEffect(
+    on(
+      [species, status, query, loaded],
+      () => {
+        setAnnounced("");
+        if (loaded() === undefined) return;
+        const timer = setTimeout(() => setAnnounced(matched()), 500);
+        onCleanup(() => clearTimeout(timer));
+      },
+      { defer: true },
+    ),
+  );
+  const count = (s?: Species) => (loaded() ?? []).filter((p) => !s || p.species === s).length;
+
+  // Typing replaces the history entry, so Back leaves the search rather than undoing it a letter at a time.
+  const pick = (next: Record<string, string | undefined>, typed = false) => {
     setShown(pageSize);
-    setParams(next);
+    setParams(next, { replace: typed });
   };
 
   return (
     <div class="shell">
       <aside class="sidebar">
         <section>
+          <label for="pet-search" class="visually-hidden">Find a pet by name</label>
           <input
+            id="pet-search"
             class="search"
             type="search"
             placeholder="Find by name…"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck={false}
             value={params.q ?? ""}
-            onInput={(e) => pick({ q: e.currentTarget.value || undefined })}
+            onInput={(e) => pick({ q: e.currentTarget.value || undefined }, true)}
           />
         </section>
         <section>
           <h2>Species</h2>
-          <ul>
+          <ul role="list">
             <li>
               <button aria-pressed={!species()} onClick={() => pick({ species: undefined })}>
                 Everyone <span class="count">{count()}</span>
@@ -63,7 +92,7 @@ export default function Pets() {
         </section>
         <section>
           <h2>Status</h2>
-          <ul>
+          <ul role="list">
             <For each={["waiting", "adopted", "all"] as Status[]}>
               {(s) => (
                 <li>
@@ -89,15 +118,18 @@ export default function Pets() {
           <button class="btn btn-small" onClick={refetch}>↻ Refresh</button>
         </div>
         <p class="muted">
-          <Show when={pets()} fallback="Fetching the shop…">
-            {matches().length} {matches().length === 1 ? "pet" : "pets"} match. New arrivals turn up every few seconds.
+          <Show when={loaded()} fallback={pets.error ? "" : "Fetching the shop…"}>
+            {matched()}. New arrivals turn up every few seconds.
           </Show>
+        </p>
+        <p class="visually-hidden" role="status">
+          {announced()}
         </p>
         <Show when={pets.error}>
           <div class="callout err">Couldn't reach the shop: {String(pets.error?.message ?? pets.error)}</div>
         </Show>
 
-        <ul class="pet-grid">
+        <ul class="pet-grid" role="list">
           <For each={matches().slice(0, shown())}>
             {(p) => (
               <li>

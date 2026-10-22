@@ -1,10 +1,35 @@
-import { For, Show, createResource, onCleanup } from "solid-js";
+import { For, Show, createEffect, createResource, on, onCleanup } from "solid-js";
 import { getStats, look } from "../api";
+import { usePageTitle } from "../title";
 
 export default function Stats() {
   const [stats, { refetch }] = createResource(getStats);
-  const timer = setInterval(refetch, 3000);
-  onCleanup(() => clearInterval(timer));
+  usePageTitle(() => "Stats");
+  // Asks again three seconds after each answer settles, the first load's included, so a slow answer never overlaps
+  // the next question, and not at all while the tab is hidden. Coming back asks at once unless an answer is on its way.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const next = () => {
+    clearTimeout(timer);
+    if (!document.hidden) timer = setTimeout(refetch, 3000);
+  };
+  // A failed answer settles too, so a shop that comes back is picked up again.
+  createEffect(
+    on(
+      () => stats.state,
+      (state) => {
+        if (state === "ready" || state === "errored") next();
+      },
+    ),
+  );
+  const onVisibility = () => {
+    clearTimeout(timer);
+    if (!document.hidden && !stats.loading) refetch();
+  };
+  document.addEventListener("visibilitychange", onVisibility);
+  onCleanup(() => {
+    clearTimeout(timer);
+    document.removeEventListener("visibilitychange", onVisibility);
+  });
 
   const pct = (a: number, b: number) => (b === 0 ? 0 : Math.round((a / b) * 100));
 
@@ -24,7 +49,8 @@ export default function Stats() {
         <div class="callout err">Couldn't reach the shop: {String(stats.error?.message ?? stats.error)}</div>
       </Show>
 
-      <Show when={stats.latest}>
+      {/* A failed resource throws when read, which would stop the page updating, so the error is checked first. */}
+      <Show when={!stats.error && stats.latest}>
         {(t) => (
           <>
             <div class="stickers" style={{ "margin-bottom": "28px" }}>
