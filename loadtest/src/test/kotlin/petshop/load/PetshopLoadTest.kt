@@ -5,6 +5,7 @@ import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.use
+import io.github.matthewjones372.lark.assert.shouldBeRight
 import io.github.matthewjones372.lark.test.eventually
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.jetty.PelicanServer
@@ -21,7 +22,6 @@ import io.github.matthewjones372.proofload.report.writeHtmlReport
 import io.github.matthewjones372.proofload.scenario
 import io.github.matthewjones372.proofload.step
 import io.github.matthewjones372.proofload.warmingUp
-import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.withClue
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.longs.shouldBeGreaterThan

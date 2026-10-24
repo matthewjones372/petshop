@@ -1,14 +1,14 @@
 package petshop.app
 
-import arrow.core.Either
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
+import io.github.matthewjones372.lark.assert.shouldBeLeft
+import io.github.matthewjones372.lark.assert.shouldBeRight
+import io.github.matthewjones372.lark.fail.Either
 import io.github.matthewjones372.lark.test.eventually
 import io.github.matthewjones372.lark.test.story
-import io.kotest.assertions.arrow.core.shouldBeLeft
-import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe

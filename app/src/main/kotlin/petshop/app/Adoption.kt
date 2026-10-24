@@ -1,18 +1,22 @@
 package petshop.app
 
-import arrow.core.Either
-import arrow.core.getOrElse
-import arrow.core.left
-import arrow.core.raise.Raise
-import arrow.core.raise.either
 import io.github.matthewjones372.lark.Schedule
 import io.github.matthewjones372.lark.VirtualThreads
 import io.github.matthewjones372.lark.actor.ActorRef
 import io.github.matthewjones372.lark.actor.Reply
 import io.github.matthewjones372.lark.actor.ask
+import io.github.matthewjones372.lark.fail.Either
+import io.github.matthewjones372.lark.fail.Fail
+import io.github.matthewjones372.lark.fail.attempt
+import io.github.matthewjones372.lark.fail.bind
+import io.github.matthewjones372.lark.fail.fail
+import io.github.matthewjones372.lark.fail.fold
+import io.github.matthewjones372.lark.fail.getOrElse
+import io.github.matthewjones372.lark.fail.left
+import io.github.matthewjones372.lark.fail.onLeft
 import io.github.matthewjones372.lark.logError
 import io.github.matthewjones372.lark.logInfo
-import io.github.matthewjones372.lark.retryRaise
+import io.github.matthewjones372.lark.retrying
 import io.github.matthewjones372.lark.stream.Running
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.StreamBackend
@@ -84,7 +88,7 @@ class Adoption(
     fun adopt(id: PetId, by: String): AdoptionReport {
         val adoption = Unfinished(id, by)
         val (warnings, answer) = warnings {
-            either {
+            attempt {
                 // Throws when the actor stopped or timed out: that is a fault (a 500), not a declared refusal.
                 val adopting = ref.ask(within = 3.seconds) { reply -> Adopt(id, by, reply) }.getOrElse { failure ->
                     // The actor may still record the pet as being adopted after the ask gave up. The registry was
@@ -112,8 +116,8 @@ class Adoption(
     }
 
     /** The transfer may have landed before its answer was lost, so the registry is asked who keeps the pet. */
-    context(_: Warnings)
-    private fun Raise<PetShopError>.readBack(adoption: Unfinished, adopting: Pet): Pet {
+    context(_: Warnings, _: Fail<PetShopError>)
+    private fun readBack(adoption: Unfinished, adopting: Pet): Pet {
         val (id, by) = adoption
         return registry.lookup(id).fold(
             { failure ->
@@ -133,12 +137,12 @@ class Adoption(
         }
     }
 
-    context(_: Warnings)
-    private fun Raise<PetShopError>.refuse(adoption: Unfinished, why: PetShopError): Nothing {
+    context(_: Warnings, _: Fail<PetShopError>)
+    private fun refuse(adoption: Unfinished, why: PetShopError): Nothing {
         val (id, by) = adoption
         ref.settled { reply -> Return(id, by, reply) }
             .onLeft { failure -> settleLater(adoption, "the return of pet ${id.value} was not recorded: $failure") }
-        raise(why)
+        fail(why)
     }
 
     context(_: Warnings)
@@ -153,9 +157,9 @@ class Adoption(
         Schedule.exponential<Unsettled>(settleEvery)
             .delayed { _, wait -> minOf(wait, 30.seconds) }
             .doWhile { failure, _ -> failure !is Unsettled.Invalid && !closed.get() }
-            .retryRaise {
+            .retrying {
                 val kept = registry.lookup(id).fold(
-                    { failure -> if (failure == NotRegistered) false else raise(Unsettled.Unrecorded) },
+                    { failure -> if (failure == NotRegistered) false else fail(Unsettled.Unrecorded) },
                     { chip -> chip.keeper == by },
                 )
                 ref.settled { reply -> if (kept) Confirm(id, by, reply) else Return(id, by, reply) }.bind()
@@ -178,7 +182,7 @@ class Adoption(
     }
 }
 
-/** The effect of noting what went wrong without changing the answer, as [Raise] is the effect of refusing. */
+/** The effect of noting what went wrong without changing the answer, as [Fail] is the effect of refusing. */
 private fun interface Warnings {
     fun warn(warning: String)
 }

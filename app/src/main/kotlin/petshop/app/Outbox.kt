@@ -8,6 +8,7 @@ import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.app.liquibase.Migrated
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.counter
+import io.github.matthewjones372.lark.fail.fold
 import io.github.matthewjones372.lark.gauge
 import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.logAnnotated

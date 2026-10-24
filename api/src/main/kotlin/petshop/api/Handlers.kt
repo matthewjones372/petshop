@@ -1,5 +1,6 @@
 package petshop.api
 
+import io.github.matthewjones372.lark.fail.fold
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.lark.stream.toSequence
