@@ -1,1 +1,1 @@
-dependencies { api("io.arrow-kt:arrow-core:2.1.2") }
+dependencies { api("io.github.matthewjones372:lark:${providers.gradleProperty("larkVersion").get()}") }

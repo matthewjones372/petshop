@@ -4,6 +4,7 @@ import io.github.matthewjones372.lark.Carriers
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.counter
+import io.github.matthewjones372.lark.fail.onLeft
 import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.stream.Hub
 import io.github.matthewjones372.lark.stream.Stream

@@ -2,11 +2,11 @@ package petshop.app
 
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
+import io.github.matthewjones372.lark.assert.shouldBeRight
 import io.github.matthewjones372.lark.kafka.Topic
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.test.story
-import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.SpanKind

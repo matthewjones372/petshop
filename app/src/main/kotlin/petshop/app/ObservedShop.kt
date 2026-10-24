@@ -1,7 +1,8 @@
 package petshop.app
 
-import arrow.core.Either
 import io.github.matthewjones372.lark.counter
+import io.github.matthewjones372.lark.fail.Either
+import io.github.matthewjones372.lark.fail.fold
 import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.logAnnotated
 import io.github.matthewjones372.lark.logInfo
