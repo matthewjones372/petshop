@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GAUNTLET_URL: "https://github.com/matthewjones372/gauntlet/releases/download/v0.1.0-rc.36/gauntlet-linux-x64"
+  GAUNTLET_URL: "https://github.com/matthewjones372/gauntlet/releases/download/v0.1.0-rc.37/gauntlet-linux-x64"
 
 jobs:
   evidence:
@@ -51,7 +51,7 @@ jobs:
           sha="$EVENT_BASE"
           if [ "$ACTION" = reopened ]; then sha=$(git rev-parse "refs/remotes/origin/$BASE_REF"); fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-      - name: Install Gauntlet 0.1.0-rc.36
+      - name: Install Gauntlet 0.1.0-rc.37
         run: |
           curl -fsSL "$GAUNTLET_URL" -o "$RUNNER_TEMP/gauntlet"
           curl -fsSL "$(dirname "$GAUNTLET_URL")/checksums.txt" | grep " gauntlet-linux-x64$" | sed "s#gauntlet-linux-x64#$RUNNER_TEMP/gauntlet#" | sha256sum -c -
@@ -109,7 +109,7 @@ jobs:
           CI_SOURCE: ${{ steps.ci.outputs.source }}
         run: |
           reports=""; if [ -n "$(ls -A ci-reports 2>/dev/null)" ]; then reports="--ci-reports ci-reports --ci-source $CI_SOURCE"; fi
-          "$RUNNER_TEMP/gauntlet" check --policy-ref "$BASE" --head "$HEAD" --out gauntlet-out --no-record --ci $reports || true
+          "$RUNNER_TEMP/gauntlet" check --policy-ref "$BASE" --head "$HEAD" --out gauntlet-out --no-record --ci --advised-mutation skip $reports || true
           # When the change edits .gauntlet/, prove the proposed policy still catches tampering.
           if ! git diff --quiet "$BASE" "$HEAD" -- .gauntlet; then
             "$RUNNER_TEMP/gauntlet" selftest --base "$HEAD" --json > gauntlet-out/selftest.json || true
@@ -120,6 +120,110 @@ jobs:
           name: gauntlet-evidence
           path: gauntlet-out
           retention-days: 30
+
+  mutation:
+    if: github.event_name == 'pull_request_target' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the change, without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Find the base to judge against
+        # A reopened pull request's event keeps its old base commit: judge it against its base branch as it is now.
+        id: base
+        env:
+          EVENT_BASE: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          ACTION: ${{ github.event.action }}
+        run: |
+          sha="$EVENT_BASE"
+          if [ "$ACTION" = reopened ]; then sha=$(git rev-parse "refs/remotes/origin/$BASE_REF"); fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Install Gauntlet 0.1.0-rc.37
+        run: |
+          curl -fsSL "$GAUNTLET_URL" -o "$RUNNER_TEMP/gauntlet"
+          curl -fsSL "$(dirname "$GAUNTLET_URL")/checksums.txt" | grep " gauntlet-linux-x64$" | sed "s#gauntlet-linux-x64#$RUNNER_TEMP/gauntlet#" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/gauntlet"
+      # A change to comments or documentation only has nothing to build (ADR 0023): skip the tools and setup too.
+      - name: Does the change need building?
+        id: needs
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: echo "build=$("$RUNNER_TEMP/gauntlet" needs-build --policy-ref "$BASE" --head "$HEAD")" >> "$GITHUB_OUTPUT"
+      - name: Set up Java
+        if: ${{ steps.needs.outputs.build != 'false' }}
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "25"
+      - name: Set up Gradle
+        if: ${{ steps.needs.outputs.build != 'false' }}
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-disabled: true
+      - name: Set up Node
+        if: ${{ steps.needs.outputs.build != 'false' }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      # The project's own CI setup, from .gauntlet/ci.yml, so its builds build here as in its CI.
+      - {"uses":"actions/setup-java@v6","with":{"distribution":"temurin","java-version":"21\n25\n"},"if":"${{ steps.needs.outputs.build != 'false' }}"}
+      - {"uses":"gradle/actions/setup-gradle@v6","if":"${{ steps.needs.outputs.build != 'false' }}"}
+      - name: Run the policy's advise mutation testing, beside the verdict
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          "$RUNNER_TEMP/gauntlet" check --policy-ref "$BASE" --head "$HEAD" --out gauntlet-mutation --no-record --ci --advised-mutation only || true
+      - name: Keep the mutation report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gauntlet-mutation
+          path: gauntlet-mutation
+          retention-days: 30
+
+  mutation-report:
+    needs: [mutation]
+    if: always() && needs.mutation.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      checks: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Get the mutation report
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: gauntlet-mutation
+          path: mutation
+      - name: Post the surviving mutants as annotations
+        run: |
+          report=mutation/gauntlet-report.json
+          [ -f "$report" ] || exit 0
+          jq --arg sha "$HEAD" '
+            ([.advice // [] | .[] | select(.check == "mutation")]) as $found
+            | ([.checks[] | select(.check == "mutation")][0] // {status: "not-executed"}) as $gate
+            | {
+                name: "gauntlet mutation", head_sha: $sha, status: "completed", conclusion: "neutral",
+                output: {
+                  title: ("mutation: " + $gate.status + (if $gate.reason then " (" + $gate.reason + ")" else "" end))[:250],
+                  summary: (if ($found | length) == 0 then "No advisory mutation findings." else ($found | map("- " + (if .path then .path + (if .line then ":" + (.line | tostring) else "" end) + ": " else "" end) + .message) | join("\n")) end)[:60000],
+                  annotations: ([$found[] | select(.path != null and .line != null) | {path, start_line: .line, end_line: .line, annotation_level: "warning", title: ("mutation: " + .ruleId), message}] | .[:50])
+                }
+              }' "$report" > check.json
+          # GitHub refuses the whole request over one annotation it can't place: post the check without them then.
+          post_check() { gh api -X POST "repos/$GITHUB_REPOSITORY/check-runs" --input - > /dev/null; }
+          post_check < check.json || jq '.output.annotations = []' check.json | post_check
 
   status:
     needs: [evidence]
@@ -151,7 +255,7 @@ jobs:
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: echo "BASE=$(git rev-parse "refs/remotes/origin/$BASE_REF")" >> "$GITHUB_ENV"
-      - name: Install Gauntlet 0.1.0-rc.36
+      - name: Install Gauntlet 0.1.0-rc.37
         run: |
           curl -fsSL "$GAUNTLET_URL" -o "$RUNNER_TEMP/gauntlet"
           curl -fsSL "$(dirname "$GAUNTLET_URL")/checksums.txt" | grep " gauntlet-linux-x64$" | sed "s#gauntlet-linux-x64#$RUNNER_TEMP/gauntlet#" | sha256sum -c -
