@@ -1,9 +1,11 @@
 package petshop.app
 
 import io.github.matthewjones372.lark.CircuitBreaker
+import io.github.matthewjones372.lark.Limit
 import io.github.matthewjones372.lark.Schedule
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
+import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.config
 import io.github.matthewjones372.lark.fail.Either
@@ -34,8 +36,16 @@ import kotlin.time.toJavaDuration
 
 data class RegistrySettings(val baseUrl: String, val timeout: Duration)
 
-class HttpChipRegistry(settings: RegistrySettings, transport: JettyHttpTransport, telemetry: OpenTelemetrySdk) :
-    ChipRegistry {
+/**
+ * One [atOnce] for every call, so adoptions and the settling stream share the registry's budget. A call past it
+ * waits for a permit rather than being refused: each call ahead ends within the client's timeout.
+ */
+class HttpChipRegistry(
+    settings: RegistrySettings,
+    transport: JettyHttpTransport,
+    telemetry: OpenTelemetrySdk,
+    private val atOnce: Limit,
+) : ChipRegistry {
 
     private val client = RegistryClient(
         baseUrl = settings.baseUrl,
@@ -70,7 +80,8 @@ class HttpChipRegistry(settings: RegistrySettings, transport: JettyHttpTransport
                 calls,
                 ifRejected = { refused -> Unreachable("${refused.guard} refused: ${refused.message}") },
             ) {
-                call()
+                // Inside the breaker, so an open one refuses without queueing for a permit.
+                atOnce.withPermit(call)
             }
         }
     }
@@ -86,4 +97,5 @@ class HttpChipRegistry(settings: RegistrySettings, transport: JettyHttpTransport
 
 val registry: Module =
     config<RegistrySettings>("petshop.registry") { RegistrySettings(string("baseUrl"), duration("timeout")) } +
+        single<Limit> { Limit.adaptive("chip-registry") } +
         singleOf(::HttpChipRegistry).boundTo<ChipRegistry>()
