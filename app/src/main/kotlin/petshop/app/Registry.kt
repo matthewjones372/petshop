@@ -64,7 +64,7 @@ class HttpChipRegistry(settings: RegistrySettings, transport: JettyHttpTransport
         asking { client.recordKeeper(chip.number, NewKeeper(to)) }
 
     /** Only a declared 404 means no chip; anything else that is not a chip means the registry did not answer. */
-    private fun asking(call: () -> Outcome<*, ChipRecord>): Either<RegistryError, Chip> = catching {
+    private fun asking(call: () -> Outcome<*, ChipRecord>): Either<RegistryError, Chip> = Either.catch {
         attempt<RegistryError, Outcome<*, ChipRecord>> {
             guarded(
                 calls,

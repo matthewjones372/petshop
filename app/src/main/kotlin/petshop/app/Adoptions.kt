@@ -14,7 +14,6 @@ import io.github.matthewjones372.lark.fail.Either
 import io.github.matthewjones372.lark.fail.fold
 import io.github.matthewjones372.lark.fail.left
 import io.github.matthewjones372.lark.fail.map
-import io.github.matthewjones372.lark.fail.nonFatalOrThrow
 import io.github.matthewjones372.lark.fail.right
 import io.github.matthewjones372.lark.logError
 import io.github.matthewjones372.lark.logWarn
@@ -87,18 +86,11 @@ private class State(val pets: Map<PetId, Pet>, private val outbox: Outbox, priva
 
     /** The pet's row and its event are one transaction, so the state changes only once both are durable. */
     fun record(pet: Pet, event: (seq: Long) -> ShopEvent): Either<Throwable, State> =
-        catching { outbox.record(pet, event) }.map { with(pet) }
+        Either.catch { outbox.record(pet, event) }.map { with(pet) }
 
-    fun keep(pet: Pet): Either<Throwable, State> = catching { outbox.keep(pet) }.map { with(pet) }
+    fun keep(pet: Pet): Either<Throwable, State> = Either.catch { outbox.keep(pet) }.map { with(pet) }
 
     private fun with(pet: Pet) = State(pets + (pet.id to pet), outbox, window).also { next -> window.show(next.pets) }
-}
-
-/** A throw as a value on the left, except a fatal one or Lark's own fail, which go on up. */
-internal inline fun <A> catching(block: () -> A): Either<Throwable, A> = try {
-    block().right()
-} catch (thrown: Throwable) {
-    thrown.nonFatalOrThrow().left()
 }
 
 /** Every write is caught where it is made: a throw out of a step would restart the actor from its opening catalogue. */
