@@ -1,11 +1,11 @@
 package petshop.app
 
-import arrow.core.Either
-import arrow.core.right
 import io.github.matthewjones372.lark.TestClock
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
+import io.github.matthewjones372.lark.fail.Either
+import io.github.matthewjones372.lark.fail.right
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.Hub
 import io.github.matthewjones372.lark.stream.Run

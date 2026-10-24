@@ -1,11 +1,13 @@
 package petshop.app
 
-import arrow.core.Either
 import io.github.matthewjones372.lark.Carriers
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.fail.Either
+import io.github.matthewjones372.lark.fail.map
+import io.github.matthewjones372.lark.fail.mapLeft
 import io.github.matthewjones372.lark.stream.Hub
 import io.github.matthewjones372.lark.stream.Run
 import io.github.matthewjones372.lark.stream.map

@@ -1,16 +1,17 @@
 package petshop.app
 
-import arrow.core.Either
-import arrow.core.flatMap
-import arrow.core.left
-import arrow.core.raise.either
-import arrow.core.right
 import io.github.matthewjones372.lark.CircuitBreaker
 import io.github.matthewjones372.lark.Schedule
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.singleOf
 import io.github.matthewjones372.lark.app.typesafe.config
+import io.github.matthewjones372.lark.fail.Either
+import io.github.matthewjones372.lark.fail.attempt
+import io.github.matthewjones372.lark.fail.flatMap
+import io.github.matthewjones372.lark.fail.left
+import io.github.matthewjones372.lark.fail.mapLeft
+import io.github.matthewjones372.lark.fail.right
 import io.github.matthewjones372.lark.guarded
 import io.github.matthewjones372.lark.policy
 import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
@@ -63,8 +64,8 @@ class HttpChipRegistry(settings: RegistrySettings, transport: JettyHttpTransport
         asking { client.recordKeeper(chip.number, NewKeeper(to)) }
 
     /** Only a declared 404 means no chip; anything else that is not a chip means the registry did not answer. */
-    private fun asking(call: () -> Outcome<*, ChipRecord>): Either<RegistryError, Chip> = Either.catch {
-        either<RegistryError, Outcome<*, ChipRecord>> {
+    private fun asking(call: () -> Outcome<*, ChipRecord>): Either<RegistryError, Chip> = catching {
+        attempt<RegistryError, Outcome<*, ChipRecord>> {
             guarded(
                 calls,
                 ifRejected = { refused -> Unreachable("${refused.guard} refused: ${refused.message}") },

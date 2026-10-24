@@ -1,6 +1,5 @@
 package petshop.app
 
-import arrow.core.Either
 import io.github.matthewjones372.lark.Carriers
 import io.github.matthewjones372.lark.Schedule
 import io.github.matthewjones372.lark.app.Module
@@ -8,6 +7,9 @@ import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.counter
+import io.github.matthewjones372.lark.fail.Either
+import io.github.matthewjones372.lark.fail.map
+import io.github.matthewjones372.lark.fail.mapLeft
 import io.github.matthewjones372.lark.increment
 import io.github.matthewjones372.lark.kafka.DecodeError
 import io.github.matthewjones372.lark.kafka.Decoder

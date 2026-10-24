@@ -1,6 +1,5 @@
 package petshop.app
 
-import arrow.core.Either
 import io.github.matthewjones372.lark.actor.ActorRef
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.actor.actor
@@ -9,6 +8,7 @@ import io.github.matthewjones372.lark.app.boundTo
 import io.github.matthewjones372.lark.app.closingOf
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.singleOf
+import io.github.matthewjones372.lark.fail.Either
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.opentelemetry.api.trace.Tracer
 import petshop.domain.ChipRegistry
