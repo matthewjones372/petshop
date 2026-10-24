@@ -1,9 +1,9 @@
 package petshop.app
 
-import arrow.core.Either
-import arrow.core.left
-import arrow.core.right
 import io.github.matthewjones372.lark.TestClock
+import io.github.matthewjones372.lark.fail.Either
+import io.github.matthewjones372.lark.fail.left
+import io.github.matthewjones372.lark.fail.right
 import io.github.matthewjones372.lark.stream.Exit
 import io.github.matthewjones372.lark.stream.Run
 import io.github.matthewjones372.lark.stream.Running

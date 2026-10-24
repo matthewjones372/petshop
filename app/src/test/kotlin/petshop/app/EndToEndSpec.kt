@@ -5,6 +5,7 @@ import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.use
+import io.github.matthewjones372.lark.assert.shouldBeRight
 import io.github.matthewjones372.lark.test.story
 import io.github.matthewjones372.pelican.health.health
 import io.github.matthewjones372.pelican.jetty.PelicanServer
@@ -14,7 +15,6 @@ import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.shouldBeError
 import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
-import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
 import org.apache.kafka.common.serialization.LongDeserializer
 import org.junit.jupiter.api.Test

@@ -2,14 +2,14 @@ package petshop.app
 
 import com.github.tomakehurst.wiremock.http.Fault
 import io.github.matthewjones372.lark.app.testApp
+import io.github.matthewjones372.lark.assert.shouldBeLeft
+import io.github.matthewjones372.lark.assert.shouldBeRight
 import io.github.matthewjones372.lark.parMap
 import io.github.matthewjones372.lark.test.story
 import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
-import io.kotest.assertions.arrow.core.shouldBeLeft
-import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test

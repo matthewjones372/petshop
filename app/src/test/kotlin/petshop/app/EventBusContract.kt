@@ -6,11 +6,11 @@ import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
+import io.github.matthewjones372.lark.assert.shouldBeRight
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.Hub
 import io.github.matthewjones372.lark.stream.start
 import io.github.matthewjones372.lark.test.story
-import io.kotest.assertions.arrow.core.shouldBeRight
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import petshop.api.Tally
