@@ -3,6 +3,7 @@ package petshop.app
 import io.github.matthewjones372.lark.actor.ActorRef
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.single
+import io.github.matthewjones372.lark.fail.fold
 import io.github.matthewjones372.lark.stream.Running
 import io.github.matthewjones372.pelican.health.Check
 import io.github.matthewjones372.pelican.health.Status

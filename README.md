@@ -58,7 +58,7 @@ The libraries being tried out:
 | Library | What it does here |
 |---|---|
 | [Pelican](https://github.com/matthewjones372/pelican) | the shop's HTTP contract as values, served on Jetty and read with kotlinx.serialization: routes, the OpenAPI document, Swagger UI and a themed RapiDoc reference that sends requests, handlers that must answer a declared failure; live and ready probes (`pelican-health`); the chip registry's client generated from its contract; typed WireMock stubs, golden files and a typed test client |
-| [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`), with its settings and secrets read and reported by `lark-app-typesafe`, the schema migrated by `lark-app-liquibase` before anything reads it, and the graph checked at build time by the wiring plugin; the shop's actor, on virtual threads in a `flock` (`lark-actor`, `lark-app-actor`); the background work, the readiness gauges and the in-process bus as `Stream`s on Lark's Forks (`lark-stream`); Kafka as a `Stream` that commits what it handled and restarts after a defect (`lark-kafka`); a circuit breaker on the chip registry, and retries on schedules; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
+| [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`), with its settings and secrets read and reported by `lark-app-typesafe`, the schema migrated by `lark-app-liquibase` before anything reads it, and the graph checked at build time by the wiring plugin; the shop's actor, on virtual threads in a `flock` (`lark-actor`, `lark-app-actor`); the background work, the readiness gauges and the in-process bus as `Stream`s on Lark's Forks (`lark-stream`); Kafka as a `Stream` that commits what it handled and restarts after a defect (`lark-kafka`); a circuit breaker on the chip registry, and retries on schedules; `Either` and `Fail` for declared failures, from the domain up; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
 | [Proofload](https://github.com/matthewjones372/proofload) | load tests that start the whole service in-process, assert correctness under load, and write an HTML report |
 | [ExoQuery](https://github.com/ExoQuery/ExoQuery) | every statement against the outbox table, written as Kotlin and checked at compile time |
 | [kimney](https://github.com/matthewjones372/kimney) | the mappings between the shop's events and their wire records, and between the domain and the API's DTOs, derived at compile time |
@@ -73,7 +73,6 @@ What they run on, and what the tests use:
 | Testcontainers | a real Postgres and a real Kafka broker for the tests, one container each per run: a fresh schema per graph, and topics and groups of each test's own |
 | WireMock | the chip registry in tests and the demo, stubbed through Pelican's `pelican-test-wiremock` |
 | Kotest assertions on JUnit 6 | every test; the end-to-end and app tests are written as stories (below) |
-| Arrow | `Either` and `Raise` for declared failures, from the domain up |
 | OpenTelemetry, Micrometer, Prometheus, Grafana, Tempo | a span per request, adoption, chip-registry call, outbox write, publish and projection, one trace from the browser through Kafka and back, exported over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; metrics at `/metrics`; the demo's dashboard and traces |
 | Logback | where Lark's log lines end up, through `lark-slf4j` |
 | Apache Kafka, avro4k, Confluent's schema registry client | the bus on a broker: events as Avro in the schema registry's wire format, written by avro4k's Confluent serde; tests run the broker in a container and Confluent's in-process `mock://` registry |
@@ -82,7 +81,7 @@ What they run on, and what the tests use:
 
 | Module | What it holds | Uses |
 |---|---|---|
-| `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | Arrow |
+| `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | Lark |
 | `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
 | `api` | the endpoints, their failures, the handlers and the DTOs | Pelican, Jetty, kimney |
 | `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus (in process, or Kafka carrying Avro) and its consumer, the wiring, `main` | Lark, kimney |
@@ -638,7 +637,7 @@ loads on the project's Kotlin, or for a project with many more queries.
 
 Pelican `1.0.1-SNAPSHOT`, Lark `0.10.2-SNAPSHOT` (its Gradle wiring plugin too, which follows `larkVersion`), Proofload
 `0.1.0-rc4`, ExoQuery `2.0.4.PL`, kimney `0.3.0`, Jetty `12.1.13`,
-kotlinx.serialization `1.11.0`, Arrow `2.1.2`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`,
+kotlinx.serialization `1.11.0`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`,
 HikariCP `7.1.0`, OpenTelemetry SDK `1.62.0`, Micrometer's Prometheus registry `1.16.6`, Logback `1.5.34`, Kotest `6.2.4`, JUnit `6.1.3`,
 avro4k `2.12.0`, Confluent's Avro serializer `8.3.0`, Kafka client `4.3.0`, the
 `apache/kafka:4.3.1` image for tests and the demo, and

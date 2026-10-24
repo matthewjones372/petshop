@@ -1,12 +1,12 @@
 package petshop.app
 
-import arrow.core.Either
-import arrow.core.left
-import arrow.core.right
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
+import io.github.matthewjones372.lark.fail.Either
+import io.github.matthewjones372.lark.fail.left
+import io.github.matthewjones372.lark.fail.right
 import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMock
 import petshop.domain.Chip
 import petshop.domain.ChipRegistry

@@ -1,6 +1,6 @@
 package petshop.domain
 
-import arrow.core.Either
+import io.github.matthewjones372.lark.fail.Either
 
 data class Chip(val number: String, val keeper: String)
 
