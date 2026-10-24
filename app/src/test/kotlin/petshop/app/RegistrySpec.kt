@@ -1,7 +1,11 @@
 package petshop.app
 
 import com.github.tomakehurst.wiremock.http.Fault
+import io.github.matthewjones372.lark.Limit
+import io.github.matthewjones372.lark.app.overriding
+import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.testApp
+import io.github.matthewjones372.lark.app.testNode
 import io.github.matthewjones372.lark.assert.shouldBeLeft
 import io.github.matthewjones372.lark.assert.shouldBeRight
 import io.github.matthewjones372.lark.parMap
@@ -10,11 +14,14 @@ import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.ok
 import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMockExtension
+import io.kotest.matchers.comparables.shouldBeGreaterThanOrEqualTo
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import petshop.domain.Adopted
+import petshop.domain.Chip
+import petshop.domain.ChipRegistry
 import petshop.domain.NotChipped
 import petshop.domain.OnShelf
 import petshop.domain.PetId
@@ -134,6 +141,30 @@ class RegistrySpec {
         And("the registry heard from that one only: the actor settles the race before anybody calls out") {
             registry.calls(lookupChip) shouldBe 1
             registry.calls(recordKeeper) shouldBe 1
+        }
+    }
+
+    @Test
+    fun `calls past the registry's limit wait their turn and are answered`() = story {
+        Given("a registry that takes 500 ms over each of four chips, and a limit of two calls at once") {
+            registry.stub(lookupChip, 0L) answers ok(chip)
+            (1L..4L).forEach { id -> registry.stub(lookupChip, id).answers(ok(chip), after = 500.milliseconds) }
+        }
+        val (answers, took) = When("four lookups start together, after one that warms the client up") {
+            val limited = Petshop.module.overriding(
+                single<RegistrySettings> { RegistrySettings(registry.baseUrl, 5.seconds) } +
+                    single<Limit> { Limit.fixed(2, "chip-registry") },
+            )
+            testNode(limited) { chips: ChipRegistry ->
+                chips.lookup(PetId(0))
+                measureTimedValue { parMap((1L..4L).toList()) { id -> chips.lookup(PetId(id)) } }
+            }
+        }
+        Then("every one is answered, none refused") {
+            answers.forEach { it.shouldBeRight() shouldBe Chip(chip.number, chip.keeper) }
+        }
+        And("they went two at a time, so it took two rounds of the registry's 500 ms") {
+            took shouldBeGreaterThanOrEqualTo 1.seconds
         }
     }
 }
