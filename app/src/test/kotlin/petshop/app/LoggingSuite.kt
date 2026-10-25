@@ -30,7 +30,8 @@ object LoggingSuite : Suite<Unit>() {
         test("nothing in main binds a logger, and the classpath still answers") { _ ->
             story {
                 Then(
-                    "the logger lark writes to is SLF4J's, found on the classpath; StderrLogger would mean the dependency does nothing",
+                    "the logger lark writes to is SLF4J's, found on the classpath; " +
+                        "StderrLogger would mean the dependency does nothing",
                 ) {
                     asMainDoes { logger.get() }.shouldBeInstanceOf<Slf4jLogger>()
                 }

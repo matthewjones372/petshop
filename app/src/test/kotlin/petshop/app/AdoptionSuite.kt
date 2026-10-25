@@ -70,7 +70,8 @@ object AdoptionSuite : Suite<Unit>() {
                 }
                 Then("she is told the registry is down") { first shouldBeLeft RegistryDown(1) } and
                     And(
-                        "Nibbles is back on the shelf: the actor said yes before the registry said no, and the no undid it",
+                        "Nibbles is back on the shelf: the actor said yes before the registry said no, " +
+                            "and the no undid it",
                     ) {
                         after?.standing shouldBe OnShelf
                     }
@@ -104,7 +105,8 @@ object AdoptionSuite : Suite<Unit>() {
                 }
                 Then("she is told it was not recorded") { answer shouldBeLeft NotRecorded(1) } and
                     And(
-                        "a sale nobody could write down did not happen: Nibbles is on the shelf, and the registry was not asked",
+                        "a sale nobody could write down did not happen: Nibbles is on the shelf, " +
+                            "and the registry was not asked",
                     ) {
                         (after?.standing shouldBe OnShelf) and (asked.get() shouldBe 0)
                     }
@@ -162,7 +164,8 @@ object AdoptionSuite : Suite<Unit>() {
             story {
                 val drawn = When("the shop's subgraph is drawn") { settled.render() }
                 Then(
-                    "it holds no server, no arrivals and no registry settings: what a test of the shop needs is the shop",
+                    "it holds no server, no arrivals and no registry settings: " +
+                        "what a test of the shop needs is the shop",
                 ) {
                     (drawn.contains("PelicanServer") shouldBe false) and
                         (drawn.contains("Arrivals") shouldBe false) and

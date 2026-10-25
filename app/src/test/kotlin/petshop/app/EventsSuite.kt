@@ -77,7 +77,8 @@ object EventsSuite : Suite<Unit>() {
                         Then("the consumer sees the second as a duplicate").eventually(5.seconds) {
                             app.projection.tally().let { (it.duplicates shouldBeOrRetry 1) to it }
                         }
-                    val once = "counts the adoption once, because the bus is at-least-once and it knows an event by its seq"
+                    val once = "counts the adoption once, because the bus is at-least-once " +
+                        "and it knows an event by its seq"
                     duplicate and And(once) { (tally.adopted(Species.Dog) shouldBe 1) and (tally.events shouldBe 1) }
                 }
             }
