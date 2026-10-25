@@ -5,9 +5,9 @@
       "properties": {
         "gauntlet": {
           "baseline": {
-            "commit": "bc7fa1d7668df49ef5802f64073b1b00fc62e4a7",
-            "gauntletVersion": "0.1.0-rc.35",
-            "irHash": "12a7cbf53c48d2715fc0968dd67d9d26f7b45bcf3b12ec45e218ecbcdcb61810"
+            "commit": "d2056af362b73d1c4a510765c75e007d09fd8ce1",
+            "gauntletVersion": "0.1.0-rc.37",
+            "irHash": "7d6be6d50d3d31b3cee29c43c810affccc335b4e7bfc2b174484f85bb06aae6b"
           },
           "legacy": [],
           "metrics": {
@@ -17,25 +17,28 @@
                 "api/src/main/kotlin/petshop/api/Catalogue.kt": 100,
                 "api/src/main/kotlin/petshop/api/Codecs.kt": 100,
                 "api/src/main/kotlin/petshop/api/Docs.kt": 0,
-                "api/src/main/kotlin/petshop/api/Dtos.kt": 85.19,
-                "api/src/main/kotlin/petshop/api/Endpoints.kt": 95.24,
+                "api/src/main/kotlin/petshop/api/Dtos.kt": 86.21,
+                "api/src/main/kotlin/petshop/api/Endpoints.kt": 96.23,
                 "api/src/main/kotlin/petshop/api/Handlers.kt": 100,
-                "app/src/main/kotlin/petshop/app/ActorPetShop.kt": 100,
-                "app/src/main/kotlin/petshop/app/Adoptions.kt": 95.35,
+                "app/src/main/kotlin/petshop/app/Adoption.kt": 100,
+                "app/src/main/kotlin/petshop/app/Adoptions.kt": 86.96,
                 "app/src/main/kotlin/petshop/app/Arrivals.kt": 100,
-                "app/src/main/kotlin/petshop/app/Avro.kt": 85.71,
+                "app/src/main/kotlin/petshop/app/Avro.kt": 90,
                 "app/src/main/kotlin/petshop/app/Bus.kt": 100,
                 "app/src/main/kotlin/petshop/app/BusChoice.kt": 100,
                 "app/src/main/kotlin/petshop/app/Checks.kt": 100,
                 "app/src/main/kotlin/petshop/app/Database.kt": 93.75,
                 "app/src/main/kotlin/petshop/app/Feed.kt": 100,
-                "app/src/main/kotlin/petshop/app/KafkaBus.kt": 97.5,
+                "app/src/main/kotlin/petshop/app/KafkaBus.kt": 98.36,
                 "app/src/main/kotlin/petshop/app/Main.kt": 0,
                 "app/src/main/kotlin/petshop/app/Meters.kt": 100,
+                "app/src/main/kotlin/petshop/app/ObservedShop.kt": 100,
                 "app/src/main/kotlin/petshop/app/Outbox.kt": 100,
-                "app/src/main/kotlin/petshop/app/PostgresOutbox.kt": 97.5,
+                "app/src/main/kotlin/petshop/app/PostgresOutbox.kt": 95.35,
                 "app/src/main/kotlin/petshop/app/Projection.kt": 100,
                 "app/src/main/kotlin/petshop/app/Registry.kt": 100,
+                "app/src/main/kotlin/petshop/app/ShopFront.kt": 94.74,
+                "app/src/main/kotlin/petshop/app/Spans.kt": 100,
                 "app/src/main/kotlin/petshop/app/Wiring.kt": 93.48,
                 "app/src/main/kotlin/petshop/app/wire/Wire.kt": 100,
                 "domain/src/main/kotlin/petshop/domain/Chips.kt": 0,
@@ -47,34 +50,37 @@
                 "api/src/main/kotlin/petshop/api/Catalogue.kt": 7,
                 "api/src/main/kotlin/petshop/api/Codecs.kt": 45,
                 "api/src/main/kotlin/petshop/api/Docs.kt": 13,
-                "api/src/main/kotlin/petshop/api/Dtos.kt": 27,
-                "api/src/main/kotlin/petshop/api/Endpoints.kt": 42,
-                "api/src/main/kotlin/petshop/api/Handlers.kt": 30,
-                "app/src/main/kotlin/petshop/app/ActorPetShop.kt": 55,
-                "app/src/main/kotlin/petshop/app/Adoptions.kt": 43,
+                "api/src/main/kotlin/petshop/api/Dtos.kt": 29,
+                "api/src/main/kotlin/petshop/api/Endpoints.kt": 53,
+                "api/src/main/kotlin/petshop/api/Handlers.kt": 31,
+                "app/src/main/kotlin/petshop/app/Adoption.kt": 80,
+                "app/src/main/kotlin/petshop/app/Adoptions.kt": 69,
                 "app/src/main/kotlin/petshop/app/Arrivals.kt": 19,
-                "app/src/main/kotlin/petshop/app/Avro.kt": 14,
-                "app/src/main/kotlin/petshop/app/Bus.kt": 12,
+                "app/src/main/kotlin/petshop/app/Avro.kt": 20,
+                "app/src/main/kotlin/petshop/app/Bus.kt": 13,
                 "app/src/main/kotlin/petshop/app/BusChoice.kt": 21,
-                "app/src/main/kotlin/petshop/app/Checks.kt": 25,
+                "app/src/main/kotlin/petshop/app/Checks.kt": 28,
                 "app/src/main/kotlin/petshop/app/Database.kt": 16,
                 "app/src/main/kotlin/petshop/app/Feed.kt": 7,
-                "app/src/main/kotlin/petshop/app/KafkaBus.kt": 40,
+                "app/src/main/kotlin/petshop/app/KafkaBus.kt": 61,
                 "app/src/main/kotlin/petshop/app/Main.kt": 2,
                 "app/src/main/kotlin/petshop/app/Meters.kt": 23,
+                "app/src/main/kotlin/petshop/app/ObservedShop.kt": 29,
                 "app/src/main/kotlin/petshop/app/Outbox.kt": 29,
-                "app/src/main/kotlin/petshop/app/PostgresOutbox.kt": 40,
+                "app/src/main/kotlin/petshop/app/PostgresOutbox.kt": 43,
                 "app/src/main/kotlin/petshop/app/Projection.kt": 25,
-                "app/src/main/kotlin/petshop/app/Registry.kt": 35,
+                "app/src/main/kotlin/petshop/app/Registry.kt": 36,
+                "app/src/main/kotlin/petshop/app/ShopFront.kt": 19,
+                "app/src/main/kotlin/petshop/app/Spans.kt": 14,
                 "app/src/main/kotlin/petshop/app/Wiring.kt": 46,
                 "app/src/main/kotlin/petshop/app/wire/Wire.kt": 13,
                 "domain/src/main/kotlin/petshop/domain/Chips.kt": 3,
                 "domain/src/main/kotlin/petshop/domain/Events.kt": 3,
-                "domain/src/main/kotlin/petshop/domain/Pets.kt": 9,
+                "domain/src/main/kotlin/petshop/domain/Pets.kt": 12,
                 "registry/src/main/kotlin/petshop/registry/Registry.kt": 25
               },
               "unit": "%",
-              "value": 89.39
+              "value": 90.05
             },
             "integrity/assertions-per-test": {
               "higherIsBetter": true,
@@ -84,7 +90,7 @@
             "integrity/executed-tests": {
               "higherIsBetter": true,
               "unit": "count",
-              "value": 82
+              "value": 103
             },
             "integrity/property-tests": {
               "higherIsBetter": true,
@@ -112,9 +118,11 @@
             "petshop.api.CatalogueCodecSpec.each catalogue reuses its own bytes()",
             "petshop.api.CatalogueCodecSpec.each shop serves the json published with its own catalogue()",
             "petshop.api.ContractSpec.a missing pet answers the declared 404, with the domain's own message()",
+            "petshop.api.ContractSpec.a pet someone else is adopting answers its own declared 409()",
             "petshop.api.ContractSpec.a request arriving with a traceparent is handled inside the caller's trace()",
             "petshop.api.ContractSpec.a test names the endpoint, not the URL()",
             "petshop.api.ContractSpec.adopting twice answers the failure the endpoint declared()",
+            "petshop.api.ContractSpec.an adoption the registry has not yet confirmed answers the declared 202, with the pet taken()",
             "petshop.api.ContractSpec.and then pins the URL on purpose, because callers hold it()",
             "petshop.api.ContractSpec.the DTO carries the id inside PetId, so the JSON id is a plain number()",
             "petshop.api.ContractSpec.the events endpoint streams each event the feed hands it, then ends with the feed()",
@@ -137,10 +145,19 @@
             "petshop.app.CatalogueBytesSpec.a new catalogue is a new array()",
             "petshop.app.CatalogueBytesSpec.a published catalogue reuses its bytes across codecs()",
             "petshop.app.CatalogueBytesSpec.a response keeps its catalogue bytes after another catalogue is published()",
+            "petshop.app.ConfirmationSpec.a pet that cannot be settled does not hold up another()",
+            "petshop.app.ConfirmationSpec.a return that could not be written is settled when the registry has no chip for the pet()",
+            "petshop.app.ConfirmationSpec.a transfer that never landed is refused once the registry says the shop still keeps the pet()",
+            "petshop.app.ConfirmationSpec.a transfer whose answer was lost is confirmed when the registry says the adopter keeps the pet()",
+            "petshop.app.ConfirmationSpec.an adoption the registry cannot confirm is pending, and settles once the registry answers()",
+            "petshop.app.ConfirmationSpec.an adoption the shop answered too late for is settled back onto the shelf()",
+            "petshop.app.ConfirmationSpec.an adoption whose confirmation was not written is pending, and settles()",
+            "petshop.app.ConfirmationSpec.someone asking for a pet while its transfer is in flight is told it is being adopted()",
             "petshop.app.DemoStubsSpec.the demo registry's stubs are the contract's()",
             "petshop.app.EndToEndSpec.somebody adopts a tortoise, and every part of the service hears about it()",
+            "petshop.app.EventsSpec.a return from before ADR 0001 still takes its adoption off the count()",
             "petshop.app.EventsSpec.an adoption reaches a consumer through the outbox and the bus()",
-            "petshop.app.EventsSpec.an adoption the registry refused reaches the consumer as a return()",
+            "petshop.app.EventsSpec.an adoption the registry refused never reaches the consumer()",
             "petshop.app.EventsSpec.an event delivered twice is counted once()",
             "petshop.app.FeedSpec.a watcher is told the trace each event was published in()",
             "petshop.app.FeedSpec.a watcher sees each event once, however often the bus delivers it()",
@@ -157,21 +174,28 @@
             "petshop.app.KafkaBusSpec.an event published before anyone reads it reaches the first reader()",
             "petshop.app.KafkaBusSpec.by default an unreadable record is written to the dead-letter topic as it was read()",
             "petshop.app.KafkaBusSpec.the whole service runs on it, and an adoption reaches the projection()",
+            "petshop.app.KafkaMessagingSpec.over Kafka, an event says where it was written and where it was read, by OpenTelemetry's names()",
             "petshop.app.LoggingSpec.an adoption reaches the backend with the pet on it, not in it()",
             "petshop.app.LoggingSpec.nothing in main binds a logger, and the classpath still answers()",
+            "petshop.app.MessagingSpansSpec.a bus with no offsets says nothing of where it read an event from()",
+            "petshop.app.MessagingSpansSpec.the projection handles each event in a consumer span, with where the bus read it from()",
+            "petshop.app.MessagingSpansSpec.the relay publishes each event in a producer span()",
             "petshop.app.PostgresOutboxSpec.Postgres numbers each event, and a claim reads them back oldest first()",
             "petshop.app.PostgresOutboxSpec.a claim that throws halfway takes nothing()",
             "petshop.app.PostgresOutboxSpec.a pet's change and its event are one transaction, so an event that fails leaves the pet as it was()",
+            "petshop.app.PostgresOutboxSpec.a return written before the registry had to confirm adoptions is still claimed()",
             "petshop.app.PostgresOutboxSpec.a second claim skips the rows the first is holding, rather than waiting for them()",
             "petshop.app.PostgresOutboxSpec.an event keeps the trace it was recorded in, for the relay to publish it in()",
             "petshop.app.PostgresOutboxSpec.the shelf starts as the opening catalogue, and keeps every change written to it()",
             "petshop.app.PostgresOutboxSpec.what the bus took leaves the table, and what it refused stays for the next claim()",
+            "petshop.app.ReadinessSpec.a shop whose actor does not answer is not ready, though its shelf still shows pets()",
             "petshop.app.RegistrySpec.a connection reset while recording the keeper puts the pet back on the shelf()",
             "petshop.app.RegistrySpec.a pet with no chip on record stays in the shop()",
             "petshop.app.RegistrySpec.a registry that keeps failing stops being asked()",
             "petshop.app.RegistrySpec.a registry that takes too long is an outage, not a hang()",
             "petshop.app.RegistrySpec.a status the contract never declared is an outage too()",
             "petshop.app.RegistrySpec.an adoption looks the chip up and records the new keeper()",
+            "petshop.app.RegistrySpec.calls past the registry's limit wait their turn and are answered()",
             "petshop.app.RegistrySpec.twenty adopters race for one tortoise and the registry hears from one of them()",
             "petshop.app.RelaySpec.a claim that throws restarts the relay one interval later, and nothing recorded is lost()",
             "petshop.app.RelaySpec.an event behind a refused one goes on the same tick, and the refused one on the next()",
@@ -180,9 +204,12 @@
             "petshop.app.RelaySpec.an hour of an empty outbox is one claim a tick and nothing published, without waiting the hour()",
             "petshop.app.RelaySpec.nothing leaves before the first tick, and each tick carries what was recorded, in order()",
             "petshop.app.RestartSpec.a restarted shop remembers who adopted what, and numbers new arrivals on()",
+            "petshop.app.RestartSpec.an adoption left unconfirmed when the shop stopped is settled when it starts again()",
             "petshop.app.SchemaSpec.a reader on the committed schema can read what the shop writes()",
+            "petshop.app.SchemaSpec.a return from the topic's history reads back as a return()",
             "petshop.app.SchemaSpec.the schema the wire classes derive is the one committed()",
             "petshop.app.ScrapeSpec.an adoption is a line in the scrape, with the outcome as a label()",
+            "petshop.app.ScrapeSpec.an adoption the registry has yet to confirm is counted as pending()",
             "petshop.app.ScrapeSpec.the scrape says how the JVM, the pool and every health check are()",
             "petshop.app.ServingSpec.a request is a line in the scrape()",
             "petshop.app.ServingSpec.the reference is served beside Swagger, in the shop's colours, over the same document()",
@@ -202,7 +229,6 @@
               "api/src/test/kotlin/petshop/api/ContractSpec.kt",
               "api/src/test/kotlin/petshop/api/GoldenSpec.kt",
               "api/src/test/kotlin/petshop/api/HealthCodecSpec.kt",
-              "app/src/main/kotlin/petshop/app/ActorPetShop.kt",
               "app/src/main/kotlin/petshop/app/Adoptions.kt",
               "app/src/main/kotlin/petshop/app/Arrivals.kt",
               "app/src/main/kotlin/petshop/app/Avro.kt",
@@ -211,22 +237,29 @@
               "app/src/main/kotlin/petshop/app/Database.kt",
               "app/src/main/kotlin/petshop/app/Feed.kt",
               "app/src/main/kotlin/petshop/app/Meters.kt",
+              "app/src/main/kotlin/petshop/app/ObservedShop.kt",
               "app/src/main/kotlin/petshop/app/PostgresOutbox.kt",
               "app/src/main/kotlin/petshop/app/Projection.kt",
               "app/src/main/kotlin/petshop/app/Registry.kt",
+              "app/src/main/kotlin/petshop/app/ShopFront.kt",
+              "app/src/main/kotlin/petshop/app/Spans.kt",
               "app/src/main/kotlin/petshop/app/Wiring.kt",
               "app/src/main/kotlin/petshop/app/wire/Wire.kt",
               "app/src/test/kotlin/petshop/app/AdoptionLogSpec.kt",
               "app/src/test/kotlin/petshop/app/AdoptionSpec.kt",
               "app/src/test/kotlin/petshop/app/BusChoiceSpec.kt",
               "app/src/test/kotlin/petshop/app/CatalogueBytesSpec.kt",
+              "app/src/test/kotlin/petshop/app/ConfirmationSpec.kt",
               "app/src/test/kotlin/petshop/app/DemoStubsSpec.kt",
               "app/src/test/kotlin/petshop/app/EventBusContract.kt",
               "app/src/test/kotlin/petshop/app/EventsSpec.kt",
               "app/src/test/kotlin/petshop/app/FeedSpec.kt",
               "app/src/test/kotlin/petshop/app/KafkaBusSpec.kt",
+              "app/src/test/kotlin/petshop/app/KafkaMessagingSpec.kt",
               "app/src/test/kotlin/petshop/app/LoggingSpec.kt",
+              "app/src/test/kotlin/petshop/app/MessagingSpansSpec.kt",
               "app/src/test/kotlin/petshop/app/PostgresOutboxSpec.kt",
+              "app/src/test/kotlin/petshop/app/ReadinessSpec.kt",
               "app/src/test/kotlin/petshop/app/Registries.kt",
               "app/src/test/kotlin/petshop/app/RegistrySpec.kt",
               "app/src/test/kotlin/petshop/app/RelaySpec.kt",
@@ -256,7 +289,7 @@
                 3,
                 4,
                 6,
-                44
+                50
               ],
               "petshop.api.GoldenSpec": [
                 1,
@@ -264,7 +297,7 @@
                 3,
                 4,
                 7,
-                44
+                50
               ],
               "petshop.api.HealthCodecSpec": [
                 1,
@@ -276,7 +309,7 @@
                 3,
                 9,
                 10,
-                11,
+                13,
                 14,
                 15,
                 16,
@@ -286,47 +319,66 @@
                 20,
                 21,
                 23,
-                34,
-                41,
-                42,
-                43,
-                44,
-                45
+                25,
+                40,
+                47,
+                48,
+                49,
+                50,
+                51
               ],
               "petshop.app.AdoptionSpec": [
                 0,
                 2,
                 9,
-                10,
-                15,
+                14,
+                17,
                 18,
                 21,
-                24,
-                34,
-                41,
-                42,
-                43,
-                44,
-                45
+                23,
+                26,
+                40,
+                47,
+                48,
+                49,
+                50,
+                51
               ],
               "petshop.app.BusChoiceSpec": [
+                11,
                 12,
-                13,
-                21,
-                22,
-                25
+                23,
+                24,
+                27
               ],
               "petshop.app.CatalogueBytesSpec": [
                 0,
                 1,
                 2,
-                10,
-                26,
-                44
+                9,
+                28,
+                50
+              ],
+              "petshop.app.ConfirmationSpec": [
+                0,
+                2,
+                9,
+                14,
+                17,
+                18,
+                21,
+                23,
+                29,
+                40,
+                47,
+                48,
+                49,
+                50,
+                51
               ],
               "petshop.app.DemoStubsSpec": [
-                27,
-                46
+                30,
+                52
               ],
               "petshop.app.EndToEndSpec": [
                 0,
@@ -337,7 +389,7 @@
                 9,
                 10,
                 11,
-                12,
+                13,
                 14,
                 15,
                 16,
@@ -347,164 +399,219 @@
                 20,
                 21,
                 22,
-                41,
-                42,
-                43,
-                44,
-                45,
-                46
+                23,
+                24,
+                47,
+                48,
+                49,
+                50,
+                51,
+                52
               ],
               "petshop.app.EventsSpec": [
                 0,
                 2,
                 3,
                 9,
-                10,
-                13,
+                12,
+                14,
                 15,
-                16,
+                17,
                 18,
                 19,
                 21,
-                29,
-                34,
-                41,
-                42,
-                43,
-                44,
-                45
+                22,
+                23,
+                32,
+                40,
+                47,
+                48,
+                49,
+                50,
+                51
               ],
               "petshop.app.FeedSpec": [
                 2,
                 3,
-                13,
-                16,
+                12,
+                15,
                 19,
-                21,
-                30,
-                41,
-                43,
-                44
+                22,
+                23,
+                33,
+                47,
+                49,
+                50
               ],
               "petshop.app.HubBusSpec": [
                 0,
                 2,
                 3,
                 9,
-                10,
-                13,
+                12,
+                14,
                 15,
-                16,
+                17,
                 18,
                 19,
                 21,
-                28,
-                34,
-                41,
-                42,
-                43,
-                44,
-                45
+                22,
+                23,
+                31,
+                40,
+                47,
+                48,
+                49,
+                50,
+                51
               ],
               "petshop.app.KafkaBusSpec": [
                 0,
                 2,
                 3,
                 9,
-                10,
-                12,
+                11,
+                14,
                 15,
-                16,
+                17,
                 18,
                 19,
                 21,
                 22,
-                28,
+                23,
+                24,
                 31,
                 34,
-                41,
-                42,
-                43,
-                44,
-                45
+                40,
+                47,
+                48,
+                49,
+                50,
+                51
+              ],
+              "petshop.app.KafkaMessagingSpec": [
+                11,
+                22,
+                24,
+                35,
+                37,
+                49,
+                50
               ],
               "petshop.app.LoggingSpec": [
                 0,
                 2,
                 9,
-                10,
-                15,
+                14,
+                17,
                 18,
                 21,
-                32,
-                34,
-                41,
-                42,
-                43,
-                44,
-                45
+                23,
+                36,
+                40,
+                47,
+                48,
+                49,
+                50,
+                51
+              ],
+              "petshop.app.MessagingSpansSpec": [
+                3,
+                12,
+                15,
+                19,
+                22,
+                37,
+                49,
+                50
               ],
               "petshop.app.PostgresOutboxSpec": [
-                15,
+                14,
                 18,
+                23,
+                38,
+                47,
+                49,
+                50,
+                51
+              ],
+              "petshop.app.ReadinessSpec": [
+                0,
+                2,
+                9,
+                10,
+                12,
+                13,
+                14,
+                15,
+                17,
+                18,
+                19,
                 21,
-                33,
-                41,
-                43,
-                44,
-                45
+                23,
+                39,
+                40,
+                47,
+                50,
+                51
               ],
               "petshop.app.RegistrySpec": [
                 0,
                 2,
                 9,
-                10,
-                15,
+                14,
+                17,
                 18,
                 20,
                 21,
-                34,
-                35,
+                23,
+                40,
                 41,
-                42,
-                43,
-                44,
-                45,
-                46
+                47,
+                48,
+                49,
+                50,
+                51,
+                52
               ],
               "petshop.app.RelaySpec": [
-                13,
-                36,
-                43,
-                44
+                12,
+                22,
+                42,
+                49,
+                50
               ],
               "petshop.app.RestartSpec": [
                 0,
                 2,
                 9,
                 10,
-                11,
-                15,
+                14,
+                17,
                 18,
                 21,
-                34,
-                37,
-                41,
-                42,
+                23,
+                40,
                 43,
-                44,
-                45
+                47,
+                48,
+                49,
+                50,
+                51
               ],
               "petshop.app.SchemaSpec": [
-                12,
-                38
+                11,
+                24,
+                44,
+                49,
+                50
               ],
               "petshop.app.ScrapeSpec": [
                 0,
                 2,
                 9,
                 10,
-                11,
+                12,
                 13,
                 14,
                 15,
@@ -513,13 +620,14 @@
                 18,
                 19,
                 21,
-                34,
-                39,
-                41,
-                42,
-                43,
-                44,
-                45
+                23,
+                40,
+                45,
+                47,
+                48,
+                49,
+                50,
+                51
               ],
               "petshop.app.ServingSpec": [
                 0,
@@ -529,7 +637,7 @@
                 4,
                 9,
                 10,
-                11,
+                12,
                 13,
                 14,
                 15,
@@ -539,15 +647,16 @@
                 19,
                 20,
                 21,
-                34,
+                23,
                 40,
-                41,
-                44,
-                45
+                46,
+                47,
+                50,
+                51
               ],
               "petshop.app.SettingsSpec": [
-                21,
-                24
+                23,
+                26
               ]
             }
           }
@@ -624,9 +733,9 @@
                 },
                 "region": {
                   "endColumn": 79,
-                  "endLine": 55,
+                  "endLine": 80,
                   "startColumn": 76,
-                  "startLine": 55
+                  "startLine": 80
                 }
               }
             }
@@ -678,9 +787,9 @@
                 },
                 "region": {
                   "endColumn": 16,
-                  "endLine": 16,
+                  "endLine": 17,
                   "startColumn": 7,
-                  "startLine": 16
+                  "startLine": 17
                 }
               }
             }
@@ -759,9 +868,9 @@
                 },
                 "region": {
                   "endColumn": 71,
-                  "endLine": 105,
+                  "endLine": 135,
                   "startColumn": 66,
-                  "startLine": 105
+                  "startLine": 135
                 }
               }
             }
@@ -812,9 +921,9 @@
                 },
                 "region": {
                   "endColumn": 19,
-                  "endLine": 53,
+                  "endLine": 57,
                   "startColumn": 19,
-                  "startLine": 53
+                  "startLine": 57
                 }
               }
             }
@@ -838,9 +947,9 @@
                 },
                 "region": {
                   "endColumn": 24,
-                  "endLine": 53,
+                  "endLine": 57,
                   "startColumn": 19,
-                  "startLine": 53
+                  "startLine": 57
                 }
               }
             }
@@ -854,33 +963,6 @@
             "signature/v1": "b21f09e4350e2d1593b0647c0ca038af71c5abf4"
           },
           "ruleId": "detekt.naming.TopLevelPropertyNaming"
-        },
-        {
-          "locations": [
-            {
-              "physicalLocation": {
-                "artifactLocation": {
-                  "uri": "app/src/test/kotlin/petshop/app/EndToEndSpec.kt"
-                },
-                "region": {
-                  "endColumn": 125,
-                  "endLine": 124,
-                  "startColumn": 1,
-                  "startLine": 124
-                }
-              }
-            }
-          ],
-          "message": {
-            "text": "Line detected, which is longer than the defined maximum line length in the code style."
-          },
-          "partialFingerprints": {
-            "gauntlet/ctx/v1": "8e6c1a5f4d0603bffe3ab80dd4fe39a8d80450dfc83a161a7098068a1ee426a4",
-            "gauntlet/line/v1": "04ad24841f6e00f61676975922f29f12b2d77e5db352a4258ee7383b26cfa689",
-            "gauntlet/symbol/v1": "3d9675b3b7dfa10b564639f24174791f6916d0e1b0fcd248a857246a46535372",
-            "signature/v1": "836a45a34f8cb4aa5d0959272813b52ae34b333a"
-          },
-          "ruleId": "detekt.style.MaxLineLength"
         },
         {
           "locations": [
@@ -908,33 +990,6 @@
             "signature/v1": "b19abb1fb05eb923f59a016ae95bbd0d7e46be1c"
           },
           "ruleId": "detekt.style.MaxLineLength"
-        },
-        {
-          "locations": [
-            {
-              "physicalLocation": {
-                "artifactLocation": {
-                  "uri": "app/src/test/kotlin/petshop/app/Registries.kt"
-                },
-                "region": {
-                  "endColumn": 19,
-                  "endLine": 19,
-                  "startColumn": 7,
-                  "startLine": 19
-                }
-              }
-            }
-          ],
-          "message": {
-            "text": "The file name 'Registries' does not match the name of the single top-level declaration 'FakeRegistry'."
-          },
-          "partialFingerprints": {
-            "gauntlet/ctx/v1": "31586e311281bc36ae1430e7bd04f52eba7af861abdb4a4a81af6c5c9563843c",
-            "gauntlet/line/v1": "02bba37fecaf81a25ba2da87ea0aa0dd09ecfc101097f044d9f28588a29c0ccd",
-            "gauntlet/symbol/v1": "414df92cf9b5a3a819b81cf3523e6860b02386531d8a192d10e89f7ebd99b8ef",
-            "signature/v1": "3b6492ba1a77475310728070c13d6500f130f507"
-          },
-          "ruleId": "detekt.naming.MatchingDeclarationName"
         },
         {
           "locations": [
