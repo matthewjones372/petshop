@@ -1,6 +1,5 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.render
@@ -14,7 +13,6 @@ import io.github.matthewjones372.lark.junit.shouldBeLeft
 import io.github.matthewjones372.lark.junit.shouldContain
 import io.github.matthewjones372.lark.junit.story
 import io.github.matthewjones372.lark.parMap
-import io.github.matthewjones372.lark.resource
 import io.github.matthewjones372.lark.timeout
 import petshop.domain.Adopted
 import petshop.domain.AlreadyAdopted
@@ -34,13 +32,11 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
-object AdoptionSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object AdoptionSuite : Suite() {
     private val settled: Module = shopWith(FakeRegistry())
 
     init {
-        test("twenty people adopt one tortoise and one of them gets it") { _ ->
+        test("twenty people adopt one tortoise and one of them gets it") {
             story {
                 val outcomes = When("twenty people ask for Nibbles at once") {
                     testApp(settled) { shop: PetShop ->
@@ -60,7 +56,7 @@ object AdoptionSuite : Suite<Unit>() {
             }
         }
 
-        test("a keeper the registry will not record puts the pet back on the shelf") { _ ->
+        test("a keeper the registry will not record puts the pet back on the shelf") {
             story {
                 val refused = Given("a registry that will not record a new keeper") {
                     shopWith(FakeRegistry(refusing = Unreachable("down for maintenance")))
@@ -78,7 +74,7 @@ object AdoptionSuite : Suite<Unit>() {
             }
         }
 
-        test("an adoption the outbox could not record is refused, and the pet stays on the shelf") { _ ->
+        test("an adoption the outbox could not record is refused, and the pet stays on the shelf") {
             story {
                 val asked = AtomicInteger()
                 val counting = object : ChipRegistry by FakeRegistry() {
@@ -113,7 +109,7 @@ object AdoptionSuite : Suite<Unit>() {
             }
         }
 
-        test("a read during a write sees the shelf as it was, and does not wait for the write") { _ ->
+        test("a read during a write sees the shelf as it was, and does not wait for the write") {
             story {
                 val entered = CountDownLatch(1)
                 val release = CountDownLatch(1)
@@ -160,7 +156,7 @@ object AdoptionSuite : Suite<Unit>() {
             }
         }
 
-        test("the subgraph binds no port and serves no documents") { _ ->
+        test("the subgraph binds no port and serves no documents") {
             story {
                 val drawn = When("the shop's subgraph is drawn") { settled.render() }
                 Then(
@@ -176,11 +172,9 @@ object AdoptionSuite : Suite<Unit>() {
     }
 }
 
-object SettingsSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object SettingsSuite : Suite() {
     init {
-        test("a test changes one setting and the file keeps the rest") { _ ->
+        test("a test changes one setting and the file keeps the rest") {
             story {
                 val faster = Given("the settings with arrivals every second") {
                     Petshop.module.subgraph<Settings>().overridingConfig("petshop.arrivalsEvery = 1s")
@@ -191,7 +185,7 @@ object SettingsSuite : Suite<Unit>() {
             }
         }
 
-        test("the settings come from the file rather than a default") { _ ->
+        test("the settings come from the file rather than a default") {
             story {
                 val read = When("the settings are read with nothing overridden") {
                     testApp(Petshop.module.subgraph<Settings>()) { settings: Settings -> settings }
@@ -203,7 +197,7 @@ object SettingsSuite : Suite<Unit>() {
             }
         }
 
-        test("every node that takes the settings uses them") { _ ->
+        test("every node that takes the settings uses them") {
             story {
                 val drawn = When("the whole graph is drawn") { Petshop.module.render() }
                 Then("the shop's actor does not take the settings: a dependency nothing reads is an edge that lies") {

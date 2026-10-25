@@ -4,7 +4,7 @@ import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import io.confluent.kafka.schemaregistry.testutil.MockSchemaRegistry
 import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.junit.Suite
+import io.github.matthewjones372.lark.junit.SharedSuite
 import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.shouldBeInstanceOf
 import io.github.matthewjones372.lark.junit.shouldNotBeNull
@@ -64,7 +64,7 @@ private fun KafkaBroker.junkOn(topic: String) {
 }
 
 /** The registry is Confluent's in-process `mock://`: real serializers and wire format, no server. */
-object KafkaBusSuite : Suite<KafkaBroker>() {
+object KafkaBusSuite : SharedSuite<KafkaBroker>() {
     override val shared: Resource<KafkaBroker> = kafkaBroker()
 
     init {

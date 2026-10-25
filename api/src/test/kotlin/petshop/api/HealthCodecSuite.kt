@@ -1,16 +1,12 @@
 package petshop.api
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.junit.Suite
 import io.github.matthewjones372.lark.junit.shouldBe
-import io.github.matthewjones372.lark.resource
 import io.github.matthewjones372.pelican.health.CheckResult
 import io.github.matthewjones372.pelican.health.HealthReport
 import kotlin.reflect.typeOf
 
-object HealthCodecSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object HealthCodecSuite : Suite() {
     private val report = HealthReport(
         "fail",
         mapOf(
@@ -22,21 +18,21 @@ object HealthCodecSuite : Suite<Unit>() {
     private val codec = ShopCodecs.codec<HealthReport>(typeOf<HealthReport>())
 
     init {
-        test("a health report reads back as the report that was written") { _ ->
+        test("a health report reads back as the report that was written") {
             val json = codec.encodeToString(report)
 
             (codec.decodeFromString(json) shouldBe report) and
                 (codec.decodeFrom(json.toByteArray()) shouldBe report)
         }
 
-        test("a health report is written with pelican-health's field names") { _ ->
+        test("a health report is written with pelican-health's field names") {
             codec.encodeToString(report) shouldBe
                 """{"status":"fail","checks":{"database":[{"status":"pass","observedValue":3,"observedUnit":"ms",""" +
                 """"time":"2026-10-19T08:00:00Z","componentType":"datastore"}],"registry":[{"status":"fail",""" +
                 """"observedValue":2000,"observedUnit":"ms","time":"2026-10-19T08:00:01Z","output":"timed out"}]}}"""
         }
 
-        test("the json media type serves the same health codec") { _ ->
+        test("the json media type serves the same health codec") {
             val typed = ShopCodecs.codec<HealthReport>(typeOf<HealthReport>(), "application/json")
 
             typed.decodeFromString(codec.encodeToString(report)) shouldBe report

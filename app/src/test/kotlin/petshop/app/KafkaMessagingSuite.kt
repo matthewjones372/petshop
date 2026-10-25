@@ -3,7 +3,7 @@ package petshop.app
 import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
-import io.github.matthewjones372.lark.junit.Suite
+import io.github.matthewjones372.lark.junit.SharedSuite
 import io.github.matthewjones372.lark.junit.expect
 import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.shouldNotBeNull
@@ -16,7 +16,7 @@ import io.opentelemetry.api.trace.SpanKind
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.time.Duration.Companion.seconds
 
-object KafkaMessagingSuite : Suite<KafkaBroker>() {
+object KafkaMessagingSuite : SharedSuite<KafkaBroker>() {
     override val shared: Resource<KafkaBroker> = kafkaBroker()
 
     init {

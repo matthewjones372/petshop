@@ -3,7 +3,6 @@ package petshop.app
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.junit.Suite
@@ -11,7 +10,6 @@ import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.shouldBeInstanceOf
 import io.github.matthewjones372.lark.junit.story
 import io.github.matthewjones372.lark.logger
-import io.github.matthewjones372.lark.resource
 import io.github.matthewjones372.lark.slf4j.Slf4jLogger
 import org.slf4j.LoggerFactory
 import petshop.domain.PetId
@@ -19,15 +17,13 @@ import petshop.domain.PetShop
 import java.util.concurrent.Executors
 
 /** `main` binds nothing: lark-slf4j registers itself from the classpath, and this fails if it stops. */
-object LoggingSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object LoggingSuite : Suite() {
     private val backend = (LoggerFactory.getILoggerFactory() as LoggerContext).getLogger("petshop")
 
     private val settled: Module = shopWith(FakeRegistry())
 
     init {
-        test("nothing in main binds a logger, and the classpath still answers") { _ ->
+        test("nothing in main binds a logger, and the classpath still answers") {
             story {
                 Then(
                     "the logger lark writes to is SLF4J's, found on the classpath; " +
@@ -38,7 +34,7 @@ object LoggingSuite : Suite<Unit>() {
             }
         }
 
-        test("an adoption reaches the backend with the pet on it, not in it") { _ ->
+        test("an adoption reaches the backend with the pet on it, not in it") {
             val appender = mdcKeeping()
             appender.start()
             backend.addAppender(appender)

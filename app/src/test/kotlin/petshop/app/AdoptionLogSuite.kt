@@ -1,7 +1,6 @@
 package petshop.app
 
 import io.github.matthewjones372.lark.LogLevel
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.capturingLogs
@@ -10,17 +9,14 @@ import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.shouldContain
 import io.github.matthewjones372.lark.junit.shouldContainKey
 import io.github.matthewjones372.lark.junit.story
-import io.github.matthewjones372.lark.resource
 import petshop.domain.PetId
 import petshop.domain.PetShop
 
-object AdoptionLogSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object AdoptionLogSuite : Suite() {
     private val settled: Module = shopWith(FakeRegistry())
 
     init {
-        test("an adoption names the pet and the adopter in pairs, not in prose") { _ ->
+        test("an adoption names the pet and the adopter in pairs, not in prose") {
             story {
                 val lines = When("Ada adopts Nibbles, with the log captured") {
                     capturingLogs { logs ->
@@ -38,7 +34,7 @@ object AdoptionLogSuite : Suite<Unit>() {
             }
         }
 
-        test("an adoption that cannot happen is a warning saying why") { _ ->
+        test("an adoption that cannot happen is a warning saying why") {
             story {
                 val lines = When("Ada asks for a pet the shop never had, with the log captured") {
                     capturingLogs { logs ->

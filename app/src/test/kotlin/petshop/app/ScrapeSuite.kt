@@ -1,6 +1,5 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
@@ -13,7 +12,6 @@ import io.github.matthewjones372.lark.junit.shouldContain
 import io.github.matthewjones372.lark.junit.story
 import io.github.matthewjones372.lark.metrics
 import io.github.matthewjones372.lark.micrometer.MicrometerMetrics
-import io.github.matthewjones372.lark.resource
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
@@ -41,11 +39,9 @@ private val checked = listOf(
     """petshop_health_check{check="shop"} 1.0""",
 ) + listOf("relay", "projection", "arrivals").map { run -> """petshop_health_check{check="$run"} 1.0""" }
 
-object ScrapeSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object ScrapeSuite : Suite() {
     init {
-        test("an adoption is a line in the scrape, with the outcome as a label") { _ ->
+        test("an adoption is a line in the scrape, with the outcome as a label") {
             story {
                 val registry = Given(
                     "a Prometheus registry of this test's own",
@@ -68,7 +64,7 @@ object ScrapeSuite : Suite<Unit>() {
             }
         }
 
-        test("an adoption the registry has yet to confirm is counted as pending") { _ ->
+        test("an adoption the registry has yet to confirm is counted as pending") {
             story {
                 val registry = Given(
                     "a Prometheus registry of this test's own",
@@ -93,7 +89,7 @@ object ScrapeSuite : Suite<Unit>() {
 
         // Alone: every test here starts a pool named "petshop" on Micrometer's global registry, and one closing its
         // pool removes the shared hikaricp_* meters this test reads.
-        test("the scrape says how the JVM, the pool and every health check are", alone) { _ ->
+        test("the scrape says how the JVM, the pool and every health check are", alone) {
             // Measured where the shop measures outside a suite: lark-junit binds each test a capture of its own.
             metrics.locally(MicrometerMetrics()) {
                 story {

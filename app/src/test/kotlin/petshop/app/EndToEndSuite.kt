@@ -6,7 +6,7 @@ import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.app.use
-import io.github.matthewjones372.lark.junit.Suite
+import io.github.matthewjones372.lark.junit.SharedSuite
 import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.shouldBeRight
 import io.github.matthewjones372.lark.junit.story
@@ -62,7 +62,7 @@ private fun theService(kafka: KafkaBroker, registry: PelicanWireMock, database: 
         )
 
 /** Arrivals are an hour apart, so no new pet lands between reading the table and reading /stats. */
-object EndToEndSuite : Suite<KafkaBroker>() {
+object EndToEndSuite : SharedSuite<KafkaBroker>() {
     override val shared: Resource<KafkaBroker> = kafkaBroker()
 
     init {

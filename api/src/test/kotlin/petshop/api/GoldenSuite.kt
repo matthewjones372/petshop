@@ -1,12 +1,10 @@
 package petshop.api
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.fail.Either
 import io.github.matthewjones372.lark.fail.left
 import io.github.matthewjones372.lark.junit.Expectations
 import io.github.matthewjones372.lark.junit.Suite
 import io.github.matthewjones372.lark.junit.expect
-import io.github.matthewjones372.lark.resource
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.empty
@@ -22,9 +20,7 @@ import petshop.domain.PetShopError
 import petshop.domain.Species
 
 /** A change that breaks a caller fails; one that does not rewrites the golden file, so it shows in the diff. */
-object GoldenSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object GoldenSuite : Suite() {
     private val golden = Golden()
 
     private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
@@ -47,11 +43,11 @@ object GoldenSuite : Suite<Unit>() {
     )
 
     init {
-        test("every endpoint publishes what it published") { _ ->
+        test("every endpoint publishes what it published") {
             matches { golden.operations(api.spec()) }
         }
 
-        test("a pet, and a refusal, look on the wire the way they did") { _ ->
+        test("a pet, and a refusal, look on the wire the way they did") {
             val client = api.inMemory(Handlers.onVirtualThreads)
 
             matches { golden.exchange("get-pet", client, getPet, 1L) } and

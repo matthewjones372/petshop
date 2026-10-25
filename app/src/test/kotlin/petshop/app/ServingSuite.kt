@@ -1,6 +1,5 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
@@ -14,7 +13,6 @@ import io.github.matthewjones372.lark.junit.shouldNotContain
 import io.github.matthewjones372.lark.junit.story
 import io.github.matthewjones372.lark.metrics
 import io.github.matthewjones372.lark.micrometer.MicrometerMetrics
-import io.github.matthewjones372.lark.resource
 import io.github.matthewjones372.pelican.jetty.PelicanServer
 import io.github.matthewjones372.pelican.test.apiClient
 import petshop.api.ShopCodecs
@@ -30,11 +28,9 @@ private fun theShop(): Module = Petshop.module.overriding(single<ChipRegistry> {
     .onAFreshDatabase()
     .overridingConfig("petshop.port = 0")
 
-object ServingSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object ServingSuite : Suite() {
     init {
-        test("the whole shop starts on Jetty and answers") { _ ->
+        test("the whole shop starts on Jetty and answers") {
             story {
                 val served = Given("the service, as application.conf has it, on any free port") { theShop() }
                 val pets = When("somebody asks what is on the shelf") {
@@ -48,7 +44,7 @@ object ServingSuite : Suite<Unit>() {
             }
         }
 
-        test("a request is a line in the scrape") { _ ->
+        test("a request is a line in the scrape") {
             // Counted where the shop counts outside a suite: lark-junit binds each test a capture of its own.
             metrics.locally(MicrometerMetrics()) {
                 story {
@@ -69,7 +65,7 @@ object ServingSuite : Suite<Unit>() {
             }
         }
 
-        test("the reference is served beside Swagger, in the shop's colours, over the same document") { _ ->
+        test("the reference is served beside Swagger, in the shop's colours, over the same document") {
             story {
                 val served = Given("the service on any free port") { theShop() }
                 served.use { server: PelicanServer ->

@@ -1,6 +1,5 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.TestClock
 import io.github.matthewjones372.lark.fail.Either
 import io.github.matthewjones372.lark.fail.left
@@ -9,7 +8,6 @@ import io.github.matthewjones372.lark.junit.Suite
 import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.shouldBeEmpty
 import io.github.matthewjones372.lark.junit.story
-import io.github.matthewjones372.lark.resource
 import io.github.matthewjones372.lark.stream.Exit
 import io.github.matthewjones372.lark.stream.Run
 import io.github.matthewjones372.lark.stream.Running
@@ -98,11 +96,9 @@ private val Running<Nothing, Long>.stopped: Exit<Nothing, Long>
         return exit.toCompletableFuture().join()
     }
 
-object RelaySuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object RelaySuite : Suite() {
     init {
-        test("nothing leaves before the first tick, and each tick carries what was recorded, in order") { _ ->
+        test("nothing leaves before the first tick, and each tick carries what was recorded, in order") {
             val clock = TestClock()
             story {
                 val outbox = Given("Nibbles' arrival and adoption in the outbox") { Recorded(arrived, adopted) }
@@ -128,7 +124,7 @@ object RelaySuite : Suite<Unit>() {
             }
         }
 
-        test("an event is published inside the trace it was recorded in") { _ ->
+        test("an event is published inside the trace it was recorded in") {
             val clock = TestClock()
             story {
                 val outbox = Given("Nibbles' arrival, recorded inside a trace") {
@@ -142,7 +138,7 @@ object RelaySuite : Suite<Unit>() {
             }
         }
 
-        test("an event the bus refused stays in the outbox, and each refusal costs it exactly one tick") { _ ->
+        test("an event the bus refused stays in the outbox, and each refusal costs it exactly one tick") {
             val clock = TestClock()
             story {
                 val refusals = java.util.concurrent.atomic.AtomicInteger(3)
@@ -165,7 +161,7 @@ object RelaySuite : Suite<Unit>() {
             }
         }
 
-        test("an event behind a refused one goes on the same tick, and the refused one on the next") { _ ->
+        test("an event behind a refused one goes on the same tick, and the refused one on the next") {
             val clock = TestClock()
             story {
                 val refusedOnce = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -189,7 +185,7 @@ object RelaySuite : Suite<Unit>() {
             }
         }
 
-        test("a claim that throws restarts the relay one interval later, and nothing recorded is lost") { _ ->
+        test("a claim that throws restarts the relay one interval later, and nothing recorded is lost") {
             val clock = TestClock()
             story {
                 val asks = java.util.concurrent.atomic.AtomicInteger()
@@ -221,7 +217,7 @@ object RelaySuite : Suite<Unit>() {
             }
         }
 
-        test("an hour of an empty outbox is one claim a tick and nothing published, without waiting the hour") { _ ->
+        test("an hour of an empty outbox is one claim a tick and nothing published, without waiting the hour") {
             val clock = TestClock()
             story {
                 val asks = java.util.concurrent.atomic.AtomicInteger()

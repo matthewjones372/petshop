@@ -1,6 +1,5 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.actor.ActorRef
 import io.github.matthewjones372.lark.actor.Address
 import io.github.matthewjones372.lark.app.Module
@@ -11,7 +10,6 @@ import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.junit.Suite
 import io.github.matthewjones372.lark.junit.shouldContain
 import io.github.matthewjones372.lark.junit.story
-import io.github.matthewjones372.lark.resource
 import petshop.domain.ChipRegistry
 
 /** Hears every message and answers none, as a wedged actor does. */
@@ -21,11 +19,9 @@ private object Silent : ActorRef<Shop> {
     override fun tell(message: Shop) = Unit
 }
 
-object ReadinessSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object ReadinessSuite : Suite() {
     init {
-        test("a shop whose actor does not answer is not ready, though its shelf still shows pets") { _ ->
+        test("a shop whose actor does not answer is not ready, though its shelf still shows pets") {
             story {
                 val silent: Module = Given(
                     "an actor that answers nothing, and a window still showing the opening shelf",

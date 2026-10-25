@@ -1,6 +1,5 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
@@ -13,7 +12,6 @@ import io.github.matthewjones372.lark.junit.shouldBeRight
 import io.github.matthewjones372.lark.junit.shouldNotBeNull
 import io.github.matthewjones372.lark.junit.shouldThrow
 import io.github.matthewjones372.lark.junit.story
-import io.github.matthewjones372.lark.resource
 import petshop.domain.Adopted
 import petshop.domain.Adopting
 import petshop.domain.BeingAdopted
@@ -48,11 +46,9 @@ private class HeldRegistry : ChipRegistry {
     }
 }
 
-object ConfirmationSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object ConfirmationSuite : Suite() {
     init {
-        test("someone asking for a pet while its transfer is in flight is told it is being adopted") { _ ->
+        test("someone asking for a pet while its transfer is in flight is told it is being adopted") {
             story {
                 val registry = Given("a registry that holds Ada's transfer") { HeldRegistry() }
                 val (bea, ada) = When("Bea asks for Nibbles while Ada's transfer is held, and then it goes through") {
@@ -73,7 +69,7 @@ object ConfirmationSuite : Suite<Unit>() {
             }
         }
 
-        test("a transfer whose answer was lost is confirmed when the registry says the adopter keeps the pet") { _ ->
+        test("a transfer whose answer was lost is confirmed when the registry says the adopter keeps the pet") {
             story {
                 val registry = Given("a registry that records Ada but loses its answer") {
                     ScriptedRegistry(transfers = { ScriptedRegistry.Transfer.RecordsButLosesTheAnswer })
@@ -87,7 +83,7 @@ object ConfirmationSuite : Suite<Unit>() {
             }
         }
 
-        test("a transfer that never landed is refused once the registry says the shop still keeps the pet") { _ ->
+        test("a transfer that never landed is refused once the registry says the shop still keeps the pet") {
             story {
                 val registry = Given("a registry that loses Ada's transfer before recording it") {
                     ScriptedRegistry(transfers = { ScriptedRegistry.Transfer.LosesTheRequest })
@@ -102,7 +98,7 @@ object ConfirmationSuite : Suite<Unit>() {
             }
         }
 
-        test("an adoption the registry cannot confirm is pending, and settles once the registry answers") { _ ->
+        test("an adoption the registry cannot confirm is pending, and settles once the registry answers") {
             story {
                 val registry = Given(
                     "a registry that records Ada, loses its answer, and cannot be read back at first",
@@ -123,7 +119,7 @@ object ConfirmationSuite : Suite<Unit>() {
             }
         }
 
-        test("an adoption whose confirmation was not written is pending, and settles") { _ ->
+        test("an adoption whose confirmation was not written is pending, and settles") {
             story {
                 val outbox = Given("an outbox whose first event cannot be written") { FailingFirstEvent() }
                 val shop = Petshop.module.overriding(single<ChipRegistry> { ScriptedRegistry() })
@@ -141,7 +137,7 @@ object ConfirmationSuite : Suite<Unit>() {
             }
         }
 
-        test("a return that could not be written is settled when the registry has no chip for the pet") { _ ->
+        test("a return that could not be written is settled when the registry has no chip for the pet") {
             story {
                 val outbox =
                     Given("an outbox whose second row write, the return, fails once") { FailingKeep(number = 2) }
@@ -161,7 +157,7 @@ object ConfirmationSuite : Suite<Unit>() {
             }
         }
 
-        test("an adoption the shop answered too late for is settled back onto the shelf") { _ ->
+        test("an adoption the shop answered too late for is settled back onto the shelf") {
             story {
                 val outbox = Given("an outbox that holds its first row write") { HeldFirstKeep() }
                 val shop = Petshop.module.overriding(single<ChipRegistry> { ScriptedRegistry() })
@@ -178,7 +174,7 @@ object ConfirmationSuite : Suite<Unit>() {
             }
         }
 
-        test("a pet that cannot be settled does not hold up another") { _ ->
+        test("a pet that cannot be settled does not hold up another") {
             story {
                 val registry = Given("a registry that loses every answer, and never answers about Nibbles again") {
                     ScriptedRegistry(

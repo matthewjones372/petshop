@@ -1,6 +1,5 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
@@ -10,7 +9,6 @@ import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.junit.Suite
 import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.story
-import io.github.matthewjones372.lark.resource
 import io.github.matthewjones372.lark.stream.Exit
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.lark.stream.map
@@ -34,11 +32,9 @@ private val watched: Module =
     (Petshop.module.overriding(single<ChipRegistry> { FakeRegistry() }).onAFreshDatabase() + singleOf(::Watched))
         .subgraph<Watched>()
 
-object FeedSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object FeedSuite : Suite() {
     init {
-        test("a watcher sees each event once, however often the bus delivers it") { _ ->
+        test("a watcher sees each event once, however often the bus delivers it") {
             story {
                 val barnaby = Given("Bea's adoption of Barnaby, and then a parrot arriving") {
                     PetAdopted(
@@ -68,7 +64,7 @@ object FeedSuite : Suite<Unit>() {
             }
         }
 
-        test("a watcher is told the trace each event was published in") { _ ->
+        test("a watcher is told the trace each event was published in") {
             story {
                 val pickle =
                     Given("a parrot arriving") { PetArrived(seq = 8, pet = Pet(PetId(9), "Pickle", Species.Parrot)) }
@@ -87,7 +83,7 @@ object FeedSuite : Suite<Unit>() {
             }
         }
 
-        test("with nobody watching, the feed holds nothing back for the first watcher") { _ ->
+        test("with nobody watching, the feed holds nothing back for the first watcher") {
             story {
                 testApp(watched) { app: Watched ->
                     When("an adoption is delivered before anyone watches") {

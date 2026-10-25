@@ -1,6 +1,5 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.liquibase.Migrated
 import io.github.matthewjones372.lark.app.single
@@ -12,7 +11,6 @@ import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.shouldBeEmpty
 import io.github.matthewjones372.lark.junit.shouldThrow
 import io.github.matthewjones372.lark.junit.story
-import io.github.matthewjones372.lark.resource
 import petshop.domain.Adopted
 import petshop.domain.Pet
 import petshop.domain.PetAdopted
@@ -45,11 +43,9 @@ private fun Outbox.left(): List<ShopEvent> {
     return seen
 }
 
-object PostgresOutboxSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object PostgresOutboxSuite : Suite() {
     init {
-        test("Postgres numbers each event, and a claim reads them back oldest first") { _ ->
+        test("Postgres numbers each event, and a claim reads them back oldest first") {
             story {
                 onItsOwn { outbox ->
                     val recorded = When("Nibbles arrives and is adopted, and Barnaby arrives") {
@@ -68,7 +64,7 @@ object PostgresOutboxSuite : Suite<Unit>() {
             }
         }
 
-        test("a return written before the registry had to confirm adoptions is still claimed") { _ ->
+        test("a return written before the registry had to confirm adoptions is still claimed") {
             story {
                 onItsOwn { outbox ->
                     val returned = Given("Nibbles' return, as the shop wrote it before ADR 0001, still unpublished") {
@@ -81,7 +77,7 @@ object PostgresOutboxSuite : Suite<Unit>() {
             }
         }
 
-        test("what the bus took leaves the table, and what it refused stays for the next claim") { _ ->
+        test("what the bus took leaves the table, and what it refused stays for the next claim") {
             story {
                 onItsOwn { outbox ->
                     val (arrived, adopted) = Given("Nibbles' arrival and adoption in the outbox") {
@@ -101,7 +97,7 @@ object PostgresOutboxSuite : Suite<Unit>() {
             }
         }
 
-        test("an event keeps the trace it was recorded in, for the relay to publish it in") { _ ->
+        test("an event keeps the trace it was recorded in, for the relay to publish it in") {
             story {
                 onItsOwn { outbox ->
                     Given("Nibbles' arrival, recorded inside a trace") {
@@ -120,7 +116,7 @@ object PostgresOutboxSuite : Suite<Unit>() {
             }
         }
 
-        test("a claim that throws halfway takes nothing") { _ ->
+        test("a claim that throws halfway takes nothing") {
             story {
                 onItsOwn { outbox ->
                     val arrived = Given(
@@ -139,7 +135,7 @@ object PostgresOutboxSuite : Suite<Unit>() {
             }
         }
 
-        test("a second claim skips the rows the first is holding, rather than waiting for them") { _ ->
+        test("a second claim skips the rows the first is holding, rather than waiting for them") {
             story {
                 onItsOwn { outbox ->
                     val (first, second) = Given("two of Nibbles' arrivals, then two of Barnaby's") {
@@ -180,7 +176,7 @@ object PostgresOutboxSuite : Suite<Unit>() {
             }
         }
 
-        test("the shelf starts as the opening catalogue, and keeps every change written to it") { _ ->
+        test("the shelf starts as the opening catalogue, and keeps every change written to it") {
             story {
                 onItsOwn { outbox ->
                     val first = When("the shelf is read for the first time") { outbox.shelf(listOf(nibbles, barnaby)) }
@@ -199,7 +195,7 @@ object PostgresOutboxSuite : Suite<Unit>() {
             }
         }
 
-        test("a pet's change and its event are one transaction, so an event that fails leaves the pet as it was") { _ ->
+        test("a pet's change and its event are one transaction, so an event that fails leaves the pet as it was") {
             story {
                 testApp(migrated) { (dataSource): Tables ->
                     val table = Given("a pets table with Nibbles on the shelf") {

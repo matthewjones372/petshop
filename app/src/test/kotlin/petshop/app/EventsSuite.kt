@@ -1,6 +1,5 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
@@ -10,7 +9,6 @@ import io.github.matthewjones372.lark.app.typesafe.overridingConfig
 import io.github.matthewjones372.lark.junit.Suite
 import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.story
-import io.github.matthewjones372.lark.resource
 import petshop.api.Tally
 import petshop.app.ScriptedRegistry.Transfer.LosesTheRequest
 import petshop.app.ScriptedRegistry.Transfer.Records
@@ -40,11 +38,9 @@ private fun settledWith(registry: ChipRegistry): Module =
 
 private val settled: Module = settledWith(FakeRegistry())
 
-object EventsSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object EventsSuite : Suite() {
     init {
-        test("an adoption reaches a consumer through the outbox and the bus") { _ ->
+        test("an adoption reaches a consumer through the outbox and the bus") {
             story {
                 testApp(settled) { app: Observed ->
                     When("Ada adopts Nibbles") { app.shop.adopt(PetId(1), by = "Ada") }
@@ -59,7 +55,7 @@ object EventsSuite : Suite<Unit>() {
             }
         }
 
-        test("an event delivered twice is counted once") { _ ->
+        test("an event delivered twice is counted once") {
             story {
                 val barnaby = Given("Bea's adoption of Barnaby, as an event") {
                     PetAdopted(
@@ -84,7 +80,7 @@ object EventsSuite : Suite<Unit>() {
             }
         }
 
-        test("a return from before ADR 0001 still takes its adoption off the count") { _ ->
+        test("a return from before ADR 0001 still takes its adoption off the count") {
             story {
                 val barnaby = Given("Barnaby, adopted by Bea and then returned, as the topic's history holds him") {
                     Pet(PetId(2), "Barnaby", Species.Dog, standing = Adopted("Bea"))
@@ -102,7 +98,7 @@ object EventsSuite : Suite<Unit>() {
             }
         }
 
-        test("an adoption the registry refused never reaches the consumer") { _ ->
+        test("an adoption the registry refused never reaches the consumer") {
             story {
                 val losing = Given("a registry that loses the first transfer and records the rest") {
                     settledWith(ScriptedRegistry(transfers = { if (it == 1) LosesTheRequest else Records }))

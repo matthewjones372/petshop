@@ -1,6 +1,5 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.TestClock
 import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
@@ -10,7 +9,6 @@ import io.github.matthewjones372.lark.fail.right
 import io.github.matthewjones372.lark.junit.Suite
 import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.story
-import io.github.matthewjones372.lark.resource
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.Hub
 import io.github.matthewjones372.lark.stream.Run
@@ -99,11 +97,9 @@ private class Placed(private val hub: HubBus) : EventBus by hub {
 
 private class Projected(val bus: EventBus, val projection: Projection)
 
-object MessagingSpansSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object MessagingSpansSuite : Suite() {
     init {
-        test("the relay publishes each event in a producer span") { _ ->
+        test("the relay publishes each event in a producer span") {
             story {
                 Ended().use { ended ->
                     val clock = TestClock()
@@ -120,7 +116,7 @@ object MessagingSpansSuite : Suite<Unit>() {
             }
         }
 
-        test("the projection handles each event in a consumer span, with where the bus read it from") { _ ->
+        test("the projection handles each event in a consumer span, with where the bus read it from") {
             story {
                 Ended().use { ended ->
                     val reading = Given("a projection, on a bus that says where it read each event from") {
@@ -146,7 +142,7 @@ object MessagingSpansSuite : Suite<Unit>() {
             }
         }
 
-        test("a bus with no offsets says nothing of where it read an event from") { _ ->
+        test("a bus with no offsets says nothing of where it read an event from") {
             story {
                 val read = ConcurrentLinkedQueue<Pair<ShopEvent, Attributes>>()
                 val bus = Given("the in-process bus, with Waffle's arrival on it") {

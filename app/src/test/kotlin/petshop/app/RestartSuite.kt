@@ -1,6 +1,5 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
@@ -14,7 +13,6 @@ import io.github.matthewjones372.lark.junit.shouldBeLeft
 import io.github.matthewjones372.lark.junit.shouldBeRight
 import io.github.matthewjones372.lark.junit.shouldContainAll
 import io.github.matthewjones372.lark.junit.story
-import io.github.matthewjones372.lark.resource
 import petshop.domain.Adopted
 import petshop.domain.Adopting
 import petshop.domain.AlreadyAdopted
@@ -31,11 +29,9 @@ private fun shopOn(database: DatabaseSettings, registry: ChipRegistry): Module =
     (Petshop.module.overriding(single<ChipRegistry> { registry }).onDatabase(database) + running)
         .subgraph<Running>()
 
-object RestartSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object RestartSuite : Suite() {
     init {
-        test("a restarted shop remembers who adopted what, and numbers new arrivals on") { _ ->
+        test("a restarted shop remembers who adopted what, and numbers new arrivals on") {
             val shop = shopOn(TestPostgres.fresh(), FakeRegistry()).overridingConfig("petshop.arrivalsEvery = 50ms")
             story {
                 val (adopted, before) = When("Ada adopts Nibbles, and the shop runs long enough for pets to arrive") {
@@ -63,7 +59,7 @@ object RestartSuite : Suite<Unit>() {
             }
         }
 
-        test("an adoption left unconfirmed when the shop stopped is settled when it starts again") { _ ->
+        test("an adoption left unconfirmed when the shop stopped is settled when it starts again") {
             val database = TestPostgres.fresh()
             story {
                 val down = ScriptedRegistry(

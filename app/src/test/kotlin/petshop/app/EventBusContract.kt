@@ -1,6 +1,5 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
@@ -13,7 +12,6 @@ import io.github.matthewjones372.lark.junit.expect
 import io.github.matthewjones372.lark.junit.forAll
 import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.story
-import io.github.matthewjones372.lark.resource
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.Hub
 import io.github.matthewjones372.lark.stream.start
@@ -149,13 +147,11 @@ private object HubUnderContract : BusUnderContract {
     override fun busConfig(name: String): String = "petshop.bus.kind = in-process"
 }
 
-object HubBusSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object HubBusSuite : Suite() {
     init {
-        eventBusContract<Unit>({ name, body -> test(name, body = body) }) { HubUnderContract }
+        eventBusContract<Unit>({ name, body -> test(name) { body(Unit) } }) { HubUnderContract }
 
-        test("a closed bus turns an event away, and says so") { _ ->
+        test("a closed bus turns an event away, and says so") {
             story {
                 val bus = Given("a bus whose hub has closed") { HubBus(Hub<Claimed>(1).apply { close() }) }
                 val answer = When(

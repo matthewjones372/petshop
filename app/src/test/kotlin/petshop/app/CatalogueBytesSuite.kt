@@ -1,10 +1,8 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.junit.Suite
 import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.shouldBeSameInstanceAs
-import io.github.matthewjones372.lark.resource
 import petshop.api.PetDto
 import petshop.api.ShopCodecs
 import petshop.domain.Pet
@@ -12,11 +10,9 @@ import petshop.domain.PetId
 import petshop.domain.Species
 import kotlin.reflect.typeOf
 
-object CatalogueBytesSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object CatalogueBytesSuite : Suite() {
     init {
-        test("a response keeps its catalogue bytes after another catalogue is published") { _ ->
+        test("a response keeps its catalogue bytes after another catalogue is published") {
             val shown = window(1, "Nibbles", Species.Tortoise)
             val codec = ShopCodecs.codec<List<PetDto>>(typeOf<List<PetDto>>())
             val selected = shown.listed()
@@ -32,7 +28,7 @@ object CatalogueBytesSuite : Suite<Unit>() {
                     )
         }
 
-        test("a published catalogue reuses its bytes across codecs") { _ ->
+        test("a published catalogue reuses its bytes across codecs") {
             val nibbles = window(1, "Nibbles", Species.Tortoise)
             val barnaby = window(2, "Barnaby", Species.Dog)
             val pets = typeOf<List<PetDto>>()
@@ -49,7 +45,7 @@ object CatalogueBytesSuite : Suite<Unit>() {
                     )
         }
 
-        test("a new catalogue is a new array") { _ ->
+        test("a new catalogue is a new array") {
             val nibbles = window(1, "Nibbles", Species.Tortoise)
             val codec = ShopCodecs.codec<List<PetDto>>(typeOf<List<PetDto>>())
             val published = requireNotNull(codec.encoded(nibbles.listed()))

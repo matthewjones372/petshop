@@ -1,10 +1,8 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.junit.Suite
 import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.story
-import io.github.matthewjones372.lark.resource
 import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.ok
@@ -21,14 +19,12 @@ import java.nio.file.Path
  * The demo's WireMock reads `demo/registry/mappings`, written here from the registry's endpoints, so a contract change
  * that moves an answer fails this test until the file is rewritten with `-Dpelican.golden.update=true`.
  */
-object DemoStubsSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object DemoStubsSuite : Suite() {
     // Tests run in the module's directory, under Gradle and IntelliJ both.
     private val demoMappings = Path.of("..", "demo", "registry", "mappings")
 
     init {
-        test("the demo registry's stubs are the contract's") { _ ->
+        test("the demo registry's stubs are the contract's") {
             story {
                 val stubs = Given("every pet chipped, except pet 3, and a new keeper recorded as asked") {
                     stubFile(KotlinxCodecs) {

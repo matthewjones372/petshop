@@ -1,12 +1,10 @@
 package petshop.api
 
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.fail.Either
 import io.github.matthewjones372.lark.fail.left
 import io.github.matthewjones372.lark.junit.Suite
 import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.shouldBeSameInstanceAs
-import io.github.matthewjones372.lark.resource
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.Stream
 import io.github.matthewjones372.lark.stream.empty
@@ -21,9 +19,7 @@ import petshop.domain.PetShopError
 import petshop.domain.Species
 import kotlin.reflect.typeOf
 
-object CatalogueCodecSuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object CatalogueCodecSuite : Suite() {
     private val nibbles = listOf(PetDto(1, "Nibbles", SpeciesDto.Tortoise, adopted = false))
 
     private val barnaby = listOf(PetDto(2, "Barnaby", SpeciesDto.Dog, adopted = false))
@@ -37,7 +33,7 @@ object CatalogueCodecSuite : Suite<Unit>() {
     }
 
     init {
-        test("each shop serves the json published with its own catalogue") { _ ->
+        test("each shop serves the json published with its own catalogue") {
             val nibblesJson = """[{"id":1,"name":"Nibbles","species":"Tortoise","adopted":false}]"""
             val barnabyJson = """[{"id":2,"name":"Barnaby","species":"Dog","adopted":false}]"""
             val one = Catalogue(nibbles)
@@ -53,7 +49,7 @@ object CatalogueCodecSuite : Suite<Unit>() {
                 (served { other }.response(listPets, Unit).body shouldBe barnabyJson)
         }
 
-        test("each catalogue reuses its own bytes") { _ ->
+        test("each catalogue reuses its own bytes") {
             val one = Catalogue(nibbles)
             val other = Catalogue(barnaby)
             val pets = typeOf<List<PetDto>>()
@@ -70,7 +66,7 @@ object CatalogueCodecSuite : Suite<Unit>() {
                 ((requireNotNull(codec.encoded(other)) === bytes) shouldBe false)
         }
 
-        test("a catalogue stays consistent when the list it was built from changes") { _ ->
+        test("a catalogue stays consistent when the list it was built from changes") {
             val source = mutableListOf(nibbles.single(), barnaby.single())
             val catalogue = Catalogue(source)
             val codec = ShopCodecs.codec<List<PetDto>>(typeOf<List<PetDto>>())

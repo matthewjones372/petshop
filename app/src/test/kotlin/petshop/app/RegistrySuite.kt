@@ -2,7 +2,6 @@ package petshop.app
 
 import com.github.tomakehurst.wiremock.http.Fault
 import io.github.matthewjones372.lark.Limit
-import io.github.matthewjones372.lark.Resource
 import io.github.matthewjones372.lark.app.Module
 import io.github.matthewjones372.lark.app.overriding
 import io.github.matthewjones372.lark.app.single
@@ -17,7 +16,6 @@ import io.github.matthewjones372.lark.junit.shouldBeLessThan
 import io.github.matthewjones372.lark.junit.shouldBeRight
 import io.github.matthewjones372.lark.junit.story
 import io.github.matthewjones372.lark.parMap
-import io.github.matthewjones372.lark.resource
 import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
 import io.github.matthewjones372.pelican.ok
@@ -46,11 +44,9 @@ private val chip = ChipRecord("981000000000001", keeper = "Petshop")
 private fun <A> onARegistry(block: (registry: PelicanWireMock, shop: Module) -> A): A =
     PelicanWireMock(KotlinxCodecs).use { registry -> block(registry, shopCalling(registry)) }
 
-object RegistrySuite : Suite<Unit>() {
-    override val shared: Resource<Unit> = resource { }
-
+object RegistrySuite : Suite() {
     init {
-        test("an adoption looks the chip up and records the new keeper") { _ ->
+        test("an adoption looks the chip up and records the new keeper") {
             onARegistry { registry, shop ->
                 story {
                     Given("a registry with Nibbles' chip, that records Ada as her keeper") {
@@ -72,7 +68,7 @@ object RegistrySuite : Suite<Unit>() {
             }
         }
 
-        test("a pet with no chip on record stays in the shop") { _ ->
+        test("a pet with no chip on record stays in the shop") {
             onARegistry { registry, shop ->
                 story {
                     Given(
@@ -88,7 +84,7 @@ object RegistrySuite : Suite<Unit>() {
             }
         }
 
-        test("a registry that takes too long is an outage, not a hang") { _ ->
+        test("a registry that takes too long is an outage, not a hang") {
             onARegistry { registry, _ ->
                 story {
                     Given("a registry that takes five seconds to answer, and a shop that waits 300 ms") {
@@ -107,7 +103,7 @@ object RegistrySuite : Suite<Unit>() {
             }
         }
 
-        test("a connection reset while recording the keeper puts the pet back on the shelf") { _ ->
+        test("a connection reset while recording the keeper puts the pet back on the shelf") {
             onARegistry { registry, shop ->
                 story {
                     Given("a registry that resets the connection recording Ada, and records Bea") {
@@ -134,7 +130,7 @@ object RegistrySuite : Suite<Unit>() {
             }
         }
 
-        test("a status the contract never declared is an outage too") { _ ->
+        test("a status the contract never declared is an outage too") {
             onARegistry { registry, shop ->
                 story {
                     Given(
@@ -148,7 +144,7 @@ object RegistrySuite : Suite<Unit>() {
             }
         }
 
-        test("a registry that keeps failing stops being asked") { _ ->
+        test("a registry that keeps failing stops being asked") {
             onARegistry { registry, shop ->
                 story {
                     Given(
@@ -168,7 +164,7 @@ object RegistrySuite : Suite<Unit>() {
             }
         }
 
-        test("twenty adopters race for one tortoise and the registry hears from one of them") { _ ->
+        test("twenty adopters race for one tortoise and the registry hears from one of them") {
             onARegistry { registry, shop ->
                 story {
                     Given("a registry that knows Nibbles' chip and records any keeper") {
@@ -194,7 +190,7 @@ object RegistrySuite : Suite<Unit>() {
             }
         }
 
-        test("calls past the registry's limit wait their turn and are answered") { _ ->
+        test("calls past the registry's limit wait their turn and are answered") {
             onARegistry { registry, _ ->
                 story {
                     Given("a registry that takes 500 ms over each of four chips, and a limit of two calls at once") {
