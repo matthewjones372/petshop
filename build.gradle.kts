@@ -1,6 +1,8 @@
 plugins {
     kotlin("jvm") version "2.4.20" apply false
     kotlin("plugin.serialization") version "2.4.20" apply false
+    // A failed `expect` in a lark-junit suite draws its values.
+    kotlin("plugin.power-assert") version "2.4.20" apply false
     id("org.jetbrains.kotlinx.kover") version "0.9.11" apply false
     // 2.0, because detekt 1.23 is built against Kotlin 2.0 and cannot read 2.4 sources.
     id("dev.detekt") version "2.0.0-alpha.6" apply false
@@ -12,6 +14,7 @@ subprojects {
     apply(plugin = "org.jetbrains.kotlinx.kover")
     apply(plugin = "dev.detekt")
     apply(plugin = "info.solidsoft.pitest")
+    apply(plugin = "org.jetbrains.kotlin.plugin.power-assert")
 
     repositories {
         mavenCentral()
@@ -58,11 +61,24 @@ subprojects {
         "testImplementation"("org.junit.jupiter:junit-jupiter:6.1.3")
         "testImplementation"("io.kotest:kotest-assertions-core:6.2.4")
         "testImplementation"("io.github.matthewjones372:lark-assert:${providers.gradleProperty("larkVersion").get()}")
+        // The tests are lark-junit suites: a suite is an object, its tests share one resource and run together.
+        "testImplementation"("io.github.matthewjones372:lark-junit:${providers.gradleProperty("larkVersion").get()}")
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
         // pelican-core, Avro and Confluent bring Jackson before 2.22.3, which has open advisories.
         "implementation"(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
         // Every pelican module at pelicanVersion, so no build file names a pelican version of its own.
         "implementation"(platform("io.github.matthewjones372:pelican-bom:${providers.gradleProperty("pelicanVersion").get()}"))
+    }
+
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi::class)
+    extensions.configure<org.jetbrains.kotlin.powerassert.gradle.PowerAssertGradleExtension> {
+        functions.add("io.github.matthewjones372.lark.junit.expect")
+        includedSourceSets.add("test")
+    }
+
+    // A suite's dropped Expectations is reported only under this flag.
+    tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileTestKotlin") {
+        compilerOptions.freeCompilerArgs.add("-Xreturn-value-checker=check")
     }
 
     tasks.withType<Test> {
