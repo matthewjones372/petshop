@@ -6,14 +6,15 @@ import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.fail.Either
 import io.github.matthewjones372.lark.fail.right
+import io.github.matthewjones372.lark.junit.Suite
+import io.github.matthewjones372.lark.junit.shouldBe
+import io.github.matthewjones372.lark.junit.story
 import io.github.matthewjones372.lark.stream.Forks
 import io.github.matthewjones372.lark.stream.Hub
 import io.github.matthewjones372.lark.stream.Run
 import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.lark.stream.TestStreams
 import io.github.matthewjones372.lark.stream.start
-import io.github.matthewjones372.lark.test.story
-import io.kotest.matchers.shouldBe
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.Tracer
@@ -22,7 +23,6 @@ import io.opentelemetry.sdk.trace.SdkTracerProvider
 import io.opentelemetry.sdk.trace.data.SpanData
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor
 import io.opentelemetry.sdk.trace.export.SpanExporter
-import org.junit.jupiter.api.Test
 import petshop.domain.Pet
 import petshop.domain.PetArrived
 import petshop.domain.PetId
@@ -97,60 +97,64 @@ private class Placed(private val hub: HubBus) : EventBus by hub {
 
 private class Projected(val bus: EventBus, val projection: Projection)
 
-class MessagingSpansSpec {
-
-    @Test
-    fun `the relay publishes each event in a producer span`() = story {
-        Ended().use { ended ->
-            val clock = TestClock()
-            val every = 50.milliseconds
-            Given("Waffle's arrival in the outbox, and a relay") {
-                relay(every, Once(waffle), Taken, ended.tracer).start(TestStreams(clock))
-            }.use { _ ->
-                When("the relay ticks") { clock.adjust(every) }
-                Then("its publish span is a producer's") {
-                    ended.named("publish").map { it.kind } shouldBe listOf(SpanKind.PRODUCER)
+object MessagingSpansSuite : Suite() {
+    init {
+        test("the relay publishes each event in a producer span") {
+            story {
+                Ended().use { ended ->
+                    val clock = TestClock()
+                    val every = 50.milliseconds
+                    Given("Waffle's arrival in the outbox, and a relay") {
+                        relay(every, Once(waffle), Taken, ended.tracer).start(TestStreams(clock))
+                    }.use { _ ->
+                        When("the relay ticks") { clock.adjust(every) }
+                        Then("its publish span is a producer's") {
+                            ended.named("publish").map { it.kind } shouldBe listOf(SpanKind.PRODUCER)
+                        }
+                    }
                 }
             }
         }
-    }
 
-    @Test
-    fun `the projection handles each event in a consumer span, with where the bus read it from`() = story {
-        Ended().use { ended ->
-            val reading = Given("a projection, on a bus that says where it read each event from") {
-                (
-                    projection + feed +
-                        single<StreamBackend> { Forks() } +
-                        single<EventBus> { Placed(HubBus(Hub(16))) } +
-                        single<Tracer> { ended.tracer } +
-                        single { bus: EventBus, projection: Projection -> Projected(bus, projection) }
-                    ).subgraph<Projected>()
-            }
-            testApp(reading) { app: Projected ->
-                When("Waffle's arrival is published") { app.bus.publish(waffle) }
-                Then(
-                    "the projection's process span is a consumer's, with the bus's attributes",
-                ).eventually(30.seconds) {
-                    val process = ended.named("process").single()
-                    process.kind shouldBe SpanKind.CONSUMER
-                    process.attributes.asMap() shouldBe Placed.where.asMap()
+        test("the projection handles each event in a consumer span, with where the bus read it from") {
+            story {
+                Ended().use { ended ->
+                    val reading = Given("a projection, on a bus that says where it read each event from") {
+                        (
+                            projection + feed +
+                                single<StreamBackend> { Forks() } +
+                                single<EventBus> { Placed(HubBus(Hub(16))) } +
+                                single<Tracer> { ended.tracer } +
+                                single { bus: EventBus, projection: Projection -> Projected(bus, projection) }
+                            ).subgraph<Projected>()
+                    }
+                    testApp(reading) { app: Projected ->
+                        When("Waffle's arrival is published") { app.bus.publish(waffle) }
+                        Then(
+                            "the projection's process span is a consumer's, with the bus's attributes",
+                        ).eventually(30.seconds) {
+                            val process = ended.named("process").single()
+                            (process.kind shouldBeOrRetry SpanKind.CONSUMER) and
+                                (process.attributes.asMap() shouldBeOrRetry Placed.where.asMap())
+                        }
+                    }
                 }
             }
         }
-    }
 
-    @Test
-    fun `a bus with no offsets says nothing of where it read an event from`() = story {
-        val read = ConcurrentLinkedQueue<Pair<ShopEvent, Attributes>>()
-        val bus = Given("the in-process bus, with Waffle's arrival on it") {
-            HubBus(Hub(16)).also { it.publish(waffle) }
-        }
-        When("a reader reads it with where it came from") {
-            bus.consumeFrom { event, where -> read.add(event to where) }.start(Forks())
-        }.use { _ ->
-            Then("it reads the arrival, with no attributes").eventually(30.seconds) {
-                read.toList() shouldBe listOf(waffle to Attributes.empty())
+        test("a bus with no offsets says nothing of where it read an event from") {
+            story {
+                val read = ConcurrentLinkedQueue<Pair<ShopEvent, Attributes>>()
+                val bus = Given("the in-process bus, with Waffle's arrival on it") {
+                    HubBus(Hub(16)).also { it.publish(waffle) }
+                }
+                When("a reader reads it with where it came from") {
+                    bus.consumeFrom { event, where -> read.add(event to where) }.start(Forks())
+                }.use { _ ->
+                    Then("it reads the arrival, with no attributes").eventually(30.seconds) {
+                        read.toList() shouldBeOrRetry listOf(waffle to Attributes.empty())
+                    }
+                }
             }
         }
     }
