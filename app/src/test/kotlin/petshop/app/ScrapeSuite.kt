@@ -7,6 +7,7 @@ import io.github.matthewjones372.lark.app.single
 import io.github.matthewjones372.lark.app.subgraph
 import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.junit.Suite
+import io.github.matthewjones372.lark.junit.alone
 import io.github.matthewjones372.lark.junit.forAll
 import io.github.matthewjones372.lark.junit.shouldContain
 import io.github.matthewjones372.lark.junit.story
@@ -90,7 +91,9 @@ object ScrapeSuite : Suite<Unit>() {
             }
         }
 
-        test("the scrape says how the JVM, the pool and every health check are") { _ ->
+        // Alone: every test here starts a pool named "petshop" on Micrometer's global registry, and one closing its
+        // pool removes the shared hikaricp_* meters this test reads.
+        test("the scrape says how the JVM, the pool and every health check are", alone) { _ ->
             // Measured where the shop measures outside a suite: lark-junit binds each test a capture of its own.
             metrics.locally(MicrometerMetrics()) {
                 story {
