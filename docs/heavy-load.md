@@ -1,14 +1,14 @@
 # Fifty thousand requests a second
 
 `loadtest/heavy.sh` ramps one shop from 100 to 50,000 requests a second over a minute, then holds it there for a
-minute. This page is what it found on one laptop on 2026-10-15: first with that morning's lark and Proofload, then
-again that evening with lark's parked runners (lark #421) and Proofload's cap on users in flight (Proofload #126 to
+minute. This page is what it found on one laptop on 2026-10-15: first with that morning's surefold and Proofload, then
+again that evening with surefold's parked runners (surefold #421) and Proofload's cap on users in flight (Proofload #126 to
 #128).
 
 ## Summary
 
 - **The shop answers 50,000 requests a second, but not cleanly, and this laptop cannot show whether it could.** In the
-  best run, with lark's parked runners and Proofload's cap, the shop answered 48,800 a second through the hold with
+  best run, with surefold's parked runners and Proofload's cap, the shop answered 48,800 a second through the hold with
   no failures, and the generator refused 2.4% of arrivals because 1,024 were already in flight. The p99 service time
   over the hold was 36 ms and the slowest request 185 ms. Proofload reads every run void, because every run refused
   some arrivals.
@@ -21,7 +21,7 @@ again that evening with lark's parked runners (lark #421) and Proofload's cap on
   averaged 1.3 ms and the longest was 11 ms. A refusal needs the shop's answers to take more than about 20 ms, so the
   bursts of refusals are not GC pauses. The 15 to 40 ms pauses this page first reported came from a run that was also
   recording with JFR's profiling settings while its generator collapsed.
-- **Lark's parked runners moved its cost rather than removing it.** Lark's actor runtime took 17.5% of the shop's CPU
+- **Surefold's parked runners moved its cost rather than removing it.** Surefold's actor runtime took 17.5% of the shop's CPU
   before and about 15% after, and the shop's CPU per request is unchanged at about 55 µs.
 - **Nothing else in the shop is near a limit.** Its Postgres pool never had more than one of ten connections in use
   or anyone waiting, Postgres stayed under 3% CPU, and the shop held at about 83 threads (handlers run on virtual
@@ -40,7 +40,7 @@ shop's CPU per request.
   one-minute load average is under the number of cores before it starts; it was 3.5 to 7.9 at each start.
 - The shop is the installed distribution (`./gradlew :app:installDist`) with default JVM flags: G1 and the default
   heap. The generator is a second JVM with a 4 GB heap. Both are JDK 25.
-- Pelican 1.0.1-SNAPSHOT, lark 0.10.2-SNAPSHOT, Proofload 0.1.1-SNAPSHOT, Jetty 12.1.13, PostgreSQL 17.
+- Pelican 1.0.1-SNAPSHOT, surefold 0.10.2-SNAPSHOT, Proofload 0.1.1-SNAPSHOT, Jetty 12.1.13, PostgreSQL 17.
 
 ### The scenario
 
@@ -68,9 +68,9 @@ A catalogue large enough to keep 500 adoptions a second writing would make `GET 
 pets, because it returns every pet the shop has ever had. The adoption ladder in [performance.md](performance.md)
 measures writes alone: about 1,000 a second before the shop falls behind.
 
-## Results with lark's parked runners and Proofload's cap
+## Results with surefold's parked runners and Proofload's cap
 
-The lark snapshot was published from lark's main at 066eb9c, after #421, and the Proofload snapshot after #128. The
+The surefold snapshot was published from surefold's main at 066eb9c, after #421, and the Proofload snapshot after #128. The
 fourth run also recorded the shop with JFR's default settings and a GC log.
 
 | Run | First refusal in the ramp | Hold: answered a second | Hold: refused | Hold: p99 | Hold: slowest | Load average, start to end |
@@ -92,7 +92,7 @@ the shop never had more than 82 threads.
 | G1, second | 25,900/s | 5.1% | 46 ms | 210 ms | 7.6 to 16.0 |
 | ZGC | 29,200/s | 30% | 109 ms | 604 ms | 7.9 to 30.4 |
 
-These runs, from before lark #421, predate Proofload's cap: the transport refused with a semaphore of its own, and each refusal was counted
+These runs, from before surefold #421, predate Proofload's cap: the transport refused with a semaphore of its own, and each refusal was counted
 as a failed request named `NoFreeConnection`. Every failure in all three was one: no timeouts and no errors from the
 shop. With the cap they would be counted as refused, and all three runs would read void. ZGC's pauses are under a
 millisecond, but its collector runs on threads of its own and competes for the same saturated cores, so that run
@@ -116,7 +116,7 @@ The hold in the second G1 run, a second at a time:
 | Resource | What the runs showed |
 |---|---|
 | CPU, the machine | The limit. Shop and generator together oversubscribe eight cores; the load average passes 16. |
-| CPU, the shop | About 2.7 cores at 48,800/s, so about 55 µs a request, before and after lark #421. |
+| CPU, the shop | About 2.7 cores at 48,800/s, so about 55 µs a request, before and after surefold #421. |
 | GC, the shop | About 400 MB a second; young pauses averaged 1.3 ms, the longest 11 ms. |
 | The load generator | About 3 cores. Earlier designs collapsed first: see below. |
 | Postgres pool | At most one of ten connections in use, never a wait. |
@@ -126,7 +126,7 @@ The hold in the second G1 run, a second at a time:
 
 From JFR recordings of the shop at 50,000/s (`jfr view hot-methods`):
 
-- **Lark's actor runtime.** Before lark #421, 17.5%: `Runners.run` removed its runner from a `ConcurrentHashMap` key
+- **Surefold's actor runtime.** Before surefold #421, 17.5%: `Runners.run` removed its runner from a `ConcurrentHashMap` key
   set each time the shop actor's mailbox ran dry, and the next message started a new virtual thread. After it, about
   15%: a runner that runs out of work pushes itself onto one shared stack of parked runners (`Runners.push`, 10.7%,
   a compare-and-set loop on a single head that many runners contend for) after checking that both queues are empty
@@ -171,10 +171,10 @@ at about three cores, and its slowest request in any run was 0.8 s. Proofload no
 4. **Serve reads without the actor.** Every read is an ask to the one actor that also writes adoptions to Postgres.
    An immutable snapshot of the catalogue, swapped by the actor after each write and read directly by the handlers,
    removes the ask and its runner churn from 99% of requests, and stops a slow write from holding up reads.
-5. **Shed load in the shop.** A lark `Bulkhead` around the actor ask (`guard(Bulkhead(...))` in a `policy`, with a
+5. **Shed load in the shop.** A surefold `Bulkhead` around the actor ask (`guard(Bulkhead(...))` in a `policy`, with a
    `deadline`) would answer a burst past its limit with an immediate 503, rather than letting thousands of requests
    park waiting for room in the actor's mailbox.
-6. **Lark: park runners without contending.** Lark #421 keeps runners parked instead of retiring them, but every one
+6. **Surefold: park runners without contending.** Surefold #421 keeps runners parked instead of retiring them, but every one
    that parks pushes onto the same stack, and at this rate that compare-and-set loop is 10.7% of the shop's CPU. A
    runner that spins briefly before parking, or a stack per carrier thread, might avoid most of it; neither is measured.
 

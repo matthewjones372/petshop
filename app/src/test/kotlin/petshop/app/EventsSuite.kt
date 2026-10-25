@@ -1,14 +1,14 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.overriding
-import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.subgraph
-import io.github.matthewjones372.lark.app.testApp
-import io.github.matthewjones372.lark.app.typesafe.overridingConfig
-import io.github.matthewjones372.lark.junit.Suite
-import io.github.matthewjones372.lark.junit.shouldBe
-import io.github.matthewjones372.lark.junit.story
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.overriding
+import io.github.matthewjones372.surefold.app.single
+import io.github.matthewjones372.surefold.app.subgraph
+import io.github.matthewjones372.surefold.app.testApp
+import io.github.matthewjones372.surefold.app.typesafe.overridingConfig
+import io.github.matthewjones372.surefold.junit.Suite
+import io.github.matthewjones372.surefold.junit.shouldBe
+import io.github.matthewjones372.surefold.junit.story
 import petshop.api.Tally
 import petshop.app.ScriptedRegistry.Transfer.LosesTheRequest
 import petshop.app.ScriptedRegistry.Transfer.Records

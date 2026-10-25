@@ -1,7 +1,7 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
-import io.github.matthewjones372.lark.resource
+import io.github.matthewjones372.surefold.Resource
+import io.github.matthewjones372.surefold.resource
 import org.apache.kafka.clients.admin.Admin
 import org.apache.kafka.clients.admin.AdminClientConfig
 import org.apache.kafka.clients.consumer.ConsumerConfig

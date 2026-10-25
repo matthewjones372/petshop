@@ -1,16 +1,16 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.liquibase.Migrated
-import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.subgraph
-import io.github.matthewjones372.lark.app.testApp
-import io.github.matthewjones372.lark.junit.Expectations
-import io.github.matthewjones372.lark.junit.Suite
-import io.github.matthewjones372.lark.junit.shouldBe
-import io.github.matthewjones372.lark.junit.shouldBeEmpty
-import io.github.matthewjones372.lark.junit.shouldThrow
-import io.github.matthewjones372.lark.junit.story
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.liquibase.Migrated
+import io.github.matthewjones372.surefold.app.single
+import io.github.matthewjones372.surefold.app.subgraph
+import io.github.matthewjones372.surefold.app.testApp
+import io.github.matthewjones372.surefold.junit.Expectations
+import io.github.matthewjones372.surefold.junit.Suite
+import io.github.matthewjones372.surefold.junit.shouldBe
+import io.github.matthewjones372.surefold.junit.shouldBeEmpty
+import io.github.matthewjones372.surefold.junit.shouldThrow
+import io.github.matthewjones372.surefold.junit.story
 import petshop.domain.Adopted
 import petshop.domain.Pet
 import petshop.domain.PetAdopted

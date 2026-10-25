@@ -1,6 +1,6 @@
 package petshop.domain
 
-import io.github.matthewjones372.lark.fail.Either
+import io.github.matthewjones372.surefold.fail.Either
 
 data class Chip(val number: String, val keeper: String)
 

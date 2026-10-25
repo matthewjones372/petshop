@@ -1,7 +1,7 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Carriers
-import io.github.matthewjones372.lark.otel.span
+import io.github.matthewjones372.surefold.Carriers
+import io.github.matthewjones372.surefold.otel.span
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.Tracer
 import kotlinx.serialization.json.Json

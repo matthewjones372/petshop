@@ -57,21 +57,21 @@ Never, in main or test sources. It catches interrupts, cancellations and bugs
 along with the failure that was meant. Catch the exception you expect, by name,
 or let it propagate.
 
-## Use what lark, pelican and kimney already provide
+## Use what surefold, pelican and kimney already provide
 
 Before writing a scheduler, a retry, a breaker, a health check, a config reader
-or a test wait, look for it in [lark](https://github.com/matthewjones372/lark)
+or a test wait, look for it in [surefold](https://github.com/matthewjones372/lark)
 (its `docs/cookbook.md` ends with a need-to-API table) and
 [pelican](https://github.com/matthewjones372/pelican) (`docs/modules.md`). Background work
-is a lark `Stream` on the graph's `StreamBackend`, settings are read with
-lark-app-typesafe's `config`/`secret`, readiness is pelican-health, and a test
-waits with lark-test's `eventually`.
+is a surefold `Stream` on the graph's `StreamBackend`, settings are read with
+surefold-app-typesafe's `config`/`secret`, readiness is pelican-health, and a test
+waits with surefold-test's `eventually`.
 
 A mapping between a domain type and a DTO or wire type is kimney's `transformInto()`.
 Fields that differ go in the override chain:
 `into<_, B>().withFieldComputed(...)`, `withFieldConst(...)` or `withTransformer(...)`, then `.transform()`.
 
-To read their source offline, `scripts/sources <artifact>` (e.g. `lark-stream`, `pelican-core`) unpacks the
+To read their source offline, `scripts/sources <artifact>` (e.g. `surefold-stream`, `pelican-core`) unpacks the
 sources jar at the version the build uses and prints where. kimney's is `kimney-runtime`, at the plugin version in
 `api/build.gradle.kts`: unzip its `-sources.jar` from `~/.gradle/caches/modules-2/files-2.1/io.github.matthewjones372/`;
 `Into.kt` lists every override.

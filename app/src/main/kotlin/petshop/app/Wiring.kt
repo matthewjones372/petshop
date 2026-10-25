@@ -1,28 +1,28 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.app.LarkApp
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.boundTo
-import io.github.matthewjones372.lark.app.closingOf
-import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.singleOf
-import io.github.matthewjones372.lark.app.typesafe.Layered
-import io.github.matthewjones372.lark.app.typesafe.Secrets
-import io.github.matthewjones372.lark.app.typesafe.config
-import io.github.matthewjones372.lark.app.typesafe.configOf
-import io.github.matthewjones372.lark.app.typesafe.layeredConfig
-import io.github.matthewjones372.lark.app.typesafe.layeredConfigOf
-import io.github.matthewjones372.lark.app.typesafe.origins
-import io.github.matthewjones372.lark.counter
-import io.github.matthewjones372.lark.increment
-import io.github.matthewjones372.lark.logInfo
-import io.github.matthewjones372.lark.stream.Forks
-import io.github.matthewjones372.lark.stream.StreamBackend
 import io.github.matthewjones372.pelican.Api
 import io.github.matthewjones372.pelican.client.jetty.JettyHttpTransport
 import io.github.matthewjones372.pelican.health.Health
 import io.github.matthewjones372.pelican.jetty.PelicanServer
 import io.github.matthewjones372.pelican.jetty.docs.startWithDocs
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.SurefoldApp
+import io.github.matthewjones372.surefold.app.boundTo
+import io.github.matthewjones372.surefold.app.closingOf
+import io.github.matthewjones372.surefold.app.single
+import io.github.matthewjones372.surefold.app.singleOf
+import io.github.matthewjones372.surefold.app.typesafe.Layered
+import io.github.matthewjones372.surefold.app.typesafe.Secrets
+import io.github.matthewjones372.surefold.app.typesafe.config
+import io.github.matthewjones372.surefold.app.typesafe.configOf
+import io.github.matthewjones372.surefold.app.typesafe.layeredConfig
+import io.github.matthewjones372.surefold.app.typesafe.layeredConfigOf
+import io.github.matthewjones372.surefold.app.typesafe.origins
+import io.github.matthewjones372.surefold.counter
+import io.github.matthewjones372.surefold.increment
+import io.github.matthewjones372.surefold.logInfo
+import io.github.matthewjones372.surefold.stream.Forks
+import io.github.matthewjones372.surefold.stream.StreamBackend
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
@@ -44,7 +44,7 @@ private val settings: Module =
     }
 
 private val telemetry: Module =
-    // Added to Micrometer's global composite, which is where lark-micrometer writes by default.
+    // Added to Micrometer's global composite, which is where surefold-micrometer writes by default.
     singleOf<PrometheusMeterRegistry>(
         { PrometheusMeterRegistry(PrometheusConfig.DEFAULT).also(MicrometerRegistries::addRegistry) },
         { registry ->
@@ -75,7 +75,7 @@ private fun tracing(): OpenTelemetrySdk = AutoConfiguredOpenTelemetrySdk.builder
     .build()
     .openTelemetrySdk
 
-/** Lark's streams run on virtual threads, and Jetty's client calls the registry. */
+/** Surefold's streams run on virtual threads, and Jetty's client calls the registry. */
 private val jetty: Module =
     single<StreamBackend> { Forks() } +
         closingOf { -> JettyHttpTransport() }
@@ -118,7 +118,7 @@ private val infrastructure: Module = settings + telemetry + database + jetty + r
 private val shop: Module = theShop + checks + meters + arrivals
 private val events: Module = outbox + feed + projection + bus
 
-object Petshop : LarkApp<PelicanServer>() {
+object Petshop : SurefoldApp<PelicanServer>() {
     override val module: Module = configOf(layers.config) + infrastructure + shop + events + web
 }
 

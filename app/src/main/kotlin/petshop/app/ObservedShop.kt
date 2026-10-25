@@ -1,16 +1,16 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.counter
-import io.github.matthewjones372.lark.fail.Either
-import io.github.matthewjones372.lark.fail.fold
-import io.github.matthewjones372.lark.increment
-import io.github.matthewjones372.lark.logAnnotated
-import io.github.matthewjones372.lark.logInfo
-import io.github.matthewjones372.lark.logSpan
-import io.github.matthewjones372.lark.logWarn
-import io.github.matthewjones372.lark.metricTagged
-import io.github.matthewjones372.lark.otel.tracedSpan
-import io.github.matthewjones372.lark.timed
+import io.github.matthewjones372.surefold.counter
+import io.github.matthewjones372.surefold.fail.Either
+import io.github.matthewjones372.surefold.fail.fold
+import io.github.matthewjones372.surefold.increment
+import io.github.matthewjones372.surefold.logAnnotated
+import io.github.matthewjones372.surefold.logInfo
+import io.github.matthewjones372.surefold.logSpan
+import io.github.matthewjones372.surefold.logWarn
+import io.github.matthewjones372.surefold.metricTagged
+import io.github.matthewjones372.surefold.otel.tracedSpan
+import io.github.matthewjones372.surefold.timed
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.Tracer
 import petshop.domain.Adopting
@@ -32,7 +32,7 @@ class ObservedShop(private val front: ShopFront, private val tracer: Tracer) : P
 
     override fun find(id: PetId): Pet? = front.find(id)
 
-    /** OpenTelemetry's context lives in a `LarkLocal` here; a `ThreadLocal` would not survive the ask. */
+    /** OpenTelemetry's context lives in a `SurefoldLocal` here; a `ThreadLocal` would not survive the ask. */
     override fun adopt(id: PetId, by: String): Either<PetShopError, Pet> =
         logAnnotated("pet_id" to id.value.toString(), "adopted_by" to by) {
             tracer.tracedSpan("adopt") {

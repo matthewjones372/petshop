@@ -1,15 +1,15 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.actor.ActorRef
-import io.github.matthewjones372.lark.actor.Address
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.overriding
-import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.subgraph
-import io.github.matthewjones372.lark.app.testApp
-import io.github.matthewjones372.lark.junit.Suite
-import io.github.matthewjones372.lark.junit.shouldContain
-import io.github.matthewjones372.lark.junit.story
+import io.github.matthewjones372.surefold.actor.ActorRef
+import io.github.matthewjones372.surefold.actor.Address
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.overriding
+import io.github.matthewjones372.surefold.app.single
+import io.github.matthewjones372.surefold.app.subgraph
+import io.github.matthewjones372.surefold.app.testApp
+import io.github.matthewjones372.surefold.junit.Suite
+import io.github.matthewjones372.surefold.junit.shouldContain
+import io.github.matthewjones372.surefold.junit.story
 import petshop.domain.ChipRegistry
 
 /** Hears every message and answers none, as a wedged actor does. */

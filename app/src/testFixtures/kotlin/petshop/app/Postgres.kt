@@ -1,12 +1,12 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.overriding
-import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.typesafe.Secret
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.overriding
+import io.github.matthewjones372.surefold.app.single
+import io.github.matthewjones372.surefold.app.typesafe.Secret
+import org.testcontainers.postgresql.PostgreSQLContainer
 import java.sql.DriverManager
 import java.util.concurrent.atomic.AtomicInteger
-import org.testcontainers.postgresql.PostgreSQLContainer
 
 object TestPostgres {
 

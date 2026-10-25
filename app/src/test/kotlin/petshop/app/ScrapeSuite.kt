@@ -1,17 +1,17 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.overriding
-import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.subgraph
-import io.github.matthewjones372.lark.app.testApp
-import io.github.matthewjones372.lark.junit.Suite
-import io.github.matthewjones372.lark.junit.alone
-import io.github.matthewjones372.lark.junit.forAll
-import io.github.matthewjones372.lark.junit.shouldContain
-import io.github.matthewjones372.lark.junit.story
-import io.github.matthewjones372.lark.metrics
-import io.github.matthewjones372.lark.micrometer.MicrometerMetrics
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.overriding
+import io.github.matthewjones372.surefold.app.single
+import io.github.matthewjones372.surefold.app.subgraph
+import io.github.matthewjones372.surefold.app.testApp
+import io.github.matthewjones372.surefold.junit.Suite
+import io.github.matthewjones372.surefold.junit.alone
+import io.github.matthewjones372.surefold.junit.forAll
+import io.github.matthewjones372.surefold.junit.shouldContain
+import io.github.matthewjones372.surefold.junit.story
+import io.github.matthewjones372.surefold.metrics
+import io.github.matthewjones372.surefold.micrometer.MicrometerMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
@@ -90,7 +90,7 @@ object ScrapeSuite : Suite() {
         // Alone: every test here starts a pool named "petshop" on Micrometer's global registry, and one closing its
         // pool removes the shared hikaricp_* meters this test reads.
         test("the scrape says how the JVM, the pool and every health check are", alone) {
-            // Measured where the shop measures outside a suite: lark-junit binds each test a capture of its own.
+            // Measured where the shop measures outside a suite: surefold-junit binds each test a capture of its own.
             metrics.locally(MicrometerMetrics()) {
                 story {
                     val service = Given("the shop on a fresh database") {

@@ -1,7 +1,7 @@
 plugins {
     kotlin("jvm") version "2.4.20" apply false
     kotlin("plugin.serialization") version "2.4.20" apply false
-    // A failed `expect` in a lark-junit suite draws its values.
+    // A failed `expect` in a surefold-junit suite draws its values.
     kotlin("plugin.power-assert") version "2.4.20" apply false
     id("org.jetbrains.kotlinx.kover") version "0.9.11" apply false
     // 2.0, because detekt 1.23 is built against Kotlin 2.0 and cannot read 2.4 sources.
@@ -20,10 +20,11 @@ subprojects {
         mavenCentral()
         // Confluent's artifacts are not on Maven Central.
         maven("https://packages.confluent.io/maven/") { content { includeGroup("io.confluent") } }
-        if (listOf("larkVersion", "pelicanVersion").any { providers.gradleProperty(it).get().endsWith("-SNAPSHOT") }) {
+        val versions = listOf("surefoldVersion", "pelicanVersion")
+        if (versions.any { providers.gradleProperty(it).get().endsWith("-SNAPSHOT") }) {
             maven("https://central.sonatype.com/repository/maven-snapshots/")
             mavenLocal()
-            // Gradle keeps a snapshot for 24h by default, so CI's cache compiled against a lark from before toSequence.
+            // Gradle keeps a snapshot for 24h by default, so CI's cache once compiled against a stale one.
             configurations.configureEach { resolutionStrategy.cacheChangingModulesFor(0, "seconds") }
         } else {
             // Proofload's snapshot, for the load test: a day of demo traffic needs spec 0143, which no release has yet.
@@ -55,14 +56,16 @@ subprojects {
         junit5PluginVersion.set("1.2.3")
     }
 
+    val surefoldVersion = providers.gradleProperty("surefoldVersion").get()
+
     dependencies {
         "detektPlugins"("dev.detekt:detekt-rules-ktlint-wrapper:2.0.0-alpha.6")
         "testImplementation"(kotlin("test"))
         "testImplementation"("org.junit.jupiter:junit-jupiter:6.1.3")
         "testImplementation"("io.kotest:kotest-assertions-core:6.2.4")
-        "testImplementation"("io.github.matthewjones372:lark-assert:${providers.gradleProperty("larkVersion").get()}")
-        // The tests are lark-junit suites: a suite is an object, its tests share one resource and run together.
-        "testImplementation"("io.github.matthewjones372:lark-junit:${providers.gradleProperty("larkVersion").get()}")
+        "testImplementation"("io.github.matthewjones372:surefold-assert:$surefoldVersion")
+        // The tests are surefold-junit suites: a suite is an object, its tests share one resource and run together.
+        "testImplementation"("io.github.matthewjones372:surefold-junit:$surefoldVersion")
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
         // pelican-core, Avro and Confluent bring Jackson before 2.22.3, which has open advisories.
         "implementation"(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
@@ -72,7 +75,7 @@ subprojects {
 
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi::class)
     extensions.configure<org.jetbrains.kotlin.powerassert.gradle.PowerAssertGradleExtension> {
-        functions.add("io.github.matthewjones372.lark.junit.expect")
+        functions.add("io.github.matthewjones372.surefold.junit.expect")
         includedSourceSets.add("test")
     }
 

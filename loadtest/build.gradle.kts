@@ -1,14 +1,14 @@
 // A snapshot until a release carries spec 0143, so a day of demo traffic holds what an hour does.
 val proofloadVersion = "0.1.1-SNAPSHOT"
-val larkVersion: String = providers.gradleProperty("larkVersion").get()
+val surefoldVersion: String = providers.gradleProperty("surefoldVersion").get()
 
 dependencies {
     testImplementation(project(":app"))
     testImplementation(testFixtures(project(":app")))
-    testImplementation("io.github.matthewjones372:lark-app:$larkVersion")
-    testImplementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
-    testImplementation("io.github.matthewjones372:lark-stream:$larkVersion")
-    testImplementation("io.github.matthewjones372:lark-test:$larkVersion")
+    testImplementation("io.github.matthewjones372:surefold-app:$surefoldVersion")
+    testImplementation("io.github.matthewjones372:surefold-app-typesafe:$surefoldVersion")
+    testImplementation("io.github.matthewjones372:surefold-stream:$surefoldVersion")
+    testImplementation("io.github.matthewjones372:surefold-test:$surefoldVersion")
     testImplementation("io.github.matthewjones372:pelican-test-wiremock")
     testImplementation(project(":registry"))
     testImplementation("io.github.matthewjones372:pelican-test")

@@ -5,9 +5,9 @@ After this comparison petshop runs only on Jetty with kotlinx; the `petshop.stac
 The shop runs on one of two stacks (`petshop.stack`, or `STACK`) and one of two codecs (`petshop.codec`, or
 `CODEC`):
 
-- **jetty**: Pelican on Jetty, lark streams on virtual threads (`Forks`), the registry called with
+- **jetty**: Pelican on Jetty, surefold streams on virtual threads (`Forks`), the registry called with
   `JettyHttpTransport`. No actor system is created.
-- **pekko**: Pelican on Pekko HTTP, lark streams on Pekko streams, the registry called with `PekkoHttpTransport`.
+- **pekko**: Pelican on Pekko HTTP, surefold streams on Pekko streams, the registry called with `PekkoHttpTransport`.
 - **kotlinx** or **jackson**: what reads and writes the bodies the shop serves and the registry's.
 
 This page measures all four combinations on one machine, one at a time, and says what each choice changes.
@@ -38,7 +38,7 @@ on the adoption ladder, as noise.
 - Docker Desktop 29.1.3 (8 CPUs and 8 GB for its VM), idling apart from the Postgres containers below.
 - JDK 25 for the load tests (Gradle's toolchain) and Temurin 25.0.2 for the footprint runs, default collector (G1)
   and default flags, apart from a 4 GB heap for the load test JVM (`loadtest/build.gradle.kts`).
-- Pelican 1.0.1-SNAPSHOT, lark 0.10.2-SNAPSHOT, Proofload 0.1.1-SNAPSHOT, Pekko 1.2.1, Pekko HTTP 1.3.0, Scala
+- Pelican 1.0.1-SNAPSHOT, surefold 0.10.2-SNAPSHOT, Proofload 0.1.1-SNAPSHOT, Pekko 1.2.1, Pekko HTTP 1.3.0, Scala
   2.13.17, Jetty 12.1.13, Jackson 2.22.3, kotlinx.serialization 1.11.0, PostgreSQL 17 (`postgres:17-alpine`).
 
 ## Method

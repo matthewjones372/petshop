@@ -1,14 +1,14 @@
 plugins {
     application
     `java-test-fixtures`
-    id("io.github.matthewjones372.lark.wiring")
+    id("io.github.matthewjones372.surefold.wiring")
     kotlin("plugin.serialization")
     id("io.github.matthewjones372.kimney") version "0.3.0"
 }
 
 application { mainClass.set("petshop.app.MainKt") }
 
-// lark-app warns when an incremental compile cannot see a graph's source, and warnings are errors.
+// surefold-app warns when an incremental compile cannot see a graph's source, and warnings are errors.
 tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileKotlin") { incremental = false }
 
 // LOKI_URL picks logback-loki.xml, so a run without it, and every test, never tries to reach Loki.
@@ -16,25 +16,25 @@ tasks.named<JavaExec>("run") {
     providers.environmentVariable("LOKI_URL").orNull?.let { systemProperty("logback.configurationFile", "logback-loki.xml") }
 }
 
-val larkVersion: String = providers.gradleProperty("larkVersion").get()
+val surefoldVersion: String = providers.gradleProperty("surefoldVersion").get()
 
 dependencies {
     api(project(":api"))
     implementation(project(":registry"))
-    implementation("io.github.matthewjones372:lark-app:$larkVersion")
-    implementation("io.github.matthewjones372:lark-actor:$larkVersion")
-    implementation("io.github.matthewjones372:lark-app-actor:$larkVersion")
-    implementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
-    implementation("io.github.matthewjones372:lark-app-kotlinx:$larkVersion")
-    implementation("io.github.matthewjones372:lark-app-liquibase:$larkVersion")
-    implementation("io.github.matthewjones372:lark-stream-forks:$larkVersion")
-    implementation("io.github.matthewjones372:lark-kafka:$larkVersion")
+    implementation("io.github.matthewjones372:surefold-app:$surefoldVersion")
+    implementation("io.github.matthewjones372:surefold-actor:$surefoldVersion")
+    implementation("io.github.matthewjones372:surefold-app-actor:$surefoldVersion")
+    implementation("io.github.matthewjones372:surefold-app-typesafe:$surefoldVersion")
+    implementation("io.github.matthewjones372:surefold-app-kotlinx:$surefoldVersion")
+    implementation("io.github.matthewjones372:surefold-app-liquibase:$surefoldVersion")
+    implementation("io.github.matthewjones372:surefold-stream-forks:$surefoldVersion")
+    implementation("io.github.matthewjones372:surefold-kafka:$surefoldVersion")
     // avro4k's Confluent serde needs Confluent 8.3 or later.
     implementation("com.github.avro-kotlin.avro4k:avro4k-core:2.12.0")
     implementation("com.github.avro-kotlin.avro4k:avro4k-confluent-kafka-serializer:2.12.0")
     implementation("io.confluent:kafka-avro-serializer:8.3.0")
     // Confluent 8.3 wants Kafka 8.3.0-ccs, not on Maven Central; the Apache 4.3 client stands in so there is
-    // one Kafka client on the classpath, the one lark-kafka is built against.
+    // one Kafka client on the classpath, the one surefold-kafka is built against.
     implementation("org.apache.kafka:kafka-clients") { version { strictly("4.3.0") } }
     // Past open advisories: lz4-java 1.10.2 under kafka-clients, and HttpClient 5.5 and HttpCore 5.3.4
     // under Confluent's schema-registry client.
@@ -46,7 +46,7 @@ dependencies {
         // Confluent's 32.0.1 calls sun.misc.Unsafe, which JDK 25 warns about at runtime; 33.7 uses VarHandle.
         implementation("com.google.guava:guava:33.7.2-jre")
     }
-    implementation("io.github.matthewjones372:lark-otel:$larkVersion")
+    implementation("io.github.matthewjones372:surefold-otel:$surefoldVersion")
     // One OpenTelemetry version for the API pelican brings and the SDK here: a mixed pair fails at start.
     implementation(platform("io.opentelemetry:opentelemetry-bom:1.67.0"))
     implementation("io.opentelemetry:opentelemetry-sdk")
@@ -63,8 +63,8 @@ dependencies {
     implementation("io.github.matthewjones372:pelican-client-jetty")
 
     // Each registers itself through ServiceLoader, so being on the classpath is enough.
-    implementation("io.github.matthewjones372:lark-slf4j:$larkVersion")
-    implementation("io.github.matthewjones372:lark-micrometer:$larkVersion")
+    implementation("io.github.matthewjones372:surefold-slf4j:$surefoldVersion")
+    implementation("io.github.matthewjones372:surefold-micrometer:$surefoldVersion")
 
     // On the Prometheus Java client 1.x; the simpleclient build it replaces is deprecated.
     implementation("io.micrometer:micrometer-registry-prometheus:1.16.6")
@@ -76,14 +76,14 @@ dependencies {
     testImplementation("ch.qos.logback:logback-classic:1.5.34")
 
     testFixturesApi("org.testcontainers:testcontainers-postgresql:2.0.5")
-    testFixturesImplementation("io.github.matthewjones372:lark-app:$larkVersion")
-    testFixturesImplementation("io.github.matthewjones372:lark-app-typesafe:$larkVersion")
+    testFixturesImplementation("io.github.matthewjones372:surefold-app:$surefoldVersion")
+    testFixturesImplementation("io.github.matthewjones372:surefold-app-typesafe:$surefoldVersion")
     testFixturesImplementation("org.postgresql:postgresql:42.7.13")
     testFixturesImplementation(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
 
-    testImplementation("io.github.matthewjones372:lark-stream-test:$larkVersion")
+    testImplementation("io.github.matthewjones372:surefold-stream-test:$surefoldVersion")
 
-    testImplementation("io.github.matthewjones372:lark-test:$larkVersion")
+    testImplementation("io.github.matthewjones372:surefold-test:$surefoldVersion")
 
     testImplementation("org.testcontainers:testcontainers-kafka:2.0.5")
 

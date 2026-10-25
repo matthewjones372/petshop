@@ -1,9 +1,5 @@
 package petshop.api
 
-import io.github.matthewjones372.lark.fail.fold
-import io.github.matthewjones372.lark.stream.Stream
-import io.github.matthewjones372.lark.stream.StreamBackend
-import io.github.matthewjones372.lark.stream.toSequence
 import io.github.matthewjones372.pelican.Codecs
 import io.github.matthewjones372.pelican.api
 import io.github.matthewjones372.pelican.before
@@ -13,6 +9,10 @@ import io.github.matthewjones372.pelican.jetty.handledOrFail
 import io.github.matthewjones372.pelican.jetty.streamedNow
 import io.github.matthewjones372.pelican.metrics.otel.openTelemetry
 import io.github.matthewjones372.pelican.ok
+import io.github.matthewjones372.surefold.fail.fold
+import io.github.matthewjones372.surefold.stream.Stream
+import io.github.matthewjones372.surefold.stream.StreamBackend
+import io.github.matthewjones372.surefold.stream.toSequence
 import io.opentelemetry.api.OpenTelemetry
 import petshop.domain.Adopting
 import petshop.domain.NoSuchPet

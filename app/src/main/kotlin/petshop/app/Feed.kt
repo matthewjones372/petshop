@@ -1,13 +1,13 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Carriers
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.closingOf
-import io.github.matthewjones372.lark.counter
-import io.github.matthewjones372.lark.fail.onLeft
-import io.github.matthewjones372.lark.increment
-import io.github.matthewjones372.lark.stream.Hub
-import io.github.matthewjones372.lark.stream.Stream
+import io.github.matthewjones372.surefold.Carriers
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.closingOf
+import io.github.matthewjones372.surefold.counter
+import io.github.matthewjones372.surefold.fail.onLeft
+import io.github.matthewjones372.surefold.increment
+import io.github.matthewjones372.surefold.stream.Hub
+import io.github.matthewjones372.surefold.stream.Stream
 import petshop.api.ShopEventDto
 import petshop.api.toDto
 import petshop.domain.ShopEvent

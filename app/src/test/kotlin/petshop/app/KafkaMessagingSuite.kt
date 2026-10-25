@@ -1,16 +1,16 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
-import io.github.matthewjones372.lark.app.subgraph
-import io.github.matthewjones372.lark.app.testApp
-import io.github.matthewjones372.lark.junit.SharedSuite
-import io.github.matthewjones372.lark.junit.expect
-import io.github.matthewjones372.lark.junit.shouldBe
-import io.github.matthewjones372.lark.junit.shouldNotBeNull
-import io.github.matthewjones372.lark.junit.story
-import io.github.matthewjones372.lark.kafka.Topic
-import io.github.matthewjones372.lark.stream.Forks
-import io.github.matthewjones372.lark.stream.start
+import io.github.matthewjones372.surefold.Resource
+import io.github.matthewjones372.surefold.app.subgraph
+import io.github.matthewjones372.surefold.app.testApp
+import io.github.matthewjones372.surefold.junit.SharedSuite
+import io.github.matthewjones372.surefold.junit.expect
+import io.github.matthewjones372.surefold.junit.shouldBe
+import io.github.matthewjones372.surefold.junit.shouldNotBeNull
+import io.github.matthewjones372.surefold.junit.story
+import io.github.matthewjones372.surefold.kafka.Topic
+import io.github.matthewjones372.surefold.stream.Forks
+import io.github.matthewjones372.surefold.stream.start
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.SpanKind
 import java.util.concurrent.ConcurrentLinkedQueue
