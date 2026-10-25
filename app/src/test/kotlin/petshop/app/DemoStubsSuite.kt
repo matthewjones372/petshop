@@ -1,7 +1,7 @@
 package petshop.app
 
 import io.github.matthewjones372.lark.junit.Suite
-import io.github.matthewjones372.lark.junit.shouldBe
+import io.github.matthewjones372.lark.junit.holds
 import io.github.matthewjones372.lark.junit.story
 import io.github.matthewjones372.pelican.In2
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
@@ -37,8 +37,7 @@ object DemoStubsSuite : Suite() {
                         }
                     }
                 }
-                // writeTo is the check: it throws an AssertionError when the file on disk differs.
-                Then("the demo's mapping file says the same") { stubs.writeTo(demoMappings) shouldBe Unit }
+                Then("the demo's mapping file says the same") { holds { stubs.writeTo(demoMappings) } }
             }
         }
     }

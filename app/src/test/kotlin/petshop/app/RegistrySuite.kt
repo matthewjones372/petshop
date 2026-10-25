@@ -9,6 +9,7 @@ import io.github.matthewjones372.lark.app.testApp
 import io.github.matthewjones372.lark.app.testNode
 import io.github.matthewjones372.lark.junit.Suite
 import io.github.matthewjones372.lark.junit.forAll
+import io.github.matthewjones372.lark.junit.holds
 import io.github.matthewjones372.lark.junit.shouldBe
 import io.github.matthewjones372.lark.junit.shouldBeGreaterThanOrEqual
 import io.github.matthewjones372.lark.junit.shouldBeLeft
@@ -60,10 +61,10 @@ object RegistrySuite : Suite() {
                         testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") }
                     }
                     val hers = Then("Nibbles is hers") { adopted.shouldBeRight { it.standing shouldBe Adopted("Ada") } }
-                    And("the keeper was recorded against the chip the lookup answered with") {
-                        registry.verify(recordKeeper, In2(chip.number, NewKeeper("Ada")))
+                    val recorded = And("the keeper was recorded against the chip the lookup answered with") {
+                        holds { registry.verify(recordKeeper, In2(chip.number, NewKeeper("Ada"))) }
                     }
-                    hers
+                    hers and recorded
                 }
             }
         }
