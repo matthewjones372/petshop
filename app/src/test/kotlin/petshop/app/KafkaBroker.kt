@@ -1,5 +1,7 @@
 package petshop.app
 
+import io.github.matthewjones372.lark.Resource
+import io.github.matthewjones372.lark.resource
 import org.apache.kafka.clients.admin.Admin
 import org.apache.kafka.clients.admin.AdminClientConfig
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -10,8 +12,6 @@ import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.Deserializer
 import org.apache.kafka.common.serialization.StringSerializer
-import org.junit.jupiter.api.extension.BeforeAllCallback
-import org.junit.jupiter.api.extension.ExtensionContext
 import org.testcontainers.kafka.KafkaContainer
 import org.testcontainers.utility.DockerImageName
 import java.time.Duration
@@ -29,13 +29,10 @@ private object TestKafka {
     }
 }
 
-class KafkaBroker : BeforeAllCallback {
+/** The run's one broker, started by the first suite that acquires it; Testcontainers stops it when the JVM ends. */
+fun kafkaBroker(): Resource<KafkaBroker> = resource { KafkaBroker(TestKafka.container.bootstrapServers) }
 
-    val bootstrap: String get() = TestKafka.container.bootstrapServers
-
-    override fun beforeAll(context: ExtensionContext) {
-        TestKafka.container
-    }
+class KafkaBroker internal constructor(val bootstrap: String) {
 
     fun send(topic: String, vararg values: String) {
         KafkaProducer(mapOf<String, Any>("bootstrap.servers" to bootstrap), StringSerializer(), StringSerializer())
