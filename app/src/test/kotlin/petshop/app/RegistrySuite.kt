@@ -60,11 +60,10 @@ object RegistrySuite : Suite() {
                     val adopted = When("Ada adopts Nibbles") {
                         testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") }
                     }
-                    val hers = Then("Nibbles is hers") { adopted.shouldBeRight { it.standing shouldBe Adopted("Ada") } }
-                    val recorded = And("the keeper was recorded against the chip the lookup answered with") {
+                    Then("Nibbles is hers") { adopted.shouldBeRight { it.standing shouldBe Adopted("Ada") } }
+                    And("the keeper was recorded against the chip the lookup answered with") {
                         holds { registry.verify(recordKeeper, In2(chip.number, NewKeeper("Ada"))) }
                     }
-                    hers and recorded
                 }
             }
         }
@@ -78,9 +77,9 @@ object RegistrySuite : Suite() {
                     val (answer, after) = When("Ada adopts Nibbles") {
                         testApp(shop) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1)) }
                     }
-                    Then("she is told Nibbles has no chip") { answer shouldBeLeft NotChipped(1) } and
-                        And("Nibbles stays in the shop") { after?.standing shouldBe OnShelf } and
-                        And("with no chip to transfer, nothing was sent") { registry.calls(recordKeeper) shouldBe 0 }
+                    Then("she is told Nibbles has no chip") { answer shouldBeLeft NotChipped(1) }
+                    And("Nibbles stays in the shop") { after?.standing shouldBe OnShelf }
+                    And("with no chip to transfer, nothing was sent") { registry.calls(recordKeeper) shouldBe 0 }
                 }
             }
         }
@@ -96,10 +95,10 @@ object RegistrySuite : Suite() {
                             measureTimedValue { shop.adopt(PetId(1), by = "Ada") }
                         }
                     }
-                    Then("she is told the registry is down") { answer shouldBeLeft RegistryDown(1) } and
-                        And(
-                            "she was not kept waiting: the shop's timeout decides that, not the registry",
-                        ) { took shouldBeLessThan 2.seconds }
+                    Then("she is told the registry is down") { answer shouldBeLeft RegistryDown(1) }
+                    And(
+                        "she was not kept waiting: the shop's timeout decides that, not the registry",
+                    ) { took shouldBeLessThan 2.seconds }
                 }
             }
         }
@@ -123,10 +122,10 @@ object RegistrySuite : Suite() {
                             shop.adopt(PetId(1), by = "Ada") to shop.adopt(PetId(1), by = "Bea")
                         }
                     }
-                    Then("Ada is told the registry is down") { refused shouldBeLeft RegistryDown(1) } and
-                        And(
-                            "her adoption was undone, so Nibbles was still there for Bea",
-                        ) { retried.shouldBeRight { it.standing shouldBe Adopted("Bea") } }
+                    Then("Ada is told the registry is down") { refused shouldBeLeft RegistryDown(1) }
+                    And(
+                        "her adoption was undone, so Nibbles was still there for Bea",
+                    ) { retried.shouldBeRight { it.standing shouldBe Adopted("Bea") } }
                 }
             }
         }
@@ -156,7 +155,8 @@ object RegistrySuite : Suite() {
                     }
                     Then("every time she is told the registry is down") {
                         answers.forAll { it shouldBeLeft RegistryDown(1) }
-                    } and And(
+                    }
+                    And(
                         "the registry was asked five times: after five failures in a row the breaker answers for it",
                     ) {
                         registry.calls(lookupChip) shouldBe 5
@@ -180,13 +180,14 @@ object RegistrySuite : Suite() {
                             parMap(adopters) { who -> shop.adopt(PetId(1), by = "adopter $who") }
                         }
                     }
-                    Then("one of them gets her") { outcomes.count { it.isRight() } shouldBe 1 } and
-                        And(
-                            "the registry heard from that one only: " +
-                                "the actor settles the race before anybody calls out",
-                        ) {
-                            (registry.calls(lookupChip) shouldBe 1) and (registry.calls(recordKeeper) shouldBe 1)
-                        }
+                    Then("one of them gets her") { outcomes.count { it.isRight() } shouldBe 1 }
+                    And(
+                        "the registry heard from that one only: " +
+                            "the actor settles the race before anybody calls out",
+                    ) {
+                        registry.calls(lookupChip) shouldBe 1
+                        registry.calls(recordKeeper) shouldBe 1
+                    }
                 }
             }
         }
@@ -212,7 +213,8 @@ object RegistrySuite : Suite() {
                     }
                     Then("every one is answered, none refused") {
                         answers.forAll { it shouldBeRight Chip(chip.number, chip.keeper) }
-                    } and And("they went two at a time, so it took two rounds of the registry's 500 ms") {
+                    }
+                    And("they went two at a time, so it took two rounds of the registry's 500 ms") {
                         took shouldBeGreaterThanOrEqual 1.seconds
                     }
                 }

@@ -48,18 +48,15 @@ object FeedSuite : Suite() {
                     val seen = When("someone is watching") {
                         app.feed.watch().map { it.seq }.take(2).runCollect().run(app.streams)
                     }
-                    val watching = Then("the feed has them as a watcher").eventually(5.seconds) {
-                        app.feed.watchers shouldBeOrRetry 1
-                    }
+                    Then("the feed has them as a watcher").eventually(5.seconds) { app.feed.watchers shouldBe 1 }
                     When("the bus delivers the adoption twice, then the arrival") {
                         app.bus.publish(barnaby)
                         app.bus.publish(barnaby)
                         app.bus.publish(pickle)
                     }
-                    watching and
-                        Then("the watcher sees the adoption and the arrival, in order, and the repeat not at all") {
-                            seen.toCompletableFuture().get(5, TimeUnit.SECONDS) shouldBe Exit.Done(listOf(7L, 8L))
-                        }
+                    Then("the watcher sees the adoption and the arrival, in order, and the repeat not at all") {
+                        seen.toCompletableFuture().get(5, TimeUnit.SECONDS) shouldBe Exit.Done(listOf(7L, 8L))
+                    }
                 }
             }
         }
@@ -72,11 +69,9 @@ object FeedSuite : Suite() {
                     val seen = When("someone is watching") {
                         app.feed.watch().map { traceOf(it.traceparent) ?: "none" }.take(1).runCollect().run(app.streams)
                     }
-                    val watching = Then("the feed has them as a watcher").eventually(5.seconds) {
-                        app.feed.watchers shouldBeOrRetry 1
-                    }
+                    Then("the feed has them as a watcher").eventually(5.seconds) { app.feed.watchers shouldBe 1 }
                     When("the arrival is published inside a trace") { inATrace { app.bus.publish(pickle) } }
-                    watching and Then("the watcher is given that trace, so a page can continue it") {
+                    Then("the watcher is given that trace, so a page can continue it") {
                         seen.toCompletableFuture().get(5, TimeUnit.SECONDS) shouldBe Exit.Done(listOf(A_TRACE))
                     }
                 }
@@ -90,19 +85,18 @@ object FeedSuite : Suite() {
                         val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise, standing = Adopted("Ada"))
                         app.bus.publish(PetAdopted(seq = 3, pet = nibbles, by = "Ada"))
                     }
-                    val counted = Then("the projection has counted it").eventually(5.seconds) {
-                        app.projection.tally().events shouldBeOrRetry 1
+                    Then("the projection has counted it").eventually(5.seconds) {
+                        app.projection.tally().events shouldBe 1
                     }
-                    val (seen, watching) = When("someone starts watching, and then a parrot arrives") {
+                    val seen = When("someone starts watching, and then a parrot arrives") {
                         val first = app.feed.watch().map { it.seq }.take(1).runCollect().run(app.streams)
-                        val watching = eventually(5.seconds) { app.feed.watchers shouldBeOrRetry 1 }
+                        eventually(5.seconds) { app.feed.watchers shouldBe 1 }
                         app.bus.publish(PetArrived(seq = 4, pet = Pet(PetId(9), "Pickle", Species.Parrot)))
-                        first to watching
+                        first
                     }
-                    counted and watching and
-                        Then("the first thing they see is the arrival, not the earlier adoption") {
-                            seen.toCompletableFuture().get(5, TimeUnit.SECONDS) shouldBe Exit.Done(listOf(4L))
-                        }
+                    Then("the first thing they see is the arrival, not the earlier adoption") {
+                        seen.toCompletableFuture().get(5, TimeUnit.SECONDS) shouldBe Exit.Done(listOf(4L))
+                    }
                 }
             }
         }

@@ -88,19 +88,20 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                         val body = ByteBuffer.wrap(record.value())
                         And(
                             "its key is the event's seq, as a number, so a partition keeps one event's copies in order",
-                        ) { record.key() shouldBe 3L } and
-                            And(
-                                "it is Confluent's wire format: a zero magic byte, " +
-                                    "then the id the registry gave the schema",
-                            ) {
-                                val magic = body.get()
-                                val schema = MockSchemaRegistry.getClientForScope("wire").getSchemaById(body.int)
-                                (magic shouldBe 0.toByte()) and (schema shouldBe AvroSchema(shopEventSchema))
-                            } and
-                            And("it reads back as the event it was") {
-                                val deserializer = ShopEventDeserializer(registry("wire"))
-                                deserializer.deserialize("wire", record.value()) shouldBe nibbles
-                            }
+                        ) { record.key() shouldBe 3L }
+                        And(
+                            "it is Confluent's wire format: a zero magic byte, " +
+                                "then the id the registry gave the schema",
+                        ) {
+                            val magic = body.get()
+                            val schema = MockSchemaRegistry.getClientForScope("wire").getSchemaById(body.int)
+                            magic shouldBe 0.toByte()
+                            schema shouldBe AvroSchema(shopEventSchema)
+                        }
+                        And("it reads back as the event it was") {
+                            val deserializer = ShopEventDeserializer(registry("wire"))
+                            deserializer.deserialize("wire", record.value()) shouldBe nibbles
+                        }
                     }
                 }
             }
@@ -117,7 +118,7 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                 val dead = ConcurrentLinkedQueue<DecodeError>()
                 val seen = ConcurrentLinkedQueue<Any>()
 
-                val reached = using(kafka.busOn("mixed", deadLetters = dead::add)) { bus ->
+                using(kafka.busOn("mixed", deadLetters = dead::add)) { bus ->
                     When("the bus publishes Waffle, and a consumer reads the topic") {
                         bus.publish(waffle)
                         bus.consume { event -> seen.add(event) }.start(Forks())
@@ -127,11 +128,13 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                         }
                     }
                 }
-                reached and And("the unreadable record went to dead letters, from offset 0") {
+                And("the unreadable record went to dead letters, from offset 0") {
                     dead.singleOrNull().shouldNotBeNull { letter ->
-                        (letter.offset shouldBe 0L) and letter.cause.shouldBeInstanceOf<Exception>()
+                        letter.offset shouldBe 0L
+                        letter.cause.shouldBeInstanceOf<Exception>()
                     }
-                } and And("the unreadable record and the event after it are both committed past") {
+                }
+                And("the unreadable record and the event after it are both committed past") {
                     waitUntil(30.seconds, { it == 2L }) { kafka.committed("projection-mixed", "mixed") } shouldBe 2L
                 }
             }
@@ -143,7 +146,7 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                 val waffle = PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog))
                 val seen = ConcurrentLinkedQueue<Any>()
 
-                val reached = using(kafka.busOn("lettered")) { bus ->
+                using(kafka.busOn("lettered")) { bus ->
                     When("the bus publishes Waffle behind it, and a consumer reads the topic") {
                         bus.publish(waffle)
                         bus.consume { event -> seen.add(event) }.start(Forks())
@@ -156,18 +159,22 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                 val letters = waitUntil(30.seconds, { it.size == 1 }) {
                     kafka.records("lettered.dead-letters", StringDeserializer(), ByteArrayDeserializer())
                 }
-                reached and And("one letter is on the dead-letter topic") {
+                And("one letter is on the dead-letter topic") {
                     letters.singleOrNull().shouldNotBeNull { letter ->
                         And("it is the record as it was read") {
-                            (letter.key() shouldBe "junk") and (String(letter.value()) shouldBe "not avro")
-                        } and And("where it came from rides along in its headers") {
+                            letter.key() shouldBe "junk"
+                            String(letter.value()) shouldBe "not avro"
+                        }
+                        And("where it came from rides along in its headers") {
                             val header = { name: String ->
                                 String(letter.headers().lastHeader("$DEAD_LETTER_HEADER.$name").value())
                             }
-                            (header("offset") shouldBe "0") and (header("topic") shouldBe "lettered")
+                            header("offset") shouldBe "0"
+                            header("topic") shouldBe "lettered"
                         }
                     }
-                } and And("both records are committed past") {
+                }
+                And("both records are committed past") {
                     waitUntil(
                         30.seconds,
                         { it == 2L },

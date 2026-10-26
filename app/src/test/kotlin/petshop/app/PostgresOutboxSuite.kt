@@ -5,7 +5,6 @@ import io.github.matthewjones372.surefold.app.liquibase.Migrated
 import io.github.matthewjones372.surefold.app.single
 import io.github.matthewjones372.surefold.app.subgraph
 import io.github.matthewjones372.surefold.app.testApp
-import io.github.matthewjones372.surefold.junit.Expectations
 import io.github.matthewjones372.surefold.junit.Suite
 import io.github.matthewjones372.surefold.junit.shouldBe
 import io.github.matthewjones372.surefold.junit.shouldBeEmpty
@@ -30,7 +29,7 @@ import javax.sql.DataSource
 private val nibbles = Pet(PetId(1), "Nibbles", Species.Tortoise)
 private val barnaby = Pet(PetId(2), "Barnaby", Species.Dog)
 
-private fun onItsOwn(test: (Outbox) -> Expectations): Expectations =
+private fun onItsOwn(test: (Outbox) -> Unit) =
     testApp(Petshop.module.onAFreshDatabase().subgraph<Outbox>()) { outbox: Outbox -> test(outbox) }
 
 /** Read by a claim that publishes nothing, so it takes nothing. */
@@ -59,7 +58,8 @@ object PostgresOutboxSuite : Suite() {
                     }
                     Then("Postgres numbered them 1, 2 and 3: the seq is the table's, so it counts on across restarts") {
                         recorded.map { it.seq } shouldBe listOf(1L, 2L, 3L)
-                    } and And("a claim reads them back oldest first") { outbox.left() shouldBe recorded }
+                    }
+                    And("a claim reads them back oldest first") { outbox.left() shouldBe recorded }
                 }
             }
         }
@@ -89,10 +89,10 @@ object PostgresOutboxSuite : Suite() {
                     val taken = When("a claim's bus takes the adoption and refuses the arrival") {
                         outbox.claim(10) { claimed -> claimed.map { it.event }.filter { it.seq == adopted.seq } }
                     }
-                    Then("the claim answers what was taken") { taken shouldBe listOf(adopted) } and
-                        And(
-                            "only the refused arrival is left for the next claim",
-                        ) { outbox.left() shouldBe listOf(arrived) }
+                    Then("the claim answers what was taken") { taken shouldBe listOf(adopted) }
+                    And(
+                        "only the refused arrival is left for the next claim",
+                    ) { outbox.left() shouldBe listOf(arrived) }
                 }
             }
         }
@@ -128,7 +128,8 @@ object PostgresOutboxSuite : Suite() {
                                 10,
                             ) { error("the process fell over after publishing") }
                         })
-                    } and Then("the claim rolled back, so the event goes again: at least once, not at most") {
+                    }
+                    Then("the claim rolled back, so the event goes again: at least once, not at most") {
                         outbox.left() shouldBe listOf(arrived)
                     }
                 }
@@ -154,7 +155,7 @@ object PostgresOutboxSuite : Suite() {
                             }
                         }
                     }
-                    val held = holding.await(10, TimeUnit.SECONDS) shouldBe true
+                    holding.await(10, TimeUnit.SECONDS) shouldBe true
                     val seenBeside = mutableListOf<ShopEvent>()
                     // On a thread of its own with a deadline, so a claim that waited on the first one's locks fails
                     // the test rather than hanging it.
@@ -166,11 +167,14 @@ object PostgresOutboxSuite : Suite() {
                             }
                         }.get(5, TimeUnit.SECONDS)
                     }
-                    held and Then("the second saw only Barnaby's, and nothing waited: FOR UPDATE SKIP LOCKED") {
-                        (seenBeside shouldBe second) and beside.shouldBeEmpty()
-                    } and And("once the first lets go, it took Nibbles' and left Barnaby's") {
+                    Then("the second saw only Barnaby's, and nothing waited: FOR UPDATE SKIP LOCKED") {
+                        seenBeside shouldBe second
+                        beside.shouldBeEmpty()
+                    }
+                    And("once the first lets go, it took Nibbles' and left Barnaby's") {
                         letGo.countDown()
-                        (slow.get(5, TimeUnit.SECONDS) shouldBe first) and (outbox.left() shouldBe second)
+                        slow.get(5, TimeUnit.SECONDS) shouldBe first
+                        outbox.left() shouldBe second
                     }
                 }
             }
@@ -180,13 +184,13 @@ object PostgresOutboxSuite : Suite() {
             story {
                 onItsOwn { outbox ->
                     val first = When("the shelf is read for the first time") { outbox.shelf(listOf(nibbles, barnaby)) }
-                    val opening = Then("it is the opening catalogue") { first shouldBe listOf(nibbles, barnaby) }
+                    Then("it is the opening catalogue") { first shouldBe listOf(nibbles, barnaby) }
                     When("Nibbles' adoption is recorded") {
                         outbox.record(
                             nibbles.copy(standing = Adopted("Ada")),
                         ) { seq -> PetAdopted(seq, nibbles.copy(standing = Adopted("Ada")), by = "Ada") }
                     }
-                    opening and Then("the shelf has her adopted, and the opening catalogue does not put her back") {
+                    Then("the shelf has her adopted, and the opening catalogue does not put her back") {
                         outbox.shelf(
                             listOf(nibbles, barnaby),
                         ) shouldBe listOf(nibbles.copy(standing = Adopted("Ada")), barnaby)
@@ -209,7 +213,8 @@ object PostgresOutboxSuite : Suite() {
                                 OutboxRow(0, "sold", 1, "Nibbles", "Tortoise", adopted = true, adoptedBy = "Ada"),
                             )
                         })
-                    } and Then("she is still on the shelf, because the pet's row rolled back with the event") {
+                    }
+                    Then("she is still on the shelf, because the pet's row rolled back with the event") {
                         table.pets().single().standing shouldBe "on_shelf"
                     }
                 }

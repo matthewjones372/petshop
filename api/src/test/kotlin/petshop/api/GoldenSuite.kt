@@ -49,8 +49,8 @@ object GoldenSuite : Suite() {
         test("a pet, and a refusal, look on the wire the way they did") {
             val client = api.inMemory(Handlers.onVirtualThreads)
 
-            holds { golden.exchange("get-pet", client, getPet, 1L) } and
-                holds { golden.exchange("adopt-missing-pet", client, adoptPet, 404L) }
+            holds { golden.exchange("get-pet", client, getPet, 1L) }
+            holds { golden.exchange("adopt-missing-pet", client, adoptPet, 404L) }
         }
     }
 }

@@ -106,21 +106,22 @@ object RelaySuite : Suite() {
                 val relay = And("a relay publishing to a bus") { relaying(clock, outbox, bus) }
 
                 When("the clock moves to just before the first tick") { clock.adjust(every - 1.milliseconds) }
-                val early = Then("nothing has left: the first tick is one interval in") { bus.took.shouldBeEmpty() }
+                Then("nothing has left: the first tick is one interval in") { bus.took.shouldBeEmpty() }
 
                 When("it reaches the first tick") { clock.adjust(1.milliseconds) }
-                val first = Then("both events went, in order, and left the outbox") {
-                    (bus.took shouldBe listOf(1L, 2L)) and outbox.left.shouldBeEmpty()
+                Then("both events went, in order, and left the outbox") {
+                    bus.took shouldBe listOf(1L, 2L)
+                    outbox.left.shouldBeEmpty()
                 }
 
                 When("Barnaby arrives, and the clock moves one tick") {
                     outbox.record(barnabyArrived)
                     clock.adjust(every)
                 }
-                early and first and Then("his arrival went on that tick") { bus.took shouldBe listOf(1L, 2L, 3L) } and
-                    And(
-                        "stopped, the relay answers with how many it published",
-                    ) { relay.stopped shouldBe Exit.Done(3L) }
+                Then("his arrival went on that tick") { bus.took shouldBe listOf(1L, 2L, 3L) }
+                And(
+                    "stopped, the relay answers with how many it published",
+                ) { relay.stopped shouldBe Exit.Done(3L) }
             }
         }
 
@@ -149,15 +150,18 @@ object RelaySuite : Suite() {
                 val relay = relaying(clock, outbox, bus)
 
                 When("three ticks pass") { clock.adjust(every * 3) }
-                val refused = Then("there were three refusals, and the event is where it was") {
-                    (bus.refused shouldBe listOf(1L, 1L, 1L)) and bus.took.shouldBeEmpty() and
-                        (outbox.left shouldBe listOf(arrived))
+                Then("there were three refusals, and the event is where it was") {
+                    bus.refused shouldBe listOf(1L, 1L, 1L)
+                    bus.took.shouldBeEmpty()
+                    outbox.left shouldBe listOf(arrived)
                 }
 
                 When("a fourth tick passes") { clock.adjust(every) }
-                refused and Then("the bus took it, and the outbox is empty") {
-                    (bus.took shouldBe listOf(1L)) and outbox.left.shouldBeEmpty()
-                } and And("the relay published one") { relay.stopped shouldBe Exit.Done(1L) }
+                Then("the bus took it, and the outbox is empty") {
+                    bus.took shouldBe listOf(1L)
+                    outbox.left.shouldBeEmpty()
+                }
+                And("the relay published one") { relay.stopped shouldBe Exit.Done(1L) }
             }
         }
 
@@ -172,16 +176,17 @@ object RelaySuite : Suite() {
                 val relay = relaying(clock, outbox, bus)
 
                 When("one tick passes") { clock.adjust(every) }
-                val first = Then(
+                Then(
                     "the adoption went, and the refused arrival stayed: " +
                         "at least once, in order unless the bus turns one away",
                 ) {
-                    (bus.took shouldBe listOf(2L)) and (outbox.left shouldBe listOf(arrived))
+                    bus.took shouldBe listOf(2L)
+                    outbox.left shouldBe listOf(arrived)
                 }
 
                 When("another tick passes") { clock.adjust(every) }
-                first and Then("the arrival went on it") { bus.took shouldBe listOf(2L, 1L) } and
-                    And("the relay published two") { relay.stopped shouldBe Exit.Done(2L) }
+                Then("the arrival went on it") { bus.took shouldBe listOf(2L, 1L) }
+                And("the relay published two") { relay.stopped shouldBe Exit.Done(2L) }
             }
         }
 
@@ -199,21 +204,24 @@ object RelaySuite : Suite() {
                 val relay = relaying(clock, outbox, bus)
 
                 When("one tick passes") { clock.adjust(every) }
-                val threw = Then("the first claim threw, and nothing went") {
-                    (asks.get() shouldBe 1) and bus.took.shouldBeEmpty()
+                Then("the first claim threw, and nothing went") {
+                    asks.get() shouldBe 1
+                    bus.took.shouldBeEmpty()
                 }
 
                 When("another interval passes") { clock.adjust(every) }
-                val still = Then(
+                Then(
                     "still nothing: restarted at two intervals in, its first tick is one interval after that",
                 ) {
                     bus.took.shouldBeEmpty()
                 }
 
                 When("a third interval passes") { clock.adjust(every) }
-                threw and still and Then("the arrival went, and nothing recorded was lost") {
-                    (bus.took shouldBe listOf(1L)) and outbox.left.shouldBeEmpty()
-                } and And("the relay published one") { relay.stopped shouldBe Exit.Done(1L) }
+                Then("the arrival went, and nothing recorded was lost") {
+                    bus.took shouldBe listOf(1L)
+                    outbox.left.shouldBeEmpty()
+                }
+                And("the relay published one") { relay.stopped shouldBe Exit.Done(1L) }
             }
         }
 
@@ -227,8 +235,11 @@ object RelaySuite : Suite() {
                 ) { relaying(clock, Recorded { asks.incrementAndGet() }, bus) }
 
                 When("an hour passes on the test's clock") { clock.adjust(every * 72_000) }
-                Then("it claimed once a tick") { asks.get() shouldBe 72_000 } and
-                    And("published nothing") { bus.took.shouldBeEmpty() and (relay.stopped shouldBe Exit.Done(0L)) }
+                Then("it claimed once a tick") { asks.get() shouldBe 72_000 }
+                And("published nothing") {
+                    bus.took.shouldBeEmpty()
+                    relay.stopped shouldBe Exit.Done(0L)
+                }
             }
         }
     }

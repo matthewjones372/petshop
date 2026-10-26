@@ -134,8 +134,8 @@ object MessagingSpansSuite : Suite() {
                             "the projection's process span is a consumer's, with the bus's attributes",
                         ).eventually(30.seconds) {
                             val process = ended.named("process").single()
-                            (process.kind shouldBeOrRetry SpanKind.CONSUMER) and
-                                (process.attributes.asMap() shouldBeOrRetry Placed.where.asMap())
+                            process.kind shouldBe SpanKind.CONSUMER
+                            process.attributes.asMap() shouldBe Placed.where.asMap()
                         }
                     }
                 }
@@ -152,7 +152,7 @@ object MessagingSpansSuite : Suite() {
                     bus.consumeFrom { event, where -> read.add(event to where) }.start(Forks())
                 }.use { _ ->
                     Then("it reads the arrival, with no attributes").eventually(30.seconds) {
-                        read.toList() shouldBeOrRetry listOf(waffle to Attributes.empty())
+                        read.toList() shouldBe listOf(waffle to Attributes.empty())
                     }
                 }
             }

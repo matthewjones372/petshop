@@ -40,13 +40,13 @@ object CatalogueCodecSuite : Suite() {
             val other = Catalogue(barnaby)
             val codec = ShopCodecs.codec<List<PetDto>>(typeOf<List<PetDto>>())
 
-            (codec.encodeToString(one) shouldBe nibblesJson) and
-                (codec.encodeToString(other) shouldBe barnabyJson) and
-                (codec.encodeToString(one.toList()) shouldBe nibblesJson) and
-                (codec.decodeFromString(nibblesJson) shouldBe nibbles) and
-                (codec.decodeFrom(barnabyJson.toByteArray()) shouldBe barnaby) and
-                (served { one }.response(listPets, Unit).body shouldBe nibblesJson) and
-                (served { other }.response(listPets, Unit).body shouldBe barnabyJson)
+            codec.encodeToString(one) shouldBe nibblesJson
+            codec.encodeToString(other) shouldBe barnabyJson
+            codec.encodeToString(one.toList()) shouldBe nibblesJson
+            codec.decodeFromString(nibblesJson) shouldBe nibbles
+            codec.decodeFrom(barnabyJson.toByteArray()) shouldBe barnaby
+            served { one }.response(listPets, Unit).body shouldBe nibblesJson
+            served { other }.response(listPets, Unit).body shouldBe barnabyJson
         }
 
         test("each catalogue reuses its own bytes") {
@@ -57,13 +57,10 @@ object CatalogueCodecSuite : Suite() {
             val typedCodec = ShopCodecs.codec<List<PetDto>>(pets, "application/json")
             val bytes = requireNotNull(codec.encoded(one))
 
-            (typedCodec.encoded(one) shouldBeSameInstanceAs bytes) and
-                (
-                    bytes.decodeToString() shouldBe
-                        """[{"id":1,"name":"Nibbles","species":"Tortoise","adopted":false}]"""
-                    ) and
-                (codec.encoded(one.toList()) shouldBe null) and
-                ((requireNotNull(codec.encoded(other)) === bytes) shouldBe false)
+            typedCodec.encoded(one) shouldBeSameInstanceAs bytes
+            bytes.decodeToString() shouldBe """[{"id":1,"name":"Nibbles","species":"Tortoise","adopted":false}]"""
+            codec.encoded(one.toList()) shouldBe null
+            (requireNotNull(codec.encoded(other)) === bytes) shouldBe false
         }
 
         test("a catalogue stays consistent when the list it was built from changes") {
@@ -74,8 +71,8 @@ object CatalogueCodecSuite : Suite() {
 
             source.clear()
 
-            (catalogue shouldBe listOf(nibbles.single(), barnaby.single())) and
-                (codec.decodeFrom(bytes) shouldBe catalogue)
+            catalogue shouldBe listOf(nibbles.single(), barnaby.single())
+            codec.decodeFrom(bytes) shouldBe catalogue
         }
     }
 

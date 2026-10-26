@@ -78,55 +78,60 @@ object EndToEndSuite : SharedSuite<KafkaBroker>() {
                         apiClient(server.baseUrl, ShopCodecs).use { shop ->
                             // The probe's path is Pelican's whatever checks are declared, so an empty `health { }`
                             // names it.
-                            val started = Given("the whole service, started as main starts it") {
+                            Given("the whole service, started as main starts it") {
                                 shop.call(health { }.ready, Unit).status shouldBe "pass"
                             }
 
                             val nibbles = When("Ada adopts Nibbles") { shop.outcome(adoptPet, 1L) }
-                            val hers = Then("Nibbles is hers") { nibbles.shouldBeOk().adopted shouldBe true }
+                            Then("Nibbles is hers") { nibbles.shouldBeOk().adopted shouldBe true }
 
                             val again = When("somebody else asks for Nibbles too") { shop.outcome(adoptPet, 1L) }
-                            val taken = Then("they are told she is taken") {
+                            Then("they are told she is taken") {
                                 again.shouldBeError() shouldBe AlreadyAdopted(1).toDto()
                             }
 
                             val nobody = When(
                                 "somebody asks for a pet the shop never had",
                             ) { shop.outcome(adoptPet, 999L) }
-                            val none = Then(
+                            Then(
                                 "there is no such pet",
                             ) { nobody.shouldBeError() shouldBe NoSuchPet(999).toDto() }
 
                             val peel = When("somebody asks for Mrs Peel") { shop.outcome(adoptPet, 3L) }
-                            val unchipped = Then("she has no chip on record") {
+                            Then("she has no chip on record") {
                                 peel.shouldBeError() shouldBe NotChipped(3).toDto()
-                            } and And("she is still in the shop") {
+                            }
+                            And("she is still in the shop") {
                                 shop.outcome(getPet, 3L).shouldBeOk().adopted shouldBe false
                             }
 
-                            val recorded = Then(
+                            Then(
                                 "the registry recorded one new keeper, for the one adoption that happened",
                             ) {
                                 registry.calls(recordKeeper) shouldBe 1
-                            } and And("the outbox drains") {
+                            }
+                            And("the outbox drains") {
                                 waitUntil(5.seconds, { it == 0L }) { database.unsent() } shouldBe 0L
-                            } and And("/stats counts every event the table recorded") {
+                            }
+                            And("/stats counts every event the table recorded") {
                                 val (events, table) = waitUntil(5.seconds, { (events, table) -> events == table }) {
                                     shop.call(stats, Unit).events.toLong() to database.recorded()
                                 }
                                 events shouldBe table
-                            } and And("the tortoise's adoption among them, counted once") {
+                            }
+                            And("the tortoise's adoption among them, counted once") {
                                 val tally = shop.call(stats, Unit)
-                                (tally.bySpecies.single { it.species == Species.Tortoise }.adopted shouldBe 1) and
-                                    (tally.duplicates shouldBe 0)
+                                tally.bySpecies.single { it.species == Species.Tortoise }.adopted shouldBe 1
+                                tally.duplicates shouldBe 0
                             }
 
                             val onTheTopic = When("the topic is read as the broker holds it") {
                                 kafka.records(TOPIC, LongDeserializer(), ShopEventDeserializer(schemas))
                             }
-                            val published = Then("every event the outbox recorded is on it once, keyed by its seq") {
+                            Then("every event the outbox recorded is on it once, keyed by its seq") {
                                 onTheTopic.map { it.key() }.sorted() shouldBe (1..database.recorded()).toList()
-                            } and And("the adoptions read back from the Avro as Nibbles' alone") {
+                            }
+                            And("the adoptions read back from the Avro as Nibbles' alone") {
                                 // Mrs Peel's adoption waited on the registry, which refused it, so the bus never heard
                                 // it begin.
                                 val adoptions = onTheTopic.map { it.value() }.sortedBy { it.seq }.mapNotNull { event ->
@@ -136,7 +141,8 @@ object EndToEndSuite : SharedSuite<KafkaBroker>() {
                                     }
                                 }
                                 adoptions shouldBe listOf("adopted Nibbles")
-                            } and And("the projection committed every event") {
+                            }
+                            And("the projection committed every event") {
                                 val (committed, table) = waitUntil(
                                     5.seconds,
                                     { (committed, table) -> committed == table },
@@ -145,10 +151,8 @@ object EndToEndSuite : SharedSuite<KafkaBroker>() {
                                 }
                                 committed shouldBe table
                             }
-
-                            started and hers and taken and none and unchipped and recorded and published
                         }
-                    }.shouldBeRight { it }
+                    } shouldBeRight Unit
                 }
             }
         }

@@ -21,11 +21,9 @@ object CatalogueBytesSuite : Suite() {
             val barnaby = Pet(PetId(2), "Barnaby", Species.Dog)
             shown.show(mapOf(barnaby.id to barnaby))
 
-            (codec.encoded(selected) shouldBeSameInstanceAs bytes) and
-                (
-                    codec.encodeToString(selected) shouldBe
-                        """[{"id":1,"name":"Nibbles","species":"Tortoise","adopted":false}]"""
-                    )
+            codec.encoded(selected) shouldBeSameInstanceAs bytes
+            codec.encodeToString(selected) shouldBe
+                """[{"id":1,"name":"Nibbles","species":"Tortoise","adopted":false}]"""
         }
 
         test("a published catalogue reuses its bytes across codecs") {
@@ -36,13 +34,10 @@ object CatalogueBytesSuite : Suite() {
             val barnabyCodec = ShopCodecs.codec<List<PetDto>>(pets, "application/json")
 
             val bytes = requireNotNull(nibblesCodec.encoded(nibbles.listed()))
-            val shared = barnabyCodec.encoded(nibbles.listed()) shouldBeSameInstanceAs bytes
-            val copied = nibblesCodec.encoded(nibbles.listed().toList()) shouldBe null
-            shared and copied and
-                (
-                    requireNotNull(barnabyCodec.encoded(barnaby.listed())).decodeToString() shouldBe
-                        """[{"id":2,"name":"Barnaby","species":"Dog","adopted":false}]"""
-                    )
+            barnabyCodec.encoded(nibbles.listed()) shouldBeSameInstanceAs bytes
+            nibblesCodec.encoded(nibbles.listed().toList()) shouldBe null
+            requireNotNull(barnabyCodec.encoded(barnaby.listed())).decodeToString() shouldBe
+                """[{"id":2,"name":"Barnaby","species":"Dog","adopted":false}]"""
         }
 
         test("a new catalogue is a new array") {

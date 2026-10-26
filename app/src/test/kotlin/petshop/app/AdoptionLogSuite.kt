@@ -27,8 +27,10 @@ object AdoptionLogSuite : Suite() {
                 val adopted =
                     Then("one line says Nibbles was adopted") { lines.single { it.message.contains("adopted") } }
                 And("it names the pet and the adopter as pairs") {
-                    (adopted.annotations["pet_id"] shouldBe "1") and (adopted.annotations["adopted_by"] shouldBe "Ada")
-                } and And("the span it was written in adds how long it had been running") {
+                    adopted.annotations["pet_id"] shouldBe "1"
+                    adopted.annotations["adopted_by"] shouldBe "Ada"
+                }
+                And("the span it was written in adds how long it had been running") {
                     adopted.annotations shouldContainKey "adopt_ms"
                 }
             }
@@ -43,10 +45,10 @@ object AdoptionLogSuite : Suite() {
                     }
                 }
                 val refused = Then("one line is a warning") { lines.single { it.level == LogLevel.Warn } }
-                And("it says why") { refused.message shouldContain "No pet 404" } and
-                    And("the pairs are on the refusal too, or a search for the pet finds half its story") {
-                        refused.annotations["pet_id"] shouldBe "404"
-                    }
+                And("it says why") { refused.message shouldContain "No pet 404" }
+                And("the pairs are on the refusal too, or a search for the pet finds half its story") {
+                    refused.annotations["pet_id"] shouldBe "404"
+                }
             }
         }
     }
