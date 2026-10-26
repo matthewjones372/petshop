@@ -73,23 +73,21 @@ object ContractSuite : Suite() {
             val app = app()
 
             // A request's toString is the line pelican-test's shouldBuild compares.
-            (app.request(getPet, 1L).toString() shouldBe "GET /pets/1") and
-                (app.request(adoptPet, 1L).toString() shouldBe "POST /pets/1/adoption") and
-                (app.request(listPets, Unit).toString() shouldBe "GET /pets") and
-                (app.request(probes.live, Unit).toString() shouldBe "GET /health/live") and
-                (app.request(probes.ready, Unit).toString() shouldBe "GET /health/ready") and
-                (app.request(metrics, Unit).toString() shouldBe "GET /metrics") and
-                (app.request(stats, Unit).toString() shouldBe "GET /stats") and
-                (app.request(events, Unit).toString() shouldBe "GET /events")
+            app.request(getPet, 1L).toString() shouldBe "GET /pets/1"
+            app.request(adoptPet, 1L).toString() shouldBe "POST /pets/1/adoption"
+            app.request(listPets, Unit).toString() shouldBe "GET /pets"
+            app.request(probes.live, Unit).toString() shouldBe "GET /health/live"
+            app.request(probes.ready, Unit).toString() shouldBe "GET /health/ready"
+            app.request(metrics, Unit).toString() shouldBe "GET /metrics"
+            app.request(stats, Unit).toString() shouldBe "GET /stats"
+            app.request(events, Unit).toString() shouldBe "GET /events"
         }
 
         test("adopting twice answers the failure the endpoint declared") {
             val app = app()
 
-            val first = app.outcome(adoptPet, 1L).shouldBeOk() shouldBe nibbles.copy(standing = Adopted("Ada")).toDto()
-            val second = app.outcome(adoptPet, 1L).shouldBeError()
-
-            first and (second shouldBe ProblemDto.AlreadyAdopted(1, "Pet 1 is already adopted"))
+            app.outcome(adoptPet, 1L).shouldBeOk() shouldBe nibbles.copy(standing = Adopted("Ada")).toDto()
+            app.outcome(adoptPet, 1L).shouldBeError() shouldBe ProblemDto.AlreadyAdopted(1, "Pet 1 is already adopted")
         }
 
         test("a missing pet answers the declared 404, with the domain's own message") {
@@ -135,8 +133,8 @@ object ContractSuite : Suite() {
             val answer = pending.outcome(adoptPet, 1L)
 
             answer.shouldBeInstanceOf<Outcome.Ok<*>> { ok ->
-                (ok.declared shouldBe adoptionPending) and
-                    (ok.value shouldBe nibbles.copy(standing = Adopting("Ada")).toDto())
+                ok.declared shouldBe adoptionPending
+                ok.value shouldBe nibbles.copy(standing = Adopting("Ada")).toDto()
             }
         }
 
@@ -173,11 +171,10 @@ object ContractSuite : Suite() {
                 ),
             ).inMemory(Handlers.onVirtualThreads)
 
-            val answered = traced.transport.send(
+            traced.transport.send(
                 traced.request(listPets, Unit).withHeader("traceparent", "00-$callersTrace-00f067aa0ba902b7-01"),
             ).status shouldBe 200
-
-            answered and (handledIn shouldBe callersTrace)
+            handledIn shouldBe callersTrace
         }
     }
 

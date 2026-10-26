@@ -80,17 +80,18 @@ object ServingSuite : Suite() {
                         "it is RapiDoc, which can send a request, " +
                             "in the shop's colours and fonts, with the paw for a logo",
                     ) {
-                        (reference.statusCode() shouldBe 200) and
-                            (reference.body() shouldContain "<rapi-doc ") and
-                            (reference.body() shouldContain "allow-try=\"true\"") and
-                            (reference.body() shouldContain "primary-color=\"#C2562B\"") and
-                            (reference.body() shouldContain "slot=\"nav-logo\"") and
-                            (reference.body() shouldContain "fonts.googleapis.com")
-                    } and And("Swagger is where it was, and the document every client reads carries no logo") {
-                        (get("/api-docs").statusCode() shouldBe 200) and
-                            (get("/openapi.json").body() shouldNotContain "x-logo")
+                        reference.statusCode() shouldBe 200
+                        reference.body() shouldContain "<rapi-doc "
+                        reference.body() shouldContain "allow-try=\"true\""
+                        reference.body() shouldContain "primary-color=\"#C2562B\""
+                        reference.body() shouldContain "slot=\"nav-logo\""
+                        reference.body() shouldContain "fonts.googleapis.com"
                     }
-                }.shouldBeRight { it }
+                    And("Swagger is where it was, and the document every client reads carries no logo") {
+                        get("/api-docs").statusCode() shouldBe 200
+                        get("/openapi.json").body() shouldNotContain "x-logo"
+                    }
+                } shouldBeRight Unit
             }
         }
     }

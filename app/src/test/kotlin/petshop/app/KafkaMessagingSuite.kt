@@ -36,28 +36,30 @@ object KafkaMessagingSuite : SharedSuite<KafkaBroker>() {
                                     "publish",
                                     SpanKind.PRODUCER,
                                 ) { expect(bus.publish(waffle).isRight()) }
-                            } and Then("the producer span names the topic, partition, offset, key and message ID") {
+                            }
+                            Then("the producer span names the topic, partition, offset, key and message ID") {
                                 ended.named("publish").singleOrNull().shouldNotBeNull { span ->
                                     val sent = span.attributes
-                                    (sent.get(Messaging.system) shouldBe "kafka") and
-                                        (sent.get(Messaging.operation) shouldBe "send") and
-                                        (sent.get(Messaging.destination) shouldBe name) and
-                                        (sent.get(Messaging.partition) shouldBe "0") and
-                                        (sent.get(Messaging.offset) shouldBe 0L) and
-                                        (sent.get(Messaging.key) shouldBe "4") and
-                                        (sent.get(Messaging.id) shouldBe "4")
+                                    sent.get(Messaging.system) shouldBe "kafka"
+                                    sent.get(Messaging.operation) shouldBe "send"
+                                    sent.get(Messaging.destination) shouldBe name
+                                    sent.get(Messaging.partition) shouldBe "0"
+                                    sent.get(Messaging.offset) shouldBe 0L
+                                    sent.get(Messaging.key) shouldBe "4"
+                                    sent.get(Messaging.id) shouldBe "4"
                                 }
-                            } and Then("the reader is told the partition, offset, message ID and its group") {
+                            }
+                            Then("the reader is told the partition, offset, message ID and its group") {
                                 waitUntil(
                                     30.seconds,
                                     { it.size == 1 },
                                 ) { read.toList() }.singleOrNull().shouldNotBeNull {
                                         where ->
-                                    (where.get(Messaging.operation) shouldBe "process") and
-                                        (where.get(Messaging.partition) shouldBe "0") and
-                                        (where.get(Messaging.offset) shouldBe 0L) and
-                                        (where.get(Messaging.id) shouldBe "4") and
-                                        (where.get(Messaging.group) shouldBe "projection-$name")
+                                    where.get(Messaging.operation) shouldBe "process"
+                                    where.get(Messaging.partition) shouldBe "0"
+                                    where.get(Messaging.offset) shouldBe 0L
+                                    where.get(Messaging.id) shouldBe "4"
+                                    where.get(Messaging.group) shouldBe "projection-$name"
                                 }
                             }
                         }

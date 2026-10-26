@@ -6,7 +6,6 @@ import io.github.matthewjones372.surefold.app.single
 import io.github.matthewjones372.surefold.app.subgraph
 import io.github.matthewjones372.surefold.app.testApp
 import io.github.matthewjones372.surefold.app.typesafe.overridingConfig
-import io.github.matthewjones372.surefold.junit.Expectations
 import io.github.matthewjones372.surefold.junit.Suite
 import io.github.matthewjones372.surefold.junit.expect
 import io.github.matthewjones372.surefold.junit.forAll
@@ -50,22 +49,22 @@ internal fun <A> using(bus: Module, block: (EventBus) -> A): A =
     testApp(bus.subgraph<EventBus>()) { theBus: EventBus -> block(theBus) }
 
 /** The contract's tests, registered through a suite's `test`, each on the bus [under] makes of the suite's resource. */
-fun <R> eventBusContract(test: (String, (R) -> Expectations) -> Unit, under: (R) -> BusUnderContract) {
+fun <R> eventBusContract(test: (String, (R) -> Unit) -> Unit, under: (R) -> BusUnderContract) {
     readers(test, under)
     service(test, under)
 }
 
-private fun <R> readers(test: (String, (R) -> Expectations) -> Unit, under: (R) -> BusUnderContract) {
+private fun <R> readers(test: (String, (R) -> Unit) -> Unit, under: (R) -> BusUnderContract) {
     test("an event published before anyone reads it reaches the first reader") { shared ->
         story {
             using(under(shared).bus("early")) { bus ->
                 val waffle = arrival(1, "Waffle")
-                val published = Given("Waffle's arrival, published before anyone reads the bus") {
+                Given("Waffle's arrival, published before anyone reads the bus") {
                     expect(bus.publish(waffle).isRight())
                 }
                 val seen = ConcurrentLinkedQueue<ShopEvent>()
                 When("a reader starts") { bus.consume { seen.add(it) }.start(Forks()) }.use { _ ->
-                    published and Then("it reads Waffle's arrival") {
+                    Then("it reads Waffle's arrival") {
                         waitUntil(30.seconds, { it == listOf(waffle) }) { seen.toList() } shouldBe listOf(waffle)
                     }
                 }
@@ -81,7 +80,8 @@ private fun <R> readers(test: (String, (R) -> Expectations) -> Unit, under: (R) 
                     val published = listOf(arrival(1, "Pickle"), arrival(2, "Waffle"), arrival(3, "Biscuit"))
                     When("three arrivals are published") {
                         published.forAll { expect(bus.publish(it).isRight()) }
-                    } and Then("it reads them in that order") {
+                    }
+                    Then("it reads them in that order") {
                         waitUntil(30.seconds, { it == published }) { seen.toList() } shouldBe published
                     }
                 }
@@ -98,7 +98,8 @@ private fun <R> readers(test: (String, (R) -> Expectations) -> Unit, under: (R) 
                 }.use { _ ->
                     When("Waffle's arrival is published inside a trace") {
                         inATrace { expect(bus.publish(arrival(1, "Waffle")).isRight()) }
-                    } and Then("the reader handled it in that trace") {
+                    }
+                    Then("the reader handled it in that trace") {
                         waitUntil(30.seconds, { it == listOf(A_TRACE) }) { traces.toList() } shouldBe listOf(A_TRACE)
                     }
                 }
@@ -107,7 +108,7 @@ private fun <R> readers(test: (String, (R) -> Expectations) -> Unit, under: (R) 
     }
 }
 
-private fun <R> service(test: (String, (R) -> Expectations) -> Unit, under: (R) -> BusUnderContract) {
+private fun <R> service(test: (String, (R) -> Unit) -> Unit, under: (R) -> BusUnderContract) {
     test("the whole service runs on it, and an adoption reaches the projection") { shared ->
         val bus = under(shared)
         story {
@@ -119,15 +120,15 @@ private fun <R> service(test: (String, (R) -> Expectations) -> Unit, under: (R) 
             testApp(service) { app: Served ->
                 When("Ada adopts Nibbles") { app.shop.adopt(PetId(1), by = "Ada") }
                 val tally = waitUntil(30.seconds, { it.adopted(Species.Tortoise) == 1 }) { app.projection.tally() }
-                val counted = Then("the projection counts a tortoise adopted") {
+                Then("the projection counts a tortoise adopted") {
                     tally.adopted(Species.Tortoise) shouldBe 1
-                } and And("it counted one event, once") {
-                    (tally.events shouldBe 1) and (tally.duplicates shouldBe 0)
                 }
-                if (!bus.remembersReaders) {
-                    counted
-                } else {
-                    counted and And("the bus remembers the reader handled it") {
+                And("it counted one event, once") {
+                    tally.events shouldBe 1
+                    tally.duplicates shouldBe 0
+                }
+                if (bus.remembersReaders) {
+                    And("the bus remembers the reader handled it") {
                         waitUntil(30.seconds, { it == 1L }) { bus.handled("service") } shouldBe 1L
                     }
                 }

@@ -56,9 +56,10 @@ object ScrapeSuite : Suite() {
                     }
                 }
                 Then("there is one series per outcome, which is what lets a single query answer either question") {
-                    (scrape shouldContain """petshop_adoptions_total{outcome="taken"""") and
-                        (scrape shouldContain """petshop_adoptions_total{outcome="already_adopted"""")
-                } and And("timed recorded into a distribution, which Prometheus reads as a summary") {
+                    scrape shouldContain """petshop_adoptions_total{outcome="taken""""
+                    scrape shouldContain """petshop_adoptions_total{outcome="already_adopted""""
+                }
+                And("timed recorded into a distribution, which Prometheus reads as a summary") {
                     scrape shouldContain "petshop_adopt_duration_count"
                 }
             }
@@ -103,12 +104,14 @@ object ScrapeSuite : Suite() {
                     testApp(service) { app: Scraped ->
                         val scrape = When("Prometheus scrapes it") { app.registry.scrape() }
                         Then("the JVM's meters are there, under the names a JVM dashboard reads") {
-                            (scrape shouldContain "jvm_memory_used_bytes") and
-                                (scrape shouldContain "jvm_threads_live_threads") and
-                                (scrape shouldContain "process_cpu_usage")
-                        } and And("so is the pool") {
+                            scrape shouldContain "jvm_memory_used_bytes"
+                            scrape shouldContain "jvm_threads_live_threads"
+                            scrape shouldContain "process_cpu_usage"
+                        }
+                        And("so is the pool") {
                             scrape shouldContain """hikaricp_connections_active{pool="petshop""""
-                        } and And("the shop is ready, and each check answers") {
+                        }
+                        And("the shop is ready, and each check answers") {
                             // The checks are asked on their own thread, once a second, so the first answer is a
                             // moment behind.
                             val now = waitUntil(

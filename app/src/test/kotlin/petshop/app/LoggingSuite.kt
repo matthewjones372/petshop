@@ -48,8 +48,8 @@ object LoggingSuite : Suite() {
                             "logback received the adoption",
                         ) { appender.list.single { it.message.contains("adopted") } }
                     And("the pet and the adopter are in its MDC, which is what a pattern and a field search read") {
-                        (adopted.mdcPropertyMap["pet_id"] shouldBe "1") and
-                            (adopted.mdcPropertyMap["adopted_by"] shouldBe "Ada")
+                        adopted.mdcPropertyMap["pet_id"] shouldBe "1"
+                        adopted.mdcPropertyMap["adopted_by"] shouldBe "Ada"
                     }
                 }
             } finally {

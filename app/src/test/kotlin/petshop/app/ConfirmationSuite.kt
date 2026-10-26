@@ -62,10 +62,10 @@ object ConfirmationSuite : Suite() {
                         beas to adas
                     }
                 }
-                Then("Bea is told Nibbles is being adopted") { bea shouldBeLeft BeingAdopted(1) } and
-                    And("Ada has her, confirmed") {
-                        ada.shouldNotBeNull { it.shouldBeRight { pet -> pet.standing shouldBe Adopted("Ada") } }
-                    }
+                Then("Bea is told Nibbles is being adopted") { bea shouldBeLeft BeingAdopted(1) }
+                And("Ada has her, confirmed") {
+                    ada.shouldNotBeNull { it.shouldBeRight { pet -> pet.standing shouldBe Adopted("Ada") } }
+                }
             }
         }
 
@@ -93,8 +93,8 @@ object ConfirmationSuite : Suite() {
                         shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1))
                     }
                 }
-                Then("she is told the registry is down") { answer shouldBeLeft RegistryDown(1) } and
-                    And("Nibbles is back on the shelf") { after?.standing shouldBe OnShelf }
+                Then("she is told the registry is down") { answer shouldBeLeft RegistryDown(1) }
+                And("Nibbles is back on the shelf") { after?.standing shouldBe OnShelf }
             }
         }
 
@@ -112,8 +112,9 @@ object ConfirmationSuite : Suite() {
                     val answer = When("Ada adopts Nibbles") { shop.adopt(PetId(1), by = "Ada") }
                     Then("she is told it is pending: Nibbles is being adopted by her") {
                         answer.shouldBeRight { it.standing shouldBe Adopting("Ada") }
-                    } and And("once the registry answers, Nibbles is hers").eventually(5.seconds) {
-                        shop.find(PetId(1))?.standing shouldBeOrRetry Adopted("Ada")
+                    }
+                    And("once the registry answers, Nibbles is hers").eventually(5.seconds) {
+                        shop.find(PetId(1))?.standing shouldBe Adopted("Ada")
                     }
                 }
             }
@@ -130,8 +131,9 @@ object ConfirmationSuite : Suite() {
                         When("Ada adopts Nibbles, and the registry records her") { shop.adopt(PetId(1), by = "Ada") }
                     Then("she is told it is pending") {
                         answer.shouldBeRight { it.standing shouldBe Adopting("Ada") }
-                    } and And("settling writes her adoption").eventually(5.seconds) {
-                        shop.find(PetId(1))?.standing shouldBeOrRetry Adopted("Ada")
+                    }
+                    And("settling writes her adoption").eventually(5.seconds) {
+                        shop.find(PetId(1))?.standing shouldBe Adopted("Ada")
                     }
                 }
             }
@@ -147,12 +149,12 @@ object ConfirmationSuite : Suite() {
                         .subgraph<PetShop>()
                 testApp(shop) { shop: PetShop ->
                     val answer = When("Ada adopts Nibbles, who has no chip") { shop.adopt(PetId(1), by = "Ada") }
-                    Then("she is told Nibbles has no chip") { answer shouldBeLeft NotChipped(1) } and
-                        And(
-                            "settling puts Nibbles back on the shelf, since the registry answered",
-                        ).eventually(5.seconds) {
-                            shop.find(PetId(1))?.standing shouldBeOrRetry OnShelf
-                        }
+                    Then("she is told Nibbles has no chip") { answer shouldBeLeft NotChipped(1) }
+                    And(
+                        "settling puts Nibbles back on the shelf, since the registry answered",
+                    ).eventually(5.seconds) {
+                        shop.find(PetId(1))?.standing shouldBe OnShelf
+                    }
                 }
             }
         }
@@ -165,11 +167,11 @@ object ConfirmationSuite : Suite() {
                     .subgraph<PetShop>()
                 testApp(shop) { shop: PetShop ->
                     When("Ada adopts Nibbles, the shop gives up waiting for the actor, and then the write lands") {
-                        val gaveUp = shouldThrow<IllegalStateException>({ shop.adopt(PetId(1), by = "Ada") })
+                        shouldThrow<IllegalStateException>({ shop.adopt(PetId(1), by = "Ada") })
                         outbox.release.countDown()
-                        gaveUp
-                    } and Then("settling puts Nibbles back on the shelf, since the registry was never asked")
-                        .eventually(10.seconds) { shop.find(PetId(1))?.standing shouldBeOrRetry OnShelf }
+                    }
+                    Then("settling puts Nibbles back on the shelf, since the registry was never asked")
+                        .eventually(10.seconds) { shop.find(PetId(1))?.standing shouldBe OnShelf }
                 }
             }
         }
@@ -184,11 +186,12 @@ object ConfirmationSuite : Suite() {
                 }
                 testApp(shopWith(registry)) { shop: PetShop ->
                     When("Ada adopts Nibbles, and then Bea adopts Barnaby") {
-                        shop.adopt(PetId(1), by = "Ada").shouldBeRight { it.standing shouldBe Adopting("Ada") } and
-                            shop.adopt(PetId(2), by = "Bea").shouldBeRight { it.standing shouldBe Adopting("Bea") }
-                    } and Then("Barnaby settles while Nibbles still waits").eventually(5.seconds) {
-                        (shop.find(PetId(2))?.standing shouldBeOrRetry Adopted("Bea")) and
-                            (shop.find(PetId(1))?.standing shouldBeOrRetry Adopting("Ada"))
+                        shop.adopt(PetId(1), by = "Ada").shouldBeRight { it.standing shouldBe Adopting("Ada") }
+                        shop.adopt(PetId(2), by = "Bea").shouldBeRight { it.standing shouldBe Adopting("Bea") }
+                    }
+                    Then("Barnaby settles while Nibbles still waits").eventually(5.seconds) {
+                        shop.find(PetId(2))?.standing shouldBe Adopted("Bea")
+                        shop.find(PetId(1))?.standing shouldBe Adopting("Ada")
                     }
                 }
             }

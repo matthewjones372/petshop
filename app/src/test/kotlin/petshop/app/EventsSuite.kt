@@ -44,12 +44,13 @@ object EventsSuite : Suite() {
             story {
                 testApp(settled) { app: Observed ->
                     When("Ada adopts Nibbles") { app.shop.adopt(PetId(1), by = "Ada") }
-                    val (counted, tally) =
+                    val tally =
                         Then("the consumer counts a tortoise adopted, once it has caught up").eventually(5.seconds) {
-                            app.projection.tally().let { (it.adopted(Species.Tortoise) shouldBeOrRetry 1) to it }
+                            app.projection.tally().also { it.adopted(Species.Tortoise) shouldBe 1 }
                         }
-                    counted and And("it counted one event, and none twice") {
-                        (tally.events shouldBe 1) and (tally.duplicates shouldBe 0)
+                    And("it counted one event, and none twice") {
+                        tally.events shouldBe 1
+                        tally.duplicates shouldBe 0
                     }
                 }
             }
@@ -69,13 +70,15 @@ object EventsSuite : Suite() {
                         app.bus.publish(barnaby)
                         app.bus.publish(barnaby)
                     }
-                    val (duplicate, tally) =
-                        Then("the consumer sees the second as a duplicate").eventually(5.seconds) {
-                            app.projection.tally().let { (it.duplicates shouldBeOrRetry 1) to it }
-                        }
+                    val tally = Then("the consumer sees the second as a duplicate").eventually(5.seconds) {
+                        app.projection.tally().also { it.duplicates shouldBe 1 }
+                    }
                     val once = "counts the adoption once, because the bus is at-least-once " +
                         "and it knows an event by its seq"
-                    duplicate and And(once) { (tally.adopted(Species.Dog) shouldBe 1) and (tally.events shouldBe 1) }
+                    And(once) {
+                        tally.adopted(Species.Dog) shouldBe 1
+                        tally.events shouldBe 1
+                    }
                 }
             }
         }
@@ -90,10 +93,10 @@ object EventsSuite : Suite() {
                         app.bus.publish(PetAdopted(seq = 7, pet = barnaby, by = "Bea"))
                         app.bus.publish(PetReturned(seq = 8, pet = barnaby.copy(standing = OnShelf)))
                     }
-                    val (both, tally) = Then("the consumer counts both events").eventually(5.seconds) {
-                        app.projection.tally().let { (it.events shouldBeOrRetry 2) to it }
+                    val tally = Then("the consumer counts both events").eventually(5.seconds) {
+                        app.projection.tally().also { it.events shouldBe 2 }
                     }
-                    both and And("no dog is counted adopted") { tally.adopted(Species.Dog) shouldBe 0 }
+                    And("no dog is counted adopted") { tally.adopted(Species.Dog) shouldBe 0 }
                 }
             }
         }
@@ -108,11 +111,12 @@ object EventsSuite : Suite() {
                         app.shop.adopt(PetId(1), by = "Ada")
                         app.shop.adopt(PetId(2), by = "Bea")
                     }
-                    val (one, tally) = Then("the consumer hears one event, Bea's").eventually(5.seconds) {
-                        app.projection.tally().let { (it.events shouldBeOrRetry 1) to it }
+                    val tally = Then("the consumer hears one event, Bea's").eventually(5.seconds) {
+                        app.projection.tally().also { it.events shouldBe 1 }
                     }
-                    one and And("no tortoise was ever counted adopted: the bus never heard Ada's adoption begin") {
-                        (tally.adopted(Species.Tortoise) shouldBe 0) and (tally.adopted(Species.Dog) shouldBe 1)
+                    And("no tortoise was ever counted adopted: the bus never heard Ada's adoption begin") {
+                        tally.adopted(Species.Tortoise) shouldBe 0
+                        tally.adopted(Species.Dog) shouldBe 1
                     }
                 }
             }

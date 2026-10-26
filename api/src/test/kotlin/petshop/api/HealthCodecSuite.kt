@@ -21,8 +21,8 @@ object HealthCodecSuite : Suite() {
         test("a health report reads back as the report that was written") {
             val json = codec.encodeToString(report)
 
-            (codec.decodeFromString(json) shouldBe report) and
-                (codec.decodeFrom(json.toByteArray()) shouldBe report)
+            codec.decodeFromString(json) shouldBe report
+            codec.decodeFrom(json.toByteArray()) shouldBe report
         }
 
         test("a health report is written with pelican-health's field names") {

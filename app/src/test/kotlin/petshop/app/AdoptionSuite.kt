@@ -45,7 +45,8 @@ object AdoptionSuite : Suite() {
                 }
                 Then("exactly one gets her, because an actor handles one message at a time") {
                     outcomes.count { it.isRight() } shouldBe 1
-                } and And(
+                }
+                And(
                     "the other nineteen are told she is taken, or being adopted while her transfer is in flight",
                 ) {
                     val told = outcomes.count {
@@ -64,13 +65,13 @@ object AdoptionSuite : Suite() {
                 val (first, after) = When("Ada adopts Nibbles") {
                     testApp(refused) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1)) }
                 }
-                Then("she is told the registry is down") { first shouldBeLeft RegistryDown(1) } and
-                    And(
-                        "Nibbles is back on the shelf: the actor said yes before the registry said no, " +
-                            "and the no undid it",
-                    ) {
-                        after?.standing shouldBe OnShelf
-                    }
+                Then("she is told the registry is down") { first shouldBeLeft RegistryDown(1) }
+                And(
+                    "Nibbles is back on the shelf: the actor said yes before the registry said no, " +
+                        "and the no undid it",
+                ) {
+                    after?.standing shouldBe OnShelf
+                }
             }
         }
 
@@ -99,13 +100,14 @@ object AdoptionSuite : Suite() {
                 val (answer, after) = When("Ada adopts Nibbles") {
                     testApp(unrecorded) { shop: PetShop -> shop.adopt(PetId(1), by = "Ada") to shop.find(PetId(1)) }
                 }
-                Then("she is told it was not recorded") { answer shouldBeLeft NotRecorded(1) } and
-                    And(
-                        "a sale nobody could write down did not happen: Nibbles is on the shelf, " +
-                            "and the registry was not asked",
-                    ) {
-                        (after?.standing shouldBe OnShelf) and (asked.get() shouldBe 0)
-                    }
+                Then("she is told it was not recorded") { answer shouldBeLeft NotRecorded(1) }
+                And(
+                    "a sale nobody could write down did not happen: Nibbles is on the shelf, " +
+                        "and the registry was not asked",
+                ) {
+                    after?.standing shouldBe OnShelf
+                    asked.get() shouldBe 0
+                }
             }
         }
 
@@ -149,10 +151,11 @@ object AdoptionSuite : Suite() {
                 }
                 Then("the read saw Nibbles still for sale, without waiting out the ask") {
                     val (all, found) = during
-                    (all.map { it.id.value } shouldBe opening.map { it.id.value }) and
-                        (all.single { it.id == PetId(1) }.standing shouldBe OnShelf) and
-                        (found?.standing shouldBe OnShelf)
-                } and And("once the write has finished she has Nibbles") { after?.standing shouldBe Adopted("Ada") }
+                    all.map { it.id.value } shouldBe opening.map { it.id.value }
+                    all.single { it.id == PetId(1) }.standing shouldBe OnShelf
+                    found?.standing shouldBe OnShelf
+                }
+                And("once the write has finished she has Nibbles") { after?.standing shouldBe Adopted("Ada") }
             }
         }
 
@@ -163,9 +166,9 @@ object AdoptionSuite : Suite() {
                     "it holds no server, no arrivals and no registry settings: " +
                         "what a test of the shop needs is the shop",
                 ) {
-                    (drawn.contains("PelicanServer") shouldBe false) and
-                        (drawn.contains("Arrivals") shouldBe false) and
-                        (drawn.contains("RegistrySettings") shouldBe false)
+                    drawn.contains("PelicanServer") shouldBe false
+                    drawn.contains("Arrivals") shouldBe false
+                    drawn.contains("RegistrySettings") shouldBe false
                 }
             }
         }
@@ -180,8 +183,8 @@ object SettingsSuite : Suite() {
                     Petshop.module.subgraph<Settings>().overridingConfig("petshop.arrivalsEvery = 1s")
                 }
                 val read = When("they are read") { testApp(faster) { settings: Settings -> settings } }
-                Then("arrivals are every second") { read.arrivalsEvery shouldBe 1.seconds } and
-                    And("the port, never restated, came from application.conf") { read.port shouldBe 8080 }
+                Then("arrivals are every second") { read.arrivalsEvery shouldBe 1.seconds }
+                And("the port, never restated, came from application.conf") { read.port shouldBe 8080 }
             }
         }
 
@@ -191,8 +194,9 @@ object SettingsSuite : Suite() {
                     testApp(Petshop.module.subgraph<Settings>()) { settings: Settings -> settings }
                 }
                 Then("they are application.conf's") {
-                    (read.host shouldBe "127.0.0.1") and (read.port shouldBe 8080) and
-                        (read.arrivalsEvery shouldBe 5.seconds)
+                    read.host shouldBe "127.0.0.1"
+                    read.port shouldBe 8080
+                    read.arrivalsEvery shouldBe 5.seconds
                 }
             }
         }
@@ -202,7 +206,8 @@ object SettingsSuite : Suite() {
                 val drawn = When("the whole graph is drawn") { Petshop.module.render() }
                 Then("the shop's actor does not take the settings: a dependency nothing reads is an edge that lies") {
                     drawn.contains("Settings --> ActorRef_Shop_") shouldBe false
-                } and And("the arrivals do") { drawn shouldContain "Settings --> Arrivals" }
+                }
+                And("the arrivals do") { drawn shouldContain "Settings --> Arrivals" }
             }
         }
     }

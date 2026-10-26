@@ -34,26 +34,29 @@ object RestartSuite : Suite() {
         test("a restarted shop remembers who adopted what, and numbers new arrivals on") {
             val shop = shopOn(TestPostgres.fresh(), FakeRegistry()).overridingConfig("petshop.arrivalsEvery = 50ms")
             story {
-                val (adopted, before) = When("Ada adopts Nibbles, and the shop runs long enough for pets to arrive") {
+                val before = When("Ada adopts Nibbles, and the shop runs long enough for pets to arrive") {
                     testApp(shop) { app: Running ->
-                        expect(app.shop.adopt(PetId(1), by = "Ada").isRight()) to
-                            waitUntil(5.seconds, { pets -> pets.size > opening.size }) { app.shop.all() }
+                        expect(app.shop.adopt(PetId(1), by = "Ada").isRight())
+                        waitUntil(5.seconds, { pets -> pets.size > opening.size }) { app.shop.all() }
                     }
                 }
-                val arrived = (before.size > opening.size) shouldBe true
+                (before.size > opening.size) shouldBe true
                 testApp(shop) { app: Running ->
-                    adopted and arrived and Then("the restarted shop has Nibbles adopted") {
+                    Then("the restarted shop has Nibbles adopted") {
                         app.shop.find(PetId(1))?.standing shouldBe Adopted("Ada")
-                    } and And("somebody asking for her is told she is taken") {
+                    }
+                    And("somebody asking for her is told she is taken") {
                         app.shop.adopt(PetId(1), by = "Bea") shouldBeLeft AlreadyAdopted(1)
-                    } and And(
+                    }
+                    And(
                         "new pets arrive with ids of their own, and every pet from before is still there as it was",
                     ) {
                         // A reused id would replace an earlier pet in the table, so it shows as one gone or changed.
                         val after = waitUntil(5.seconds, { it.size > before.size && it.containsAll(before) }) {
                             app.shop.all()
                         }
-                        ((after.size > before.size) shouldBe true) and (after shouldContainAll before)
+                        (after.size > before.size) shouldBe true
+                        after shouldContainAll before
                     }
                 }
             }
@@ -66,7 +69,7 @@ object RestartSuite : Suite() {
                     transfers = { ScriptedRegistry.Transfer.RecordsButLosesTheAnswer },
                     answers = { _, n -> n == 1 },
                 )
-                val unconfirmed = When(
+                When(
                     "Ada adopts Nibbles, the registry records her but cannot be read back, and the shop stops",
                 ) {
                     testApp(shopOn(database, down)) { app: Running ->
@@ -75,7 +78,7 @@ object RestartSuite : Suite() {
                 }
                 val back = ScriptedRegistry(keepers = mapOf(PetId(1) to "Ada"))
                 testApp(shopOn(database, back)) { app: Running ->
-                    unconfirmed and Then("the restarted shop asks the registry, which says Ada keeps her") {
+                    Then("the restarted shop asks the registry, which says Ada keeps her") {
                         waitUntil(5.seconds, { it == Adopted("Ada") }) { app.shop.find(PetId(1))?.standing } shouldBe
                             Adopted("Ada")
                     }
