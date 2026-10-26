@@ -86,6 +86,7 @@ dependencies {
     testImplementation("io.github.matthewjones372:surefold-test:$surefoldVersion")
 
     testImplementation("io.github.matthewjones372:surefold-kafka-test:$surefoldVersion")
+    testImplementation("io.github.matthewjones372:surefold-otel-test:$surefoldVersion")
 
     testImplementation("io.github.matthewjones372:pelican-test-wiremock")
     testImplementation(project(":registry"))

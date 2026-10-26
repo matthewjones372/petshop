@@ -9,6 +9,7 @@ import io.github.matthewjones372.surefold.fail.right
 import io.github.matthewjones372.surefold.junit.Suite
 import io.github.matthewjones372.surefold.junit.shouldBe
 import io.github.matthewjones372.surefold.junit.story
+import io.github.matthewjones372.surefold.otel.Spans
 import io.github.matthewjones372.surefold.stream.Forks
 import io.github.matthewjones372.surefold.stream.Hub
 import io.github.matthewjones372.surefold.stream.Run
@@ -18,11 +19,6 @@ import io.github.matthewjones372.surefold.stream.start
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.Tracer
-import io.opentelemetry.sdk.common.CompletableResultCode
-import io.opentelemetry.sdk.trace.SdkTracerProvider
-import io.opentelemetry.sdk.trace.data.SpanData
-import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor
-import io.opentelemetry.sdk.trace.export.SpanExporter
 import petshop.domain.Pet
 import petshop.domain.PetArrived
 import petshop.domain.PetId
@@ -31,32 +27,6 @@ import petshop.domain.Species
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-
-/** Spans as the SDK ends them, to read their kind and attributes. */
-internal class Ended : AutoCloseable {
-    val spans = ConcurrentLinkedQueue<SpanData>()
-    private val provider = SdkTracerProvider.builder()
-        .addSpanProcessor(
-            SimpleSpanProcessor.create(
-                object : SpanExporter {
-                    override fun export(ended: Collection<SpanData>): CompletableResultCode {
-                        spans.addAll(ended)
-                        return CompletableResultCode.ofSuccess()
-                    }
-
-                    override fun flush(): CompletableResultCode = CompletableResultCode.ofSuccess()
-
-                    override fun shutdown(): CompletableResultCode = CompletableResultCode.ofSuccess()
-                },
-            ),
-        )
-        .build()
-    val tracer: Tracer = provider.get("test")
-
-    fun named(name: String): List<SpanData> = spans.filter { it.name == name }
-
-    override fun close() = provider.close()
-}
 
 internal val waffle = PetArrived(seq = 4, pet = Pet(PetId(104), "Waffle", Species.Dog))
 
@@ -101,15 +71,15 @@ object MessagingSpansSuite : Suite() {
     init {
         test("the relay publishes each event in a producer span") {
             story {
-                Ended().use { ended ->
+                Spans().use { spans ->
                     val clock = TestClock()
                     val every = 50.milliseconds
                     Given("Waffle's arrival in the outbox, and a relay") {
-                        relay(every, Once(waffle), Taken, ended.tracer).start(TestStreams(clock))
+                        relay(every, Once(waffle), Taken, spans.tracer).start(TestStreams(clock))
                     }.use { _ ->
                         When("the relay ticks") { clock.adjust(every) }
                         Then("its publish span is a producer's") {
-                            ended.named("publish").map { it.kind } shouldBe listOf(SpanKind.PRODUCER)
+                            spans.named("publish").map { it.kind } shouldBe listOf(SpanKind.PRODUCER)
                         }
                     }
                 }
@@ -118,13 +88,13 @@ object MessagingSpansSuite : Suite() {
 
         test("the projection handles each event in a consumer span, with where the bus read it from") {
             story {
-                Ended().use { ended ->
+                Spans().use { spans ->
                     val reading = Given("a projection, on a bus that says where it read each event from") {
                         (
                             projection + feed +
                                 single<StreamBackend> { Forks() } +
                                 single<EventBus> { Placed(HubBus(Hub(16))) } +
-                                single<Tracer> { ended.tracer } +
+                                single<Tracer> { spans.tracer } +
                                 single { bus: EventBus, projection: Projection -> Projected(bus, projection) }
                             ).subgraph<Projected>()
                     }
@@ -133,7 +103,7 @@ object MessagingSpansSuite : Suite() {
                         Then(
                             "the projection's process span is a consumer's, with the bus's attributes",
                         ).eventually(30.seconds) {
-                            val process = ended.named("process").single()
+                            val process = spans.named("process").single()
                             process.kind shouldBe SpanKind.CONSUMER
                             process.attributes.asMap() shouldBe Placed.where.asMap()
                         }
