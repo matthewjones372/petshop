@@ -49,12 +49,10 @@ object KafkaMessagingSuite : SharedSuite<KafkaBroker>() {
                                     sent.get(Messaging.id) shouldBe "4"
                                 }
                             }
-                            Then("the reader is told the partition, offset, message ID and its group") {
-                                waitUntil(
-                                    30.seconds,
-                                    { it.size == 1 },
-                                ) { read.toList() }.singleOrNull().shouldNotBeNull {
-                                        where ->
+                            Then("the reader is told the partition, offset, message ID and its group").eventually(
+                                30.seconds,
+                            ) {
+                                read.toList().singleOrNull().shouldNotBeNull { where ->
                                     where.get(Messaging.operation) shouldBe "process"
                                     where.get(Messaging.partition) shouldBe "0"
                                     where.get(Messaging.offset) shouldBe 0L

@@ -64,9 +64,7 @@ private fun <R> readers(test: (String, (R) -> Unit) -> Unit, under: (R) -> BusUn
                 }
                 val seen = ConcurrentLinkedQueue<ShopEvent>()
                 When("a reader starts") { bus.consume { seen.add(it) }.start(Forks()) }.use { _ ->
-                    Then("it reads Waffle's arrival") {
-                        waitUntil(30.seconds, { it == listOf(waffle) }) { seen.toList() } shouldBe listOf(waffle)
-                    }
+                    Then("it reads Waffle's arrival").eventually(30.seconds) { seen.toList() shouldBe listOf(waffle) }
                 }
             }
         }
@@ -81,9 +79,7 @@ private fun <R> readers(test: (String, (R) -> Unit) -> Unit, under: (R) -> BusUn
                     When("three arrivals are published") {
                         published.forAll { expect(bus.publish(it).isRight()) }
                     }
-                    Then("it reads them in that order") {
-                        waitUntil(30.seconds, { it == published }) { seen.toList() } shouldBe published
-                    }
+                    Then("it reads them in that order").eventually(30.seconds) { seen.toList() shouldBe published }
                 }
             }
         }
@@ -99,8 +95,8 @@ private fun <R> readers(test: (String, (R) -> Unit) -> Unit, under: (R) -> BusUn
                     When("Waffle's arrival is published inside a trace") {
                         inATrace { expect(bus.publish(arrival(1, "Waffle")).isRight()) }
                     }
-                    Then("the reader handled it in that trace") {
-                        waitUntil(30.seconds, { it == listOf(A_TRACE) }) { traces.toList() } shouldBe listOf(A_TRACE)
+                    Then("the reader handled it in that trace").eventually(30.seconds) {
+                        traces.toList() shouldBe listOf(A_TRACE)
                     }
                 }
             }
@@ -119,17 +115,16 @@ private fun <R> service(test: (String, (R) -> Unit) -> Unit, under: (R) -> BusUn
             }
             testApp(service) { app: Served ->
                 When("Ada adopts Nibbles") { app.shop.adopt(PetId(1), by = "Ada") }
-                val tally = waitUntil(30.seconds, { it.adopted(Species.Tortoise) == 1 }) { app.projection.tally() }
-                Then("the projection counts a tortoise adopted") {
-                    tally.adopted(Species.Tortoise) shouldBe 1
+                val tally = Then("the projection counts a tortoise adopted").eventually(30.seconds) {
+                    app.projection.tally().also { it.adopted(Species.Tortoise) shouldBe 1 }
                 }
                 And("it counted one event, once") {
                     tally.events shouldBe 1
                     tally.duplicates shouldBe 0
                 }
                 if (bus.remembersReaders) {
-                    And("the bus remembers the reader handled it") {
-                        waitUntil(30.seconds, { it == 1L }) { bus.handled("service") } shouldBe 1L
+                    And("the bus remembers the reader handled it").eventually(30.seconds) {
+                        bus.handled("service") shouldBe 1L
                     }
                 }
             }

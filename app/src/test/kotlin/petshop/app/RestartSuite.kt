@@ -9,10 +9,12 @@ import io.github.matthewjones372.surefold.app.typesafe.overridingConfig
 import io.github.matthewjones372.surefold.junit.Suite
 import io.github.matthewjones372.surefold.junit.expect
 import io.github.matthewjones372.surefold.junit.shouldBe
+import io.github.matthewjones372.surefold.junit.shouldBeGreaterThan
 import io.github.matthewjones372.surefold.junit.shouldBeLeft
 import io.github.matthewjones372.surefold.junit.shouldBeRight
 import io.github.matthewjones372.surefold.junit.shouldContainAll
 import io.github.matthewjones372.surefold.junit.story
+import io.github.matthewjones372.surefold.test.eventually
 import petshop.domain.Adopted
 import petshop.domain.Adopting
 import petshop.domain.AlreadyAdopted
@@ -37,7 +39,7 @@ object RestartSuite : Suite() {
                 val before = When("Ada adopts Nibbles, and the shop runs long enough for pets to arrive") {
                     testApp(shop) { app: Running ->
                         expect(app.shop.adopt(PetId(1), by = "Ada").isRight())
-                        waitUntil(5.seconds, { pets -> pets.size > opening.size }) { app.shop.all() }
+                        eventually(5.seconds) { app.shop.all().also { it.size shouldBeGreaterThan opening.size } }
                     }
                 }
                 (before.size > opening.size) shouldBe true
@@ -48,13 +50,11 @@ object RestartSuite : Suite() {
                     And("somebody asking for her is told she is taken") {
                         app.shop.adopt(PetId(1), by = "Bea") shouldBeLeft AlreadyAdopted(1)
                     }
+                    // A reused id would replace an earlier pet in the table, so it shows as one gone or changed.
                     And(
                         "new pets arrive with ids of their own, and every pet from before is still there as it was",
-                    ) {
-                        // A reused id would replace an earlier pet in the table, so it shows as one gone or changed.
-                        val after = waitUntil(5.seconds, { it.size > before.size && it.containsAll(before) }) {
-                            app.shop.all()
-                        }
+                    ).eventually(5.seconds) {
+                        val after = app.shop.all()
                         (after.size > before.size) shouldBe true
                         after shouldContainAll before
                     }
@@ -78,9 +78,8 @@ object RestartSuite : Suite() {
                 }
                 val back = ScriptedRegistry(keepers = mapOf(PetId(1) to "Ada"))
                 testApp(shopOn(database, back)) { app: Running ->
-                    Then("the restarted shop asks the registry, which says Ada keeps her") {
-                        waitUntil(5.seconds, { it == Adopted("Ada") }) { app.shop.find(PetId(1))?.standing } shouldBe
-                            Adopted("Ada")
+                    Then("the restarted shop asks the registry, which says Ada keeps her").eventually(5.seconds) {
+                        app.shop.find(PetId(1))?.standing shouldBe Adopted("Ada")
                     }
                 }
             }
