@@ -125,7 +125,9 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                         bus.publish(waffle)
                         bus.consume { event -> seen.add(event) }.start(Forks())
                     }.use { _ ->
-                        Then("Waffle reaches the consumer").eventually(30.seconds) { seen.toList() shouldBe listOf(waffle) }
+                        Then("Waffle reaches the consumer").eventually(30.seconds) {
+                            seen.toList() shouldBe listOf(waffle)
+                        }
                     }
                 }
                 And("the unreadable record went to dead letters, from offset 0") {
@@ -151,7 +153,9 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                         bus.publish(waffle)
                         bus.consume { event -> seen.add(event) }.start(Forks())
                     }.use { _ ->
-                        Then("Waffle reaches the consumer").eventually(30.seconds) { seen.toList() shouldBe listOf(waffle) }
+                        Then("Waffle reaches the consumer").eventually(30.seconds) {
+                            seen.toList() shouldBe listOf(waffle)
+                        }
                     }
                 }
                 val letters = eventually(30.seconds) {
