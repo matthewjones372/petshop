@@ -110,14 +110,9 @@ object EndToEndSuite : SharedSuite<KafkaBroker>() {
                             ) {
                                 registry.calls(recordKeeper) shouldBe 1
                             }
-                            And("the outbox drains") {
-                                waitUntil(5.seconds, { it == 0L }) { database.unsent() } shouldBe 0L
-                            }
-                            And("/stats counts every event the table recorded") {
-                                val (events, table) = waitUntil(5.seconds, { (events, table) -> events == table }) {
-                                    shop.call(stats, Unit).events.toLong() to database.recorded()
-                                }
-                                events shouldBe table
+                            And("the outbox drains").eventually(5.seconds) { database.unsent() shouldBe 0L }
+                            And("/stats counts every event the table recorded").eventually(5.seconds) {
+                                shop.call(stats, Unit).events.toLong() shouldBe database.recorded()
                             }
                             And("the tortoise's adoption among them, counted once") {
                                 val tally = shop.call(stats, Unit)
@@ -142,14 +137,8 @@ object EndToEndSuite : SharedSuite<KafkaBroker>() {
                                 }
                                 adoptions shouldBe listOf("adopted Nibbles")
                             }
-                            And("the projection committed every event") {
-                                val (committed, table) = waitUntil(
-                                    5.seconds,
-                                    { (committed, table) -> committed == table },
-                                ) {
-                                    kafka.committed(GROUP, TOPIC) to database.recorded()
-                                }
-                                committed shouldBe table
+                            And("the projection committed every event").eventually(5.seconds) {
+                                kafka.committed(GROUP, TOPIC) shouldBe database.recorded()
                             }
                         }
                     } shouldBeRight Unit

@@ -111,13 +111,10 @@ object ScrapeSuite : Suite() {
                         And("so is the pool") {
                             scrape shouldContain """hikaricp_connections_active{pool="petshop""""
                         }
-                        And("the shop is ready, and each check answers") {
-                            // The checks are asked on their own thread, once a second, so the first answer is a
-                            // moment behind.
-                            val now = waitUntil(
-                                10.seconds,
-                                { now -> checked.all { it in now } },
-                            ) { app.registry.scrape() }
+                        // The checks are asked on their own thread, once a second, so the first answer is a
+                        // moment behind.
+                        And("the shop is ready, and each check answers").eventually(10.seconds) {
+                            val now = app.registry.scrape()
                             checked.forAll { now shouldContain it }
                         }
                     }

@@ -7,6 +7,7 @@ import io.github.matthewjones372.surefold.app.Module
 import io.github.matthewjones372.surefold.junit.SharedSuite
 import io.github.matthewjones372.surefold.junit.shouldBe
 import io.github.matthewjones372.surefold.junit.shouldBeInstanceOf
+import io.github.matthewjones372.surefold.junit.shouldHaveSize
 import io.github.matthewjones372.surefold.junit.shouldNotBeNull
 import io.github.matthewjones372.surefold.junit.story
 import io.github.matthewjones372.surefold.kafka.DEAD_LETTER_HEADER
@@ -14,6 +15,7 @@ import io.github.matthewjones372.surefold.kafka.DecodeError
 import io.github.matthewjones372.surefold.kafka.Topic
 import io.github.matthewjones372.surefold.stream.Forks
 import io.github.matthewjones372.surefold.stream.start
+import io.github.matthewjones372.surefold.test.eventually
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
@@ -80,8 +82,8 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                     )
                 }
                 When("the bus publishes it") { using(kafka.busOn("wire")) { it.publish(nibbles) } }
-                val records = waitUntil(30.seconds, { it.size == 1 }) {
-                    kafka.records("wire", LongDeserializer(), ByteArrayDeserializer())
+                val records = eventually(30.seconds) {
+                    kafka.records("wire", LongDeserializer(), ByteArrayDeserializer()).also { it shouldHaveSize 1 }
                 }
                 Then("one record is on the topic") {
                     records.singleOrNull().shouldNotBeNull { record ->
@@ -123,8 +125,8 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                         bus.publish(waffle)
                         bus.consume { event -> seen.add(event) }.start(Forks())
                     }.use { _ ->
-                        Then("Waffle reaches the consumer") {
-                            waitUntil(30.seconds, { it == listOf(waffle) }) { seen.toList() } shouldBe listOf(waffle)
+                        Then("Waffle reaches the consumer").eventually(30.seconds) {
+                            seen.toList() shouldBe listOf(waffle)
                         }
                     }
                 }
@@ -134,8 +136,8 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                         letter.cause.shouldBeInstanceOf<Exception>()
                     }
                 }
-                And("the unreadable record and the event after it are both committed past") {
-                    waitUntil(30.seconds, { it == 2L }) { kafka.committed("projection-mixed", "mixed") } shouldBe 2L
+                And("the unreadable record and the event after it are both committed past").eventually(30.seconds) {
+                    kafka.committed("projection-mixed", "mixed") shouldBe 2L
                 }
             }
         }
@@ -151,13 +153,14 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                         bus.publish(waffle)
                         bus.consume { event -> seen.add(event) }.start(Forks())
                     }.use { _ ->
-                        Then("Waffle reaches the consumer") {
-                            waitUntil(30.seconds, { it == listOf(waffle) }) { seen.toList() } shouldBe listOf(waffle)
+                        Then("Waffle reaches the consumer").eventually(30.seconds) {
+                            seen.toList() shouldBe listOf(waffle)
                         }
                     }
                 }
-                val letters = waitUntil(30.seconds, { it.size == 1 }) {
+                val letters = eventually(30.seconds) {
                     kafka.records("lettered.dead-letters", StringDeserializer(), ByteArrayDeserializer())
+                        .also { it shouldHaveSize 1 }
                 }
                 And("one letter is on the dead-letter topic") {
                     letters.singleOrNull().shouldNotBeNull { letter ->
@@ -174,11 +177,8 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                         }
                     }
                 }
-                And("both records are committed past") {
-                    waitUntil(
-                        30.seconds,
-                        { it == 2L },
-                    ) { kafka.committed("projection-lettered", "lettered") } shouldBe 2L
+                And("both records are committed past").eventually(30.seconds) {
+                    kafka.committed("projection-lettered", "lettered") shouldBe 2L
                 }
             }
         }
