@@ -23,16 +23,22 @@ import io.github.matthewjones372.proofload.stages
 import io.github.matthewjones372.proofload.step
 import io.github.matthewjones372.proofload.then
 import org.eclipse.jetty.client.HttpClient
+import org.eclipse.jetty.client.Response
+import org.eclipse.jetty.client.Result
 import org.eclipse.jetty.client.StringRequestContent
+import org.eclipse.jetty.http.HttpHeader
 import org.eclipse.jetty.io.ByteBufferPool
 import petshop.api.ProblemDto
 import petshop.api.ShopCodecs
 import petshop.api.adoptPet
 import petshop.api.getPet
 import petshop.api.listPets
+import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.SplittableRandom
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -135,16 +141,53 @@ private class JettyTransport(target: String, private val timeout: Duration) :
     }
 
     override fun send(request: RequestSpec): ResponseSpec {
-        val response = client.newRequest(base + request.target)
+        val answer = CompletableFuture<ResponseSpec>()
+        client.newRequest(base + request.target)
             .method(request.method.name)
             .timeout(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
             .headers { headers -> request.headers.forEach { (name, value) -> headers.add(name, value) } }
             .apply { request.body?.let { body(StringRequestContent("application/json", it)) } }
-            .send()
-        return ResponseSpec(response.status, response.headers.map { it.name to it.value }, response.contentAsString)
+            .send(BodyInOneArray(answer))
+        // The cause, as a blocking `send()` throws it: a timeout stays a `TimeoutException`.
+        return try {
+            answer.get()
+        } catch (e: ExecutionException) {
+            throw e.cause ?: e
+        }
     }
 
     override fun close() = client.stop()
+}
+
+/**
+ * The body copied once, into an array sized by `Content-Length`. `ContentResponse` accumulates into a buffer of its own
+ * and then copies that out with `toArray`, and `getContentAsString` decodes it a third time.
+ */
+private class BodyInOneArray(private val answer: CompletableFuture<ResponseSpec>) : Response.Listener {
+    private var body = ByteArray(0)
+    private var size = 0
+
+    override fun onHeaders(response: Response) {
+        val length = response.headers.getLongField(HttpHeader.CONTENT_LENGTH)
+        if (length > 0) body = ByteArray(length.toInt())
+    }
+
+    override fun onContent(response: Response, content: ByteBuffer) {
+        val arriving = content.remaining()
+        if (size + arriving > body.size) body = body.copyOf(maxOf(size + arriving, body.size * 2))
+        content.get(body, size, arriving)
+        size += arriving
+    }
+
+    override fun onComplete(result: Result) {
+        if (result.isFailed) {
+            answer.completeExceptionally(result.failure)
+        } else {
+            val response = result.response
+            val bytes = if (size == body.size) body else body.copyOf(size)
+            answer.complete(ResponseSpec(response.status, response.headers.map { it.name to it.value }, bytes))
+        }
+    }
 }
 
 private val ROLL = sessionKey<Int>("roll")
