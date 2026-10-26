@@ -292,7 +292,7 @@ adopt pet                         petshop-web   the click
         GET, POST                 petshop       the calls to the chip registry
 ```
 
-The trace crosses the outbox because the write keeps what it was made in (lark's `Carriers.capture()`) in the
+The trace crosses the outbox because the write keeps what it was made in (surefold's `Carriers.capture()`) in the
 row's `metadata` column, and the relay publishes each event inside it. On Kafka it rides as record headers, and the
 projection handles each record inside them. `/events` hands each event's `traceparent` to the page, which opens
 `live event` under it. An arrival is a trace of its own, `arrival`, that ends the same way.

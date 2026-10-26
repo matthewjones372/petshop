@@ -41,5 +41,5 @@ interface PetShop {
 
     fun find(id: PetId): Pet?
 
-    fun adopt(id: PetId, by: String): io.github.matthewjones372.lark.fail.Either<PetShopError, Pet>
+    fun adopt(id: PetId, by: String): io.github.matthewjones372.surefold.fail.Either<PetShopError, Pet>
 }

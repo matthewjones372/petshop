@@ -3,7 +3,7 @@ plugins {
     id("io.github.matthewjones372.kimney") version "0.3.0"
 }
 
-val larkVersion: String = providers.gradleProperty("larkVersion").get()
+val surefoldVersion: String = providers.gradleProperty("surefoldVersion").get()
 
 dependencies {
     // api, so a module that depends on this one resolves the pelican modules named below without versions.
@@ -15,9 +15,9 @@ dependencies {
     api("io.github.matthewjones372:pelican-health")
     // A span per request, continuing an inbound traceparent.
     api("io.github.matthewjones372:pelican-metrics-otel")
-    api("io.github.matthewjones372:lark-stream:$larkVersion")
+    api("io.github.matthewjones372:surefold-stream:$surefoldVersion")
 
-    testImplementation("io.github.matthewjones372:lark-stream-forks:$larkVersion")
+    testImplementation("io.github.matthewjones372:surefold-stream-forks:$surefoldVersion")
     testImplementation("io.github.matthewjones372:pelican-test")
     testImplementation("io.github.matthewjones372:pelican-test-jetty")
     testImplementation("io.github.matthewjones372:pelican-test-golden")

@@ -1,8 +1,8 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.junit.Suite
-import io.github.matthewjones372.lark.junit.shouldBe
-import io.github.matthewjones372.lark.junit.story
+import io.github.matthewjones372.surefold.junit.Suite
+import io.github.matthewjones372.surefold.junit.shouldBe
+import io.github.matthewjones372.surefold.junit.story
 import org.apache.avro.Schema
 import org.apache.avro.SchemaCompatibility
 import petshop.domain.OnShelf

@@ -1,15 +1,15 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.actor.ActorRef
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.actor.actor
-import io.github.matthewjones372.lark.app.actor.actors
-import io.github.matthewjones372.lark.app.boundTo
-import io.github.matthewjones372.lark.app.closingOf
-import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.singleOf
-import io.github.matthewjones372.lark.fail.Either
-import io.github.matthewjones372.lark.stream.StreamBackend
+import io.github.matthewjones372.surefold.actor.ActorRef
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.actor.actor
+import io.github.matthewjones372.surefold.app.actor.actors
+import io.github.matthewjones372.surefold.app.boundTo
+import io.github.matthewjones372.surefold.app.closingOf
+import io.github.matthewjones372.surefold.app.single
+import io.github.matthewjones372.surefold.app.singleOf
+import io.github.matthewjones372.surefold.fail.Either
+import io.github.matthewjones372.surefold.stream.StreamBackend
 import io.opentelemetry.api.trace.Tracer
 import petshop.domain.ChipRegistry
 import petshop.domain.Pet

@@ -1,13 +1,13 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.overriding
-import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.subgraph
-import io.github.matthewjones372.lark.fail.Either
-import io.github.matthewjones372.lark.fail.left
-import io.github.matthewjones372.lark.fail.right
 import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMock
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.overriding
+import io.github.matthewjones372.surefold.app.single
+import io.github.matthewjones372.surefold.app.subgraph
+import io.github.matthewjones372.surefold.fail.Either
+import io.github.matthewjones372.surefold.fail.left
+import io.github.matthewjones372.surefold.fail.right
 import petshop.domain.Chip
 import petshop.domain.ChipRegistry
 import petshop.domain.NotRegistered

@@ -1,11 +1,11 @@
 package petshop.app
 
 import com.typesafe.config.ConfigException
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.choice
-import io.github.matthewjones372.lark.app.typesafe.Reading
-import io.github.matthewjones372.lark.app.typesafe.config
-import io.github.matthewjones372.lark.kafka.Topic
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.choice
+import io.github.matthewjones372.surefold.app.typesafe.Reading
+import io.github.matthewjones372.surefold.app.typesafe.config
+import io.github.matthewjones372.surefold.kafka.Topic
 
 /** Set by `petshop.bus.kind` in application.conf, overridden by `BUS`. */
 sealed interface BusSettings {

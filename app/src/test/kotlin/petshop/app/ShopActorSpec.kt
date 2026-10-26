@@ -1,14 +1,14 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.actor.ActorRef
-import io.github.matthewjones372.lark.actor.Reply
-import io.github.matthewjones372.lark.actor.ask
-import io.github.matthewjones372.lark.app.subgraph
-import io.github.matthewjones372.lark.app.testApp
-import io.github.matthewjones372.lark.assert.shouldBeLeft
-import io.github.matthewjones372.lark.assert.shouldBeRight
-import io.github.matthewjones372.lark.fail.Either
-import io.github.matthewjones372.lark.test.story
+import io.github.matthewjones372.surefold.actor.ActorRef
+import io.github.matthewjones372.surefold.actor.Reply
+import io.github.matthewjones372.surefold.actor.ask
+import io.github.matthewjones372.surefold.app.subgraph
+import io.github.matthewjones372.surefold.app.testApp
+import io.github.matthewjones372.surefold.assert.shouldBeLeft
+import io.github.matthewjones372.surefold.assert.shouldBeRight
+import io.github.matthewjones372.surefold.fail.Either
+import io.github.matthewjones372.surefold.test.story
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import petshop.domain.Adopted

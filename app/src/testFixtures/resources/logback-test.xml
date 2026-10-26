@@ -13,7 +13,7 @@
 
     <!-- At INFO for LoggingSpec's appender, but not printed: the tests provoke refusals on purpose. -->
     <logger name="petshop" level="INFO" additivity="false"/>
-    <logger name="lark" level="INFO" additivity="false"/>
+    <logger name="surefold" level="INFO" additivity="false"/>
 
     <root level="WARN">
         <appender-ref ref="console"/>

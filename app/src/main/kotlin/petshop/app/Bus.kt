@@ -1,17 +1,17 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Carriers
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.boundTo
-import io.github.matthewjones372.lark.app.closingOf
-import io.github.matthewjones372.lark.app.singleOf
-import io.github.matthewjones372.lark.fail.Either
-import io.github.matthewjones372.lark.fail.map
-import io.github.matthewjones372.lark.fail.mapLeft
-import io.github.matthewjones372.lark.stream.Hub
-import io.github.matthewjones372.lark.stream.Run
-import io.github.matthewjones372.lark.stream.map
-import io.github.matthewjones372.lark.stream.runFold
+import io.github.matthewjones372.surefold.Carriers
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.boundTo
+import io.github.matthewjones372.surefold.app.closingOf
+import io.github.matthewjones372.surefold.app.singleOf
+import io.github.matthewjones372.surefold.fail.Either
+import io.github.matthewjones372.surefold.fail.map
+import io.github.matthewjones372.surefold.fail.mapLeft
+import io.github.matthewjones372.surefold.stream.Hub
+import io.github.matthewjones372.surefold.stream.Run
+import io.github.matthewjones372.surefold.stream.map
+import io.github.matthewjones372.surefold.stream.runFold
 import io.opentelemetry.api.common.Attributes
 import petshop.domain.ShopEvent
 

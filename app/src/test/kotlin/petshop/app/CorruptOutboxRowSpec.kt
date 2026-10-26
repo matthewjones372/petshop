@@ -1,11 +1,11 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.liquibase.Migrated
-import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.subgraph
-import io.github.matthewjones372.lark.app.testApp
-import io.github.matthewjones372.lark.test.story
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.liquibase.Migrated
+import io.github.matthewjones372.surefold.app.single
+import io.github.matthewjones372.surefold.app.subgraph
+import io.github.matthewjones372.surefold.app.testApp
+import io.github.matthewjones372.surefold.test.story
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test

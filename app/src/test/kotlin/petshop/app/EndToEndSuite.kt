@@ -1,15 +1,5 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.Resource
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.overriding
-import io.github.matthewjones372.lark.app.single
-import io.github.matthewjones372.lark.app.typesafe.overridingConfig
-import io.github.matthewjones372.lark.app.use
-import io.github.matthewjones372.lark.junit.SharedSuite
-import io.github.matthewjones372.lark.junit.shouldBe
-import io.github.matthewjones372.lark.junit.shouldBeRight
-import io.github.matthewjones372.lark.junit.story
 import io.github.matthewjones372.pelican.health.health
 import io.github.matthewjones372.pelican.jetty.PelicanServer
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
@@ -18,6 +8,16 @@ import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.pelican.test.shouldBeError
 import io.github.matthewjones372.pelican.test.shouldBeOk
 import io.github.matthewjones372.pelican.test.wiremock.PelicanWireMock
+import io.github.matthewjones372.surefold.Resource
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.overriding
+import io.github.matthewjones372.surefold.app.single
+import io.github.matthewjones372.surefold.app.typesafe.overridingConfig
+import io.github.matthewjones372.surefold.app.use
+import io.github.matthewjones372.surefold.junit.SharedSuite
+import io.github.matthewjones372.surefold.junit.shouldBe
+import io.github.matthewjones372.surefold.junit.shouldBeRight
+import io.github.matthewjones372.surefold.junit.story
 import org.apache.kafka.common.serialization.LongDeserializer
 import petshop.api.ShopCodecs
 import petshop.api.adoptPet

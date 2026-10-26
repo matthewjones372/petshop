@@ -6,7 +6,10 @@ import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.StatusCode
 import io.opentelemetry.api.trace.Tracer
 
-/** A span with a kind and attributes, ended in error on a throw: lark's `span` starts every span internal and bare. */
+/**
+ * A span with a kind and attributes, ended in error on a throw: surefold's `span` starts every span internal and
+ * bare.
+ */
 internal fun <A> Tracer.span(
     name: String,
     kind: SpanKind,

@@ -1,17 +1,17 @@
 pluginManagement {
-    val larkVersion = providers.gradleProperty("larkVersion").get()
+    val surefoldVersion = providers.gradleProperty("surefoldVersion").get()
     val pelicanVersion = providers.gradleProperty("pelicanVersion").get()
     repositories {
         mavenCentral()
         gradlePluginPortal()
-        if (listOf(larkVersion, pelicanVersion).any { it.endsWith("-SNAPSHOT") }) {
+        if (listOf(surefoldVersion, pelicanVersion).any { it.endsWith("-SNAPSHOT") }) {
             maven("https://central.sonatype.com/repository/maven-snapshots/")
             mavenLocal()
         }
     }
     // Each plugin ships from the same build as its library, so it follows the library's version.
     plugins {
-        id("io.github.matthewjones372.lark.wiring") version larkVersion
+        id("io.github.matthewjones372.surefold.wiring") version surefoldVersion
         id("io.github.matthewjones372.pelican") version pelicanVersion
     }
 }

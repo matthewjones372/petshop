@@ -16,7 +16,7 @@ docker compose -f demo/docker-compose.yml up -d postgres registry
 ```
 
 The shop runs on Pelican's Jetty backend and reads and writes its bodies with kotlinx.serialization. Jetty serves the
-API and calls the chip registry, and Lark's streams run on its Forks, on virtual threads. Neither Pekko nor Scala is
+API and calls the chip registry, and Surefold's streams run on its Forks, on virtual threads. Neither Pekko nor Scala is
 on the classpath, and `./gradlew check` fails if a dependency brings Pekko, Scala, `pelican-jackson` or
 `jackson-module-kotlin` back. [docs/performance.md](docs/performance.md) is the comparison with Pekko HTTP and Jackson
 that settled it.
@@ -48,7 +48,7 @@ Tempo's span metrics; `demo/README.md` says what each number is.
 running shop. Grafana is at <http://localhost:3000> and Estate at <http://localhost:8095>; see `demo/README.md`.
 
 [tweet-street](https://github.com/matthewjones372/tweet-street) uses the same libraries on something larger: a bank
-in four services, with accounts as actors on a three-node Lark cluster, transfers as sagas, and Proofload and chaos
+in four services, with accounts as actors on a three-node Surefold cluster, transfers as sagas, and Proofload and chaos
 runs against it. Petshop stays the small one, where each library can be judged on its own.
 
 ## Libraries and dependencies
@@ -58,7 +58,7 @@ The libraries being tried out:
 | Library | What it does here |
 |---|---|
 | [Pelican](https://github.com/matthewjones372/pelican) | the shop's HTTP contract as values, served on Jetty and read with kotlinx.serialization: routes, the OpenAPI document, Swagger UI and a themed RapiDoc reference that sends requests, handlers that must answer a declared failure; live and ready probes (`pelican-health`); the chip registry's client generated from its contract; typed WireMock stubs, golden files and a typed test client |
-| [Lark](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`lark-app`), with its settings and secrets read and reported by `lark-app-typesafe`, the schema migrated by `lark-app-liquibase` before anything reads it, and the graph checked at build time by the wiring plugin; the shop's actor, on virtual threads in a `flock` (`lark-actor`, `lark-app-actor`); the background work, the readiness gauges and the in-process bus as `Stream`s on Lark's Forks (`lark-stream`); Kafka as a `Stream` that commits what it handled and restarts after a defect (`lark-kafka`); a circuit breaker on the chip registry, and retries on schedules; `Either` and `Fail` for declared failures, from the domain up; logs, metrics and traces that cross a fork (`lark-slf4j`, `lark-micrometer`, `lark-otel`) |
+| [Surefold](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`surefold-app`), with its settings and secrets read and reported by `surefold-app-typesafe`, the schema migrated by `surefold-app-liquibase` before anything reads it, and the graph checked at build time by the wiring plugin; the shop's actor, on virtual threads in a `flock` (`surefold-actor`, `surefold-app-actor`); the background work, the readiness gauges and the in-process bus as `Stream`s on Surefold's Forks (`surefold-stream`); Kafka as a `Stream` that commits what it handled and restarts after a defect (`surefold-kafka`); a circuit breaker on the chip registry, and retries on schedules; `Either` and `Fail` for declared failures, from the domain up; logs, metrics and traces that cross a fork (`surefold-slf4j`, `surefold-micrometer`, `surefold-otel`) |
 | [Proofload](https://github.com/matthewjones372/proofload) | load tests that start the whole service in-process, assert correctness under load, and write an HTML report |
 | [ExoQuery](https://github.com/ExoQuery/ExoQuery) | every statement against the outbox table, written as Kotlin and checked at compile time |
 | [kimney](https://github.com/matthewjones372/kimney) | the mappings between the shop's events and their wire records, and between the domain and the API's DTOs, derived at compile time |
@@ -74,17 +74,17 @@ What they run on, and what the tests use:
 | WireMock | the chip registry in tests and the demo, stubbed through Pelican's `pelican-test-wiremock` |
 | Kotest assertions on JUnit 6 | every test; the end-to-end and app tests are written as stories (below) |
 | OpenTelemetry, Micrometer, Prometheus, Grafana, Tempo | a span per request, adoption, chip-registry call, outbox write, publish and projection, one trace from the browser through Kafka and back, exported over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; metrics at `/metrics`; the demo's dashboard and traces |
-| Logback | where Lark's log lines end up, through `lark-slf4j` |
+| Logback | where Surefold's log lines end up, through `surefold-slf4j` |
 | Apache Kafka, avro4k, Confluent's schema registry client | the bus on a broker: events as Avro in the schema registry's wire format, written by avro4k's Confluent serde; tests run the broker in a container and Confluent's in-process `mock://` registry |
 
 ## Modules
 
 | Module | What it holds | Uses |
 |---|---|---|
-| `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | Lark |
+| `domain` | `Pet`, `PetShop`, `ChipRegistry`, and the ways adopting can fail | Surefold |
 | `registry` | the chip registry's contract as endpoint values, and the client generated from it | Pelican |
 | `api` | the endpoints, their failures, the handlers and the DTOs | Pelican, Jetty, kimney |
-| `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus (in process, or Kafka carrying Avro) and its consumer, the wiring, `main` | Lark, kimney |
+| `app` | the actor, the arrivals stream, the chip registry's client, the outbox and its relay, the bus (in process, or Kafka carrying Avro) and its consumer, the wiring, `main` | Surefold, kimney |
 | `outbox-table` | the outbox's row and its SQL, in an included build on the Kotlin version ExoQuery supports | ExoQuery |
 | `loadtest` | the shop under load, started in-process | Proofload |
 
@@ -168,7 +168,7 @@ Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT �
   it keeps counting across restarts.
 - **Every statement is ExoQuery**, apart from the schema, which is a
   SQL-formatted Liquibase changelog (`app/src/main/resources/db/changelog.sql`)
-  run by `lark-app-liquibase` as a graph node: the outbox takes its `Migrated`,
+  run by `surefold-app-liquibase` as a graph node: the outbox takes its `Migrated`,
   so it cannot be built before the tables exist. The insert is `insert<OutboxRow> { setParams(row).excluding(seq) }.returning { it.seq }`.
   ExoQuery has no locking clause, so the claim is a `@SqlFragment` that wraps
   the query in a free block:
@@ -198,12 +198,12 @@ Adopt ─▶ shop actor ─▶ BEGIN; UPSERT pets; INSERT INTO outbox; COMMIT �
   both. Each instance's projection sees only its own relay's bus, so the two
   counts must add up to exactly the number of events recorded. With the
   locking clause removed, they add up to more.
-- **The relay is a stream, run on Lark's Forks.** `Stream.tick` makes the
+- **The relay is a stream, run on Surefold's Forks.** `Stream.tick` makes the
   claim on a virtual thread (`mapPar`, because JDBC blocks), and publishes
   inside it while the rows are held. A refusal is logged and counted, and the
   event stays in the table for the next tick. `restartOnDefect` restarts the
   relay after a claim that throws, and the rolled-back claim loses nothing.
-- **The bus** is Lark's `Hub` in the same process, with a bounded queue for
+- **The bus** is Surefold's `Hub` in the same process, with a bounded queue for
   each reader, standing in for a broker. Like a broker, it refuses when a
   reader is full and once closed.
 - **The consumer** is `bus.consume { … }`. It folds each event into one value
@@ -234,7 +234,7 @@ The first such test in a JVM waits 25 to 35 seconds for the containers to start,
 
 `KafkaBus` is the same `EventBus` on a real broker, and the projection does not
 change. Each event goes out as an Avro record in the schema registry's wire
-format, keyed by its `seq` as a number, and comes back through `lark-kafka`'s consumer
+format, keyed by its `seq` as a number, and comes back through `surefold-kafka`'s consumer
 loop, which commits an offset only once the projection has folded that event
 in.
 
@@ -259,7 +259,7 @@ ShopEvent ◀──kimney── wire record ◀──avro4k's Confluent serde─
 - **One schema per topic.** The three events are a union inside one
   `ShopEventRecord`, so the registry holds versions of one subject instead of
   a record type per case.
-- **Publishing uses `lark-kafka`'s `Producer`.** A record it gives up on is a
+- **Publishing uses `surefold-kafka`'s `Producer`.** A record it gives up on is a
   `BusRefused`, and the event stays in the outbox. The time a send may take is
   set by the producer's own timeouts, without a `get()` around the send.
 - **Two kinds of failure are handled differently.** A record that is not the
@@ -272,7 +272,7 @@ ShopEvent ◀──kimney── wire record ◀──avro4k's Confluent serde─
 `petshop.bus.kind` (`BUS` in the environment) picks the bus: `in-process` by
 default, or `kafka`, which reads the broker, topic, group and registry from
 `petshop.bus.kafka`. The choice is made where the graph is assembled, with
-lark-app's `Config.choosing`, so the unused branch has no node: a shop on the
+surefold-app's `Config.choosing`, so the unused branch has no node: a shop on the
 in-process bus opens no producer, and a shop on Kafka starts no hub. Any other
 `kind` stops the application from starting, with a message naming where it was
 set.
@@ -291,7 +291,7 @@ fun petshopFrom(conf: Config): Module =
     configOf(conf) + settings + telemetry + database + http + registry + theShop + checks + meters + arrivals +
         events + bus(conf) + web
 
-object Petshop : LarkApp<PelicanServer>() {
+object Petshop : SurefoldApp<PelicanServer>() {
     override val module: Module = petshop
     override fun AppScope.run(root: PelicanServer) {
         logInfo(reported())
@@ -304,7 +304,7 @@ object Petshop : LarkApp<PelicanServer>() {
 anything. `run` logs where every setting came from, secrets masked, and returns
 when the process is asked to stop; the graph's release then stops the server,
 the streams and the pool in reverse order. The compiler plugin checks the graph against it as you type, and
-`larkWiring` checks it by running it.
+`surefoldWiring` checks it by running it.
 
 The load test starts the same value in its own process, runs two thousand
 requests through it, and gets the port back afterwards.
@@ -320,7 +320,7 @@ The registry's contract is written the same way as the shop's own, as values,
 in `registry`. Pelican's Gradle plugin generates the client from them; the
 generated code is committed and checked on every build. `HttpChipRegistry`
 holds the rest: the shop's decision about which answers mean "no chip" and
-which mean "could not ask", and a lark circuit breaker, so that after five
+which mean "could not ask", and a surefold circuit breaker, so that after five
 failures in a row an adoption is refused at once instead of after the timeout.
 
 ## Tests
@@ -330,8 +330,8 @@ Every test in `app` is written as a story: `Given`, `When`, `Then`, `And` and
 check what the last one did. A failing step ends the story with an
 `AssertionError` whose message is the story up to that step, so CI and the
 JUnit XML show where it broke. The console output is coloured under
-`FORCE_COLOR` or in IntelliJ. The code is Lark's
-`lark-test` module.
+`FORCE_COLOR` or in IntelliJ. The code is Surefold's
+`surefold-test` module.
 
 The end-to-end test uses the whole graph that `main` starts, with three nodes
 swapped: the registry's location, the database the outbox is in, and the bus,
@@ -383,7 +383,7 @@ Story: somebody adopts a tortoise, and every part of the service hears about it
 
 `use` releases the port, the actor system and the pool when the block returns,
 so there is no teardown to write. `eventually` blocks instead of suspending,
-because `use`'s block is not `suspend`, and its timeout uses Lark's clock.
+because `use`'s block is not `suspend`, and its timeout uses Surefold's clock.
 
 A test of one part starts only that part. `subgraph` cuts the graph down to
 what a node depends on, and a collaborator is replaced in one of two places,
@@ -400,7 +400,7 @@ registry.stub(lookupChip, 1L) answers ok(ChipRecord("981000000000001", keeper = 
 registry.stub(recordKeeper, In2("981000000000001", NewKeeper("Ada"))) fails Fault.CONNECTION_RESET_BY_PEER
 ```
 
-The relay's tests run it on a clock the test controls (`lark-stream-test`), so
+The relay's tests run it on a clock the test controls (`surefold-stream-test`), so
 an hour of ticks is one `adjust` call and nothing sleeps. The API the shop
 offers its callers is recorded in golden files: `golden.operations(api.spec())`
 fails on a change that would break an existing caller.
@@ -423,11 +423,11 @@ exec(adoptTaken) { step ->
 | | Verdict |
 |---|---|
 | Pelican | Worth it. The most benefit for the least effort: one contract gives the routes, the documents, the probes, a client and its stubs |
-| Lark, the application graph | Worth it for a service with several resources and tests that start parts of it. It does not reduce the amount of code; it rules out a set of mistakes |
-| Lark, configuration | Worth it. Every fault in a file at once, secrets that cannot be printed, and a report of where each setting came from |
-| Lark, streams | Worth it for background work: the relay, the arrivals, the projection and the readiness gauges are one shape, testable on a clock the test controls, and restart themselves |
-| Lark, resilience | Worth it. A circuit breaker and retries are a few lines, and report their own metrics |
-| Lark, Kafka | Worth it. A topic is a stream like the others, an offset is committed only once its event is handled, and a registry outage pauses the consumer instead of ending it |
+| Surefold, the application graph | Worth it for a service with several resources and tests that start parts of it. It does not reduce the amount of code; it rules out a set of mistakes |
+| Surefold, configuration | Worth it. Every fault in a file at once, secrets that cannot be printed, and a report of where each setting came from |
+| Surefold, streams | Worth it for background work: the relay, the arrivals, the projection and the readiness gauges are one shape, testable on a clock the test controls, and restart themselves |
+| Surefold, resilience | Worth it. A circuit breaker and retries are a few lines, and report their own metrics |
+| Surefold, Kafka | Worth it. A topic is a stream like the others, an offset is committed only once its event is handled, and a registry outage pauses the consumer instead of ending it |
 | Proofload | Worth it. The least effort of anything here: correctness under load in a few lines |
 | kimney | Worth it once events or the API have a wire format of their own; a missing field is a compile error |
 | ExoQuery | Not here. The type checking is real, but for six statements it costs a separate build on an older Kotlin |
@@ -473,7 +473,7 @@ has to pick another. A declared status whose body does not match the
 declared shape is not that failure: the generated client throws
 `ApiCallFailed`, which the shop treats as the registry being unreachable.
 
-### Lark: the application graph
+### Surefold: the application graph
 
 **What it gives.** Each of these has a test in this repository:
 
@@ -483,7 +483,7 @@ declared shape is not that failure: the generated client throws
 - **An actor cannot answer with null.** `Reply<A : Any>` does not accept a
   nullable type, so "no such pet" is an `Option<Pet>`.
 - **The wiring is checked at build time.** A missing key is a compiler error on
-  the recipe that asked for it, and `larkWiring` runs every graph on `check`.
+  the recipe that asked for it, and `surefoldWiring` runs every graph on `check`.
 - **Fakes must replace something.** `overriding` refuses a node under a key the
   graph does not hold.
 - **Nothing is left open.** The port, the streams, the actor system, the pool
@@ -494,7 +494,7 @@ declared shape is not that failure: the generated client throws
   the outcome as a label answers both how many adoptions and how many refusals.
 - **Log lines can be searched by pet.** `adopt` annotates `pet_id` and
   `adopted_by`; the pair survives the fork the ask runs on and reaches
-  Logback's MDC through `lark-slf4j`.
+  Logback's MDC through `surefold-slf4j`.
 
 **What it costs.** `Wiring.kt` holds a graph a hand-written `main` might wire in
 fewer lines. `singleOf(::Thing)` shortens a plain constructor, but most nodes
@@ -506,9 +506,9 @@ likely to break on a Kotlin upgrade. It only reads graphs from source it can
 see: IntelliJ runs it only with `kotlin.k2.only.bundled.compiler.plugins.enabled`
 unchecked, a module from another Gradle module has no source to read, and an
 incremental compile can skip a graph spread over several files. It says when it
-has not read a graph, and `larkWiring`, which runs the graph, is not affected.
+has not read a graph, and `surefoldWiring`, which runs the graph, is not affected.
 
-### Lark: configuration
+### Surefold: configuration
 
 **What it gives.** Each module reads its own section with `config(path) { }`,
 and a bad file reports every fault at once, in Typesafe Config's words with the
@@ -523,7 +523,7 @@ key with `overridingConfig` and keeps the rest of `application.conf`.
 value overrode, throws on the `key = default` / `key = ${?ENV}` pair
 `application.conf` uses, so the report comes from the merged document.
 
-### Lark: streams
+### Surefold: streams
 
 **What it gives.**
 
@@ -547,20 +547,20 @@ value overrode, throws on the `key = default` / `key = ${?ENV}` pair
 **Its limits.** Forks' `stop` interrupts the loop, which should cut short a
 claim blocked on Postgres and roll it back; no test here checks that.
 
-### Lark: resilience
+### Surefold: resilience
 
 **What it gives.** The chip registry is called through a `policy` with a
 `CircuitBreaker`: after five failures in a row the shop stops asking and refuses
 adoptions at once, then lets one trial through on an exponential schedule. A
 declared 404 is an answer, not a failure, so it never opens the breaker.
-`lark.breaker.state` and `lark.policy.calls` are on `/metrics` without any code
+`surefold.breaker.state` and `surefold.policy.calls` are on `/metrics` without any code
 of the shop's. The same `Schedule` values drive the relay's and the Kafka
 consumer's restarts.
 
 **Its limits.** No retry: `lookupChip` is a `GET` and could be retried, but
 `recordKeeper` is a `POST` the registry gives no idempotency key for.
 
-### Lark: Kafka
+### Surefold: Kafka
 
 **What it gives.** Kafka is a `Stream` like any other. `runCommitting()` commits
 an offset only once its record has reached the end of the stream, so the
@@ -575,9 +575,9 @@ backoff capped at 30 seconds. The producer's failure is a value,
 adds Confluent's repository, limited to `io.confluent`. avro4k's serde needs
 Confluent 8.3, which asks for its own `8.3.0-ccs` build of the Kafka 4.3
 client, so the build pins Apache's `4.3.0` to keep one client on the classpath,
-the same client `lark-kafka` is built against.
+the same client `surefold-kafka` is built against.
 
-**Its limits.** Delivery is at least once. `lark-kafka` has `transacted` for a
+**Its limits.** Delivery is at least once. `surefold-kafka` has `transacted` for a
 consumer that writes back to Kafka, but the projection folds into memory, so it
 dedupes by `seq` instead.
 
@@ -616,7 +616,7 @@ and every mapping between them is derived at compile time. A field one side
 cannot fill, a species the DTO does not have, or a failure added to
 `PetShopError` without a place in `ProblemDto` is a compile error on the call
 that uses it, and the message names the fix. The errors show in IntelliJ with
-the same registry setting Lark's need.
+the same registry setting Surefold's need.
 
 **What it costs.** A compiler plugin in `api`'s and `app`'s builds that stops
 the build on any Kotlin minor version it does not support yet.
@@ -635,7 +635,7 @@ loads on the project's Kotlin, or for a project with many more queries.
 
 ## Versions
 
-Pelican `1.0.1-SNAPSHOT`, Lark `0.10.2-SNAPSHOT` (its Gradle wiring plugin too, which follows `larkVersion`), Proofload
+Pelican `1.0.1-SNAPSHOT`, Surefold `0.10.2-SNAPSHOT` (its Gradle wiring plugin too, which follows `surefoldVersion`), Proofload
 `0.1.0-rc4`, ExoQuery `2.0.4.PL`, kimney `0.3.0`, Jetty `12.1.13`,
 kotlinx.serialization `1.11.0`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`,
 HikariCP `7.1.0`, OpenTelemetry SDK `1.62.0`, Micrometer's Prometheus registry `1.16.6`, Logback `1.5.34`, Kotest `6.2.4`, JUnit `6.1.3`,

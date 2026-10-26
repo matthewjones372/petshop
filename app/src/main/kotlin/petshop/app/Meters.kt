@@ -1,15 +1,15 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.closingOf
-import io.github.matthewjones372.lark.gauge
-import io.github.matthewjones372.lark.stream.Running
-import io.github.matthewjones372.lark.stream.Stream
-import io.github.matthewjones372.lark.stream.StreamBackend
-import io.github.matthewjones372.lark.stream.map
-import io.github.matthewjones372.lark.stream.runFold
-import io.github.matthewjones372.lark.stream.start
-import io.github.matthewjones372.lark.stream.tick
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.closingOf
+import io.github.matthewjones372.surefold.gauge
+import io.github.matthewjones372.surefold.stream.Running
+import io.github.matthewjones372.surefold.stream.Stream
+import io.github.matthewjones372.surefold.stream.StreamBackend
+import io.github.matthewjones372.surefold.stream.map
+import io.github.matthewjones372.surefold.stream.runFold
+import io.github.matthewjones372.surefold.stream.start
+import io.github.matthewjones372.surefold.stream.tick
 import io.micrometer.core.instrument.binder.jvm.ClassLoaderMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics

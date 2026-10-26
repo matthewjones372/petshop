@@ -81,7 +81,7 @@ export default function Layout(props: RouteSectionProps) {
       </main>
       <footer class="footer">
         <div class="footer-inner">
-          <span>petshop · Pelican, Lark and friends, one small shop</span>
+          <span>petshop · Pelican, Surefold and friends, one small shop</span>
         </div>
       </footer>
     </>

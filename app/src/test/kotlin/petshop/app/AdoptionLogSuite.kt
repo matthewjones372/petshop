@@ -1,14 +1,14 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.LogLevel
-import io.github.matthewjones372.lark.app.Module
-import io.github.matthewjones372.lark.app.testApp
-import io.github.matthewjones372.lark.capturingLogs
-import io.github.matthewjones372.lark.junit.Suite
-import io.github.matthewjones372.lark.junit.shouldBe
-import io.github.matthewjones372.lark.junit.shouldContain
-import io.github.matthewjones372.lark.junit.shouldContainKey
-import io.github.matthewjones372.lark.junit.story
+import io.github.matthewjones372.surefold.LogLevel
+import io.github.matthewjones372.surefold.app.Module
+import io.github.matthewjones372.surefold.app.testApp
+import io.github.matthewjones372.surefold.capturingLogs
+import io.github.matthewjones372.surefold.junit.Suite
+import io.github.matthewjones372.surefold.junit.shouldBe
+import io.github.matthewjones372.surefold.junit.shouldContain
+import io.github.matthewjones372.surefold.junit.shouldContainKey
+import io.github.matthewjones372.surefold.junit.story
 import petshop.domain.PetId
 import petshop.domain.PetShop
 

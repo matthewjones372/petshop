@@ -2,7 +2,7 @@
   "uid": "petshop-demo",
   "title": "Petshop",
   "tags": [
-    "lark",
+    "surefold",
     "demo"
   ],
   "timezone": "browser",
@@ -122,7 +122,7 @@
         "type": "prometheus",
         "uid": "petshop-prometheus"
       },
-      "description": "Every adoption since start, not a rate: a demo watched for a minute has too few samples for a window, and an empty stat reads as broken. lark's timed records milliseconds; Prometheus convention is seconds.",
+      "description": "Every adoption since start, not a rate: a demo watched for a minute has too few samples for a window, and an empty stat reads as broken. surefold's timed records milliseconds; Prometheus convention is seconds.",
       "gridPos": {
         "x": 18,
         "y": 0,

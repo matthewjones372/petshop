@@ -1,8 +1,8 @@
 package petshop.app
 
-import io.github.matthewjones372.lark.junit.Suite
-import io.github.matthewjones372.lark.junit.shouldBe
-import io.github.matthewjones372.lark.junit.shouldBeSameInstanceAs
+import io.github.matthewjones372.surefold.junit.Suite
+import io.github.matthewjones372.surefold.junit.shouldBe
+import io.github.matthewjones372.surefold.junit.shouldBeSameInstanceAs
 import petshop.api.PetDto
 import petshop.api.ShopCodecs
 import petshop.domain.Pet
