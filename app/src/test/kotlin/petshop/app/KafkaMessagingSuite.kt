@@ -8,7 +8,9 @@ import io.github.matthewjones372.surefold.junit.expect
 import io.github.matthewjones372.surefold.junit.shouldBe
 import io.github.matthewjones372.surefold.junit.shouldNotBeNull
 import io.github.matthewjones372.surefold.junit.story
+import io.github.matthewjones372.surefold.kafka.KafkaBroker
 import io.github.matthewjones372.surefold.kafka.Topic
+import io.github.matthewjones372.surefold.kafka.kafkaBroker
 import io.github.matthewjones372.surefold.stream.Forks
 import io.github.matthewjones372.surefold.stream.start
 import io.opentelemetry.api.common.Attributes
