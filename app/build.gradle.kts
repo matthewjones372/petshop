@@ -85,7 +85,7 @@ dependencies {
 
     testImplementation("io.github.matthewjones372:surefold-test:$surefoldVersion")
 
-    testImplementation("org.testcontainers:testcontainers-kafka:2.0.5")
+    testImplementation("io.github.matthewjones372:surefold-kafka-test:$surefoldVersion")
 
     testImplementation("io.github.matthewjones372:pelican-test-wiremock")
     testImplementation(project(":registry"))

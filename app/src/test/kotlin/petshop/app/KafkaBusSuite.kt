@@ -12,12 +12,12 @@ import io.github.matthewjones372.surefold.junit.shouldNotBeNull
 import io.github.matthewjones372.surefold.junit.story
 import io.github.matthewjones372.surefold.kafka.DEAD_LETTER_HEADER
 import io.github.matthewjones372.surefold.kafka.DecodeError
+import io.github.matthewjones372.surefold.kafka.KafkaBroker
 import io.github.matthewjones372.surefold.kafka.Topic
+import io.github.matthewjones372.surefold.kafka.kafkaBroker
 import io.github.matthewjones372.surefold.stream.Forks
 import io.github.matthewjones372.surefold.stream.start
 import io.github.matthewjones372.surefold.test.eventually
-import org.apache.kafka.clients.producer.KafkaProducer
-import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.kafka.common.serialization.ByteArraySerializer
 import org.apache.kafka.common.serialization.LongDeserializer
@@ -31,7 +31,6 @@ import petshop.domain.PetId
 import petshop.domain.Species
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
 private fun registry(scope: String): Map<String, Any> = mapOf("schema.registry.url" to "mock://$scope")
@@ -53,16 +52,7 @@ private class KafkaUnderContract(private val kafka: KafkaBroker) : BusUnderContr
 
     override val remembersReaders = true
 
-    override fun handled(name: String): Long? = kafka.committed("projection-$name", name)
-}
-
-private fun KafkaBroker.junkOn(topic: String) {
-    KafkaProducer(
-        mapOf<String, Any>("bootstrap.servers" to bootstrap),
-        StringSerializer(),
-        ByteArraySerializer(),
-    )
-        .use { it.send(ProducerRecord(topic, "junk", "not avro".toByteArray())).get(30, TimeUnit.SECONDS) }
+    override fun handled(name: String): Long? = kafka.committed("projection-$name", Topic(name))
 }
 
 /** The registry is Confluent's in-process `mock://`: real serializers and wire format, no server. */
@@ -83,7 +73,8 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                 }
                 When("the bus publishes it") { using(kafka.busOn("wire")) { it.publish(nibbles) } }
                 val records = eventually(30.seconds) {
-                    kafka.records("wire", LongDeserializer(), ByteArrayDeserializer()).also { it shouldHaveSize 1 }
+                    kafka.records(Topic("wire"), LongDeserializer(), ByteArrayDeserializer())
+                        .also { it shouldHaveSize 1 }
                 }
                 Then("one record is on the topic") {
                     records.singleOrNull().shouldNotBeNull { record ->
@@ -113,7 +104,10 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
             "a record that is not the shop's Avro goes to dead letters, and the projection reads on past it",
         ) { kafka ->
             story {
-                Given("a record on the topic that is not the shop's Avro") { kafka.junkOn("mixed") }
+                Given("a record on the topic that is not the shop's Avro") {
+                    val junk = "not avro".toByteArray()
+                    kafka.send(Topic("mixed"), "junk", junk, StringSerializer(), ByteArraySerializer())
+                }
                 val waffle = And(
                     "Waffle's arrival behind it",
                 ) { PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog)) }
@@ -137,14 +131,17 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                     }
                 }
                 And("the unreadable record and the event after it are both committed past").eventually(30.seconds) {
-                    kafka.committed("projection-mixed", "mixed") shouldBe 2L
+                    kafka.committed("projection-mixed", Topic("mixed")) shouldBe 2L
                 }
             }
         }
 
         test("by default an unreadable record is written to the dead-letter topic as it was read") { kafka ->
             story {
-                Given("a record on the topic that is not the shop's Avro") { kafka.junkOn("lettered") }
+                Given("a record on the topic that is not the shop's Avro") {
+                    val junk = "not avro".toByteArray()
+                    kafka.send(Topic("lettered"), "junk", junk, StringSerializer(), ByteArraySerializer())
+                }
                 val waffle = PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog))
                 val seen = ConcurrentLinkedQueue<Any>()
 
@@ -159,7 +156,7 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                     }
                 }
                 val letters = eventually(30.seconds) {
-                    kafka.records("lettered.dead-letters", StringDeserializer(), ByteArrayDeserializer())
+                    kafka.records(Topic("lettered.dead-letters"), StringDeserializer(), ByteArrayDeserializer())
                         .also { it shouldHaveSize 1 }
                 }
                 And("one letter is on the dead-letter topic") {
@@ -178,7 +175,7 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                     }
                 }
                 And("both records are committed past").eventually(30.seconds) {
-                    kafka.committed("projection-lettered", "lettered") shouldBe 2L
+                    kafka.committed("projection-lettered", Topic("lettered")) shouldBe 2L
                 }
             }
         }

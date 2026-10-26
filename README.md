@@ -70,12 +70,13 @@ What they run on, and what the tests use:
 | Eclipse Jetty | Pelican's server and the chip registry's client |
 | kotlinx.serialization | the bodies the shop serves and the registry's |
 | PostgreSQL, HikariCP | the `pets` and `outbox` tables |
-| Testcontainers | a real Postgres and a real Kafka broker for the tests, one container each per run: a fresh schema per graph, and topics and groups of each test's own |
+| Testcontainers | a real Postgres for the tests, one container per run, with a fresh schema per graph |
+| surefold-kafka-test | a real Kafka broker in the test JVM, one per suite, with topics and groups of each test's own |
 | WireMock | the chip registry in tests and the demo, stubbed through Pelican's `pelican-test-wiremock` |
 | Kotest assertions on JUnit 6 | every test; the end-to-end and app tests are written as stories (below) |
 | OpenTelemetry, Micrometer, Prometheus, Grafana, Tempo | a span per request, adoption, chip-registry call, outbox write, publish and projection, one trace from the browser through Kafka and back, exported over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; metrics at `/metrics`; the demo's dashboard and traces |
 | Logback | where Surefold's log lines end up, through `surefold-slf4j` |
-| Apache Kafka, avro4k, Confluent's schema registry client | the bus on a broker: events as Avro in the schema registry's wire format, written by avro4k's Confluent serde; tests run the broker in a container and Confluent's in-process `mock://` registry |
+| Apache Kafka, avro4k, Confluent's schema registry client | the bus on a broker: events as Avro in the schema registry's wire format, written by avro4k's Confluent serde; tests run surefold-kafka-test's broker in the JVM and Confluent's in-process `mock://` registry |
 
 ## Modules
 
@@ -640,6 +641,6 @@ Pelican `1.0.1-SNAPSHOT`, Surefold `0.10.2-SNAPSHOT` (its Gradle wiring plugin t
 kotlinx.serialization `1.11.0`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`,
 HikariCP `7.1.0`, OpenTelemetry SDK `1.62.0`, Micrometer's Prometheus registry `1.16.6`, Logback `1.5.34`, Kotest `6.2.4`, JUnit `6.1.3`,
 avro4k `2.12.0`, Confluent's Avro serializer `8.3.0`, Kafka client `4.3.0`, the
-`apache/kafka:4.3.1` image for tests and the demo, and
+`apache/kafka:4.3.1` image for the demo (tests run surefold-kafka-test's broker in the JVM), and
 `confluentinc/cp-schema-registry:8.3.2` in the demo. Kotlin 2.4.20 (2.3.0 for
 `outbox-table/`), JDK 25 (21 for `outbox-table/`).

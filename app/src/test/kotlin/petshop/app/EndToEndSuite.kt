@@ -18,6 +18,9 @@ import io.github.matthewjones372.surefold.junit.SharedSuite
 import io.github.matthewjones372.surefold.junit.shouldBe
 import io.github.matthewjones372.surefold.junit.shouldBeRight
 import io.github.matthewjones372.surefold.junit.story
+import io.github.matthewjones372.surefold.kafka.KafkaBroker
+import io.github.matthewjones372.surefold.kafka.Topic
+import io.github.matthewjones372.surefold.kafka.kafkaBroker
 import org.apache.kafka.common.serialization.LongDeserializer
 import petshop.api.ShopCodecs
 import petshop.api.adoptPet
@@ -121,7 +124,7 @@ object EndToEndSuite : SharedSuite<KafkaBroker>() {
                             }
 
                             val onTheTopic = When("the topic is read as the broker holds it") {
-                                kafka.records(TOPIC, LongDeserializer(), ShopEventDeserializer(schemas))
+                                kafka.records(Topic(TOPIC), LongDeserializer(), ShopEventDeserializer(schemas))
                             }
                             Then("every event the outbox recorded is on it once, keyed by its seq") {
                                 onTheTopic.map { it.key() }.sorted() shouldBe (1..database.recorded()).toList()
@@ -138,7 +141,7 @@ object EndToEndSuite : SharedSuite<KafkaBroker>() {
                                 adoptions shouldBe listOf("adopted Nibbles")
                             }
                             And("the projection committed every event").eventually(5.seconds) {
-                                kafka.committed(GROUP, TOPIC) shouldBe database.recorded()
+                                kafka.committed(GROUP, Topic(TOPIC)) shouldBe database.recorded()
                             }
                         }
                     } shouldBeRight Unit
