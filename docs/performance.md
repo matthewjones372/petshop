@@ -1,6 +1,9 @@
 # Performance on each stack and codec
 
 After this comparison petshop runs only on Jetty with kotlinx; the `petshop.stack` and `petshop.codec` switches below were removed in #74.
+The comparison ran on `StackComparison`, which `Ladder` (`loadtest/src/test/kotlin/petshop/load/Ladder.kt`) has since
+replaced, and its adoption figures are from before the shop was sharded: [Adoption since sharding](#adoption-since-sharding)
+has the newer ones.
 
 The shop runs on one of two stacks (`petshop.stack`, or `STACK`) and one of two codecs (`petshop.codec`, or
 `CODEC`):
@@ -222,3 +225,34 @@ every combination. Browsing, which touches neither, is the scenario that shows t
 **Caveats.** One run per combination on a laptop. The generator, the registry and the shop share one JVM in the load
 test, so the in-process numbers include their contention; the footprint runs are the shop alone. The generator's
 schedule slipped on most rungs above 1,000/s on every combination, so those rates arrived less evenly than planned.
+
+## Adoption since sharding
+
+The adoption ceiling above was the shop's own code. One actor took every write in turn, and on each one it re-sorted
+the whole catalogue for readers and copied its map of pets; the projection copied its set of seen events on every
+event; and the relay claimed at most 100 events a tick. Most of those costs grew with the shelf, so a longer run fell
+further behind. Since then:
+
+- **Shards:** `petshop.shards` (`SHOP_SHARDS`, 8 by default) shop actors split the pets by a mixed hash of the id
+  (`shardOf`), each the only writer of its own, behind one `ActorRef<Shop>` that routes every message by its pet. No
+  rule spans two pets, so of two racing adopters the second is still refused. 1 is the old single actor.
+- **The catalogue view** (`ShopWindow`) changes one pet in place and rebuilds the list on the first read after a
+  change, reusing the same instance until then.
+- **Each actor's pets** are changed in place rather than copied per write.
+- **The relay** claims batch after batch each tick until one comes back short.
+- **The projection** keeps one set of seen events instead of a copy per event.
+
+Measured with `Ladder` on a Ryzen 9 5950X (32 threads) under WSL2, 3 runs a rung; a rung is kept up when all 3 did:
+
+| | highest adoption rate kept up | the next rung |
+|---|--:|---|
+| before, 1 actor | 100/s | 250/s fell behind, p50 82 to 225 ms |
+| 1 shard, with the view and relay changes | 500/s | 1,000/s: about 5,500 failed |
+| 8 shards | 2,000/s, p99 about 18 ms | 3,000/s fell behind |
+
+Above that the in-process ladder measures itself: the generator, Jetty and the WireMock registry share the shop's JVM,
+and the generator could no longer offer the full rate from 1,000/s. Run as separate processes on cores of their own
+(the shop on 16, Postgres on 8, the registry on 4, two generators), with 128 shards and a Hikari pool of 128, the shop
+held 4,000 adoptions a second for 40 seconds at a p50 of 19 ms with none failed, and topped out near 4,200/s. There
+its limit is its own CPU, about 2.2 ms per adoption, not Postgres: turning off `synchronous_commit` cut Postgres's CPU
+without raising throughput.

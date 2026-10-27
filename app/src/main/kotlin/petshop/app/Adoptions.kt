@@ -34,10 +34,15 @@ import petshop.domain.PetId
 import petshop.domain.PetShopError
 import petshop.domain.ShopEvent
 import petshop.domain.Standing
+import java.util.concurrent.ConcurrentSkipListMap
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 
-/** The shop's only writer: one message at a time, so of two racing adopters the second is refused. */
+/**
+ * A shop actor is the only writer of its pets: one message at a time, so of two racing adopters the second is refused.
+ * With several shards each pet belongs to exactly one of them, chosen by [shardOf], so that still holds per pet.
+ */
 sealed interface Shop
 
 data class Arrived(val pet: Pet) : Shop
@@ -59,30 +64,72 @@ data class Ping(val reply: Reply<Unit>) : Shop
 
 fun ActorRef<Shop>.answers(within: Duration): Either<AskFailure, Unit> = ask(within) { reply -> Ping(reply) }
 
+/**
+ * Which of [shards] shop actors owns the pet [id]. The id is mixed first: by `id mod shards` alone every pet of a shard
+ * shares its low bits, which are the ones a HashMap picks its bucket by, so a shard's pets piled into a few buckets.
+ */
+fun shardOf(id: PetId, shards: Int): Int = Math.floorMod((id.value * FIBONACCI ushr Int.SIZE_BITS).toInt(), shards)
+
+/** 2^64 divided by the golden ratio, odd: multiplying by it spreads consecutive ids over the high bits. */
+private const val FIBONACCI = -0x61c8864680b583ebL
+
+/** The pet a message is about, so it reaches the shard that owns it; a [Ping] has none. */
+internal fun Shop.petId(): PetId? = when (this) {
+    is Arrived -> pet.id
+    is Adopt -> id
+    is Confirm -> id
+    is Return -> id
+    is Ping -> null
+}
+
+/**
+ * What readers see of every shard's pets. A write changes one pet in place, in O(log n), and the catalogue is rebuilt
+ * on the first read after a change rather than on every write, so a busy shelf costs its writers nothing per pet. A
+ * read never sees less than every write that returned before it, since a write bumps [version] after its pet is in.
+ */
 class ShopWindow {
-    private val shown = AtomicReference(Shelf())
+    private val byId = ConcurrentSkipListMap<Long, Pet>()
+    private val version = AtomicLong()
+    private val cached = AtomicReference(Listed(-1, Catalogue(emptyList())))
 
-    fun pets(): List<Pet> = shown.get().pets
+    fun pets(): List<Pet> = byId.values.toList()
 
-    fun find(id: PetId): Pet? = shown.get().byId[id]
+    fun find(id: PetId): Pet? = byId[id.value]
 
-    fun listed(): List<PetDto> = shown.get().listed
+    /** The same [Catalogue] until a pet changes, so its encoded bytes are reused (CatalogueBytesSuite). */
+    fun listed(): List<PetDto> {
+        val now = cached.get()
+        if (now.version == version.get()) return now.catalogue
+        // One reader rebuilds; the rest wait for it rather than each sorting the shelf again.
+        return synchronized(this) {
+            val seen = version.get()
+            cached.get().takeIf { it.version == seen }?.catalogue
+                ?: Catalogue(byId.values.toList().toDto()).also { cached.set(Listed(seen, it)) }
+        }
+    }
 
     internal fun show(pets: Map<PetId, Pet>) {
-        val now = shown.get()
-        if (now.byId === pets) return
-        val ordered = pets.values.sortedBy { it.id.value }
-        shown.set(Shelf(ordered, pets, Catalogue(ordered.toDto())))
+        pets.values.forEach { byId[it.id.value] = it }
+        version.incrementAndGet()
+    }
+
+    internal fun put(pet: Pet) {
+        byId[pet.id.value] = pet
+        version.incrementAndGet()
     }
 }
 
-private class Shelf(
-    val pets: List<Pet> = emptyList(),
-    val byId: Map<PetId, Pet> = emptyMap(),
-    val listed: List<PetDto> = Catalogue(emptyList()),
-)
+private class Listed(val version: Long, val catalogue: Catalogue)
 
-private class State(val pets: Map<PetId, Pet>, private val outbox: Outbox, private val window: ShopWindow) {
+/**
+ * The actor's pets, changed in place: only the actor touches them, one message at a time, and a pet changes only after
+ * its write. Copying the map on every write cost a shard's whole catalogue per adoption. A restart therefore carries on
+ * from the pets as they now stand, which is what the table holds, rather than from the opening catalogue.
+ */
+private class State(pets: Map<PetId, Pet>, private val outbox: Outbox, private val window: ShopWindow) {
+    private val held = HashMap(pets)
+
+    val pets: Map<PetId, Pet> get() = held
 
     /** The pet's row and its event are one transaction, so the state changes only once both are durable. */
     fun record(pet: Pet, event: (seq: Long) -> ShopEvent): Either<Throwable, State> =
@@ -90,10 +137,14 @@ private class State(val pets: Map<PetId, Pet>, private val outbox: Outbox, priva
 
     fun keep(pet: Pet): Either<Throwable, State> = Either.catch { outbox.keep(pet) }.map { with(pet) }
 
-    private fun with(pet: Pet) = State(pets + (pet.id to pet), outbox, window).also { next -> window.show(next.pets) }
+    private fun with(pet: Pet): State {
+        held[pet.id] = pet
+        window.put(pet)
+        return this
+    }
 }
 
-/** Every write is caught where it is made: a throw out of a step would restart the actor from its opening catalogue. */
+/** Every write is caught where it is made: a throw out of a step would restart the actor. */
 fun shop(outbox: Outbox, window: ShopWindow, pets: Map<PetId, Pet> = emptyMap()): Behaviour<Shop, *, Nothing> {
     window.show(pets)
     return behaviour<Shop, State>(State(pets, outbox, window)) { _, state, message ->

@@ -16,39 +16,36 @@ import petshop.domain.PetArrived
 import petshop.domain.PetReturned
 import petshop.domain.ShopEvent
 import petshop.domain.Species
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 class Projection internal constructor(
-    private val latest: AtomicReference<Seen>,
+    private val latest: AtomicReference<Tally>,
     internal val running: Running<Nothing, Long>,
 ) : AutoCloseable by running {
 
-    fun tally(): Tally = latest.get().tally
+    fun tally(): Tally = latest.get()
 }
 
 private data class Delivery(val event: ShopEvent, val again: Boolean)
-
-internal data class Seen(val seqs: Set<Long>, val tally: Tally) {
-
-    operator fun plus(event: ShopEvent): Seen =
-        Seen(seqs + event.seq, tally + Delivery(event, again = event.seq in seqs))
-}
 
 private val nothingYet = Tally(events = 0, duplicates = 0, bySpecies = Species.entries.map { SpeciesTally(it, 0, 0) })
 
 /**
  * The bus is at-least-once, so every `seq` seen is kept rather than the highest: a retried event can
- * arrive after later ones, and a high-water mark would drop it.
+ * arrive after later ones, and a high-water mark would drop it. They are kept in one set the consumer adds to, not a
+ * copy per event: copying them cost each event as much as every event before it, so the consumer slowed as it went.
  */
 val projection: Module =
     closingOf(
         { bus: EventBus, streams: StreamBackend, feed: Feed, tracer: Tracer ->
-            val latest = AtomicReference(Seen(emptySet(), nothingYet))
-            // One consumer, so nothing changes `latest` between the check and the update.
+            val seen = ConcurrentHashMap.newKeySet<Long>()
+            val latest = AtomicReference(nothingYet)
+            // One consumer, so nothing changes `seen` or `latest` between the check and the update.
             val consuming = bus.consumeFrom { event, where ->
                 tracer.span("process", SpanKind.CONSUMER, where) {
-                    val first = event.seq !in latest.get().seqs
-                    latest.updateAndGet { it + event }
+                    val first = seen.add(event.seq)
+                    latest.updateAndGet { it + Delivery(event, again = !first) }
                     if (first) feed.offer(event)
                 }
             }

@@ -83,6 +83,8 @@ private val barnabyArrived = PetArrived(seq = 3, pet = Pet(PetId(2), "Barnaby", 
 
 private val every = 50.milliseconds
 
+private fun arrival(seq: Long) = PetArrived(seq = seq, pet = Pet(PetId(seq), "Pet ", Species.Cat))
+
 /** A relay on [clock], ticking [every]; each `adjust` returns once every tick due by then has run. */
 private fun relaying(clock: TestClock, outbox: Outbox, bus: EventBus) = relay(
     every,
@@ -222,6 +224,45 @@ object RelaySuite : Suite() {
                     outbox.left.shouldBeEmpty()
                 }
                 And("the relay published one") { relay.stopped shouldBe Exit.Done(1L) }
+            }
+        }
+
+        test("a tick drains everything recorded since the last, not just one batch of it") {
+            val clock = TestClock()
+            story {
+                val asks = java.util.concurrent.atomic.AtomicInteger()
+                val outbox = Given("250 arrivals in the outbox, more than two batches") {
+                    Recorded(*Array(250) { arrival(it + 1L) }) { asks.incrementAndGet() }
+                }
+                val bus = Taking()
+                val relay = relaying(clock, outbox, bus)
+
+                When("one tick passes") { clock.adjust(every) }
+                Then("all 250 went, in order, in three claims: two full and the short one that ended the tick") {
+                    bus.took shouldBe (1L..250L).toList()
+                    outbox.left.shouldBeEmpty()
+                    asks.get() shouldBe 3
+                }
+                And("the relay published 250") { relay.stopped shouldBe Exit.Done(250L) }
+            }
+        }
+
+        test("a full batch the bus refuses ends the tick, so a refusing bus is retried next tick, not spun on") {
+            val clock = TestClock()
+            story {
+                val asks = java.util.concurrent.atomic.AtomicInteger()
+                val outbox = Given("150 arrivals in the outbox") {
+                    Recorded(*Array(150) { arrival(it + 1L) }) { asks.incrementAndGet() }
+                }
+                val bus = And("a bus that refuses everything") { Taking(refuses = { true }) }
+                val relay = relaying(clock, outbox, bus)
+
+                When("two ticks pass") { clock.adjust(every * 2) }
+                Then("each tick made one claim and stopped") {
+                    asks.get() shouldBe 2
+                    outbox.left.size shouldBe 150
+                }
+                And("the relay published none") { relay.stopped shouldBe Exit.Done(0L) }
             }
         }
 
