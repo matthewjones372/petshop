@@ -68,7 +68,7 @@ internal fun relay(
 ): Run<Nothing, Long> = Stream.tick(every = every, element = Unit)
     // mapPar gives the blocking claim its own virtual thread. Publishing happens inside the
     // claim because the rows are only held while it is open.
-    .mapPar(1) { _ -> outbox.claim(batch) { claimed -> published(claimed, bus, tracer) } }
+    .mapPar(1) { _ -> drained(outbox, bus, tracer) }
     .mapConcat { published -> published }
     // A throwing claim would otherwise stop the outbox draining. Restarting is safe: the claim
     // rolled back.
@@ -80,6 +80,21 @@ internal fun relay(
         counter("petshop.outbox.published").increment()
         published + 1
     }
+
+/**
+ * Claims batch after batch until one comes back short, so a tick drains what was recorded since the last rather
+ * than [batch] of it: one claim a tick held the relay to [batch] events per `every`. It stops too when a full batch
+ * publishes nothing, as when the bus refuses all of it, so a refusing bus is retried on the next tick, not spun on.
+ */
+private fun drained(outbox: Outbox, bus: EventBus, tracer: Tracer): List<ShopEvent> {
+    val all = mutableListOf<ShopEvent>()
+    while (true) {
+        var claimed = 0
+        val published = outbox.claim(batch) { rows -> published(rows, bus, tracer).also { claimed = rows.size } }
+        all += published
+        if (claimed < batch || published.isEmpty()) return all
+    }
+}
 
 /** Each event is published inside the trace its write carried, so the bus's consumer continues that trace. */
 private fun published(claimed: List<Claimed>, bus: EventBus, tracer: Tracer): List<ShopEvent> {
