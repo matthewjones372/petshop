@@ -9,7 +9,6 @@ import io.github.matthewjones372.surefold.app.typesafe.overridingConfig
 import io.github.matthewjones372.surefold.junit.Suite
 import io.github.matthewjones372.surefold.junit.shouldBe
 import io.github.matthewjones372.surefold.junit.story
-import petshop.api.Tally
 import petshop.app.ScriptedRegistry.Transfer.LosesTheRequest
 import petshop.app.ScriptedRegistry.Transfer.Records
 import petshop.domain.Adopted
@@ -123,5 +122,3 @@ object EventsSuite : Suite() {
         }
     }
 }
-
-private fun Tally.adopted(species: Species): Int = bySpecies.single { it.species == species }.adopted

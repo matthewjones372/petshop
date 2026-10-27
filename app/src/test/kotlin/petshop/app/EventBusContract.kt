@@ -134,7 +134,7 @@ private fun <R> service(test: (String, (R) -> Unit) -> Unit, under: (R) -> BusUn
 
 private fun arrival(seq: Long, name: String) = PetArrived(seq, Pet(PetId(100 + seq), name, Species.Dog))
 
-private fun Tally.adopted(species: Species): Int = bySpecies.single { it.species == species }.adopted
+internal fun Tally.adopted(species: Species): Int = bySpecies.single { it.species == species }.adopted
 
 private object HubUnderContract : BusUnderContract {
 
