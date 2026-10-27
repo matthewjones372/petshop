@@ -636,7 +636,7 @@ loads on the project's Kotlin, or for a project with many more queries.
 
 ## Versions
 
-Pelican `1.0.1-SNAPSHOT`, Surefold `0.13.1-SNAPSHOT` (its Gradle wiring plugin too, which follows `surefoldVersion`), Proofload
+Pelican `1.2.0`, Surefold `0.14.0` (its Gradle wiring plugin too, which follows `surefoldVersion`), Proofload
 `0.1.1-SNAPSHOT`, ExoQuery `2.0.4.PL`, kimney `0.3.0`, Jetty `12.1.13`,
 kotlinx.serialization `1.11.0`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`,
 HikariCP `7.1.0`, OpenTelemetry SDK `1.67.0`, Micrometer's Prometheus registry `1.16.6`, Logback `1.5.34`, Kotest `6.2.4`, JUnit `6.1.3`,
