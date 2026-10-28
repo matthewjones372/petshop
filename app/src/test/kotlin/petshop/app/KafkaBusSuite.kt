@@ -72,10 +72,16 @@ private class FlakySchemaRegistry : AutoCloseable {
     init {
         server.createContext("/") { exchange ->
             asked.incrementAndGet()
-            val (status, body) = if (serving.get()) {
-                200 to """{"schema":${JsonPrimitive(shopEventSchema.toString())}}"""
-            } else {
-                500 to """{"error_code":50001,"message":"down"}"""
+            val path = exchange.requestURI.path
+            val (status, body) = when {
+                !serving.get() -> 500 to """{"error_code":50001,"message":"down"}"""
+
+                path.startsWith("/schemas/ids/") -> 200 to """{"schema":${JsonPrimitive(shopEventSchema.toString())}}"""
+
+                // Confluent's 8.x client asks for a subject's associations too; the shop has none.
+                path.startsWith("/associations") -> 200 to "[]"
+
+                else -> 404 to """{"error_code":40401,"message":"not here"}"""
             }
             val bytes = body.toByteArray()
             exchange.responseHeaders.add("Content-Type", "application/vnd.schemaregistry.v1+json")
@@ -219,7 +225,9 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
 
         test("a handler that throws ends the read, and nothing is committed past it") { kafka ->
             story {
-                val waffle = Given("Waffle's arrival") { PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog)) }
+                val waffle = Given(
+                    "Waffle's arrival",
+                ) { PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog)) }
                 val calls = AtomicInteger()
 
                 using(kafka.busOn("throwing")) { bus ->
@@ -236,7 +244,9 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                     }
                 }
                 And("the handler ran once: the read was not restarted onto the same record") { calls.get() shouldBe 1 }
-                And("nothing was committed") { kafka.committed("projection-throwing", Topic("throwing")).shouldBeNull() }
+                And(
+                    "nothing was committed",
+                ) { kafka.committed("projection-throwing", Topic("throwing")).shouldBeNull() }
             }
         }
 
@@ -253,7 +263,9 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                         When("a consumer reads the topic through a registry that answers 500") {
                             bus.consume { event -> seen.add(event) }.start(Forks())
                         }.use { running ->
-                            Then("the registry is asked").eventually(30.seconds) { (flaky.asked.get() > 0) shouldBe true }
+                            Then(
+                                "the registry is asked",
+                            ).eventually(30.seconds) { (flaky.asked.get() > 0) shouldBe true }
                             And("nothing has reached the consumer, or been committed") {
                                 seen.toList() shouldBe emptyList()
                                 kafka.committed("projection-outage", Topic("outage")).shouldBeNull()
