@@ -43,7 +43,8 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * An unreadable record goes to [deadLetters] and is committed past, so one bad record does not stop the
- * topic. A schema registry that cannot be asked is a defect instead, and nothing unhandled is committed.
+ * topic. A schema registry that cannot be asked restarts the read from the last commit; any other defect, a throw
+ * from the handler among them, ends it as `Died`. Nothing unhandled is committed either way.
  */
 class KafkaBus(
     private val topic: Topic,
@@ -81,10 +82,8 @@ class KafkaBus(
     )
         .divertLefts(deadLetters)
         .mapRecord { record -> record.within { each(record.value(), received(record)) } }
-        // A schema registry outage pauses the projection rather than ending it: restart from the last commit.
-        .restartOnDefect(
-            Schedule.exponential<Throwable>(100.milliseconds).delayed { _, wait -> minOf(wait, 30.seconds) },
-        )
+        // Only an outage waits and retries: a handler that throws would throw again on the same record, for ever.
+        .restartOnDefect(registryBack)
         .runCommitting()
 
     private fun received(record: ConsumerRecord<Long, ShopEvent>): Attributes = Attributes.builder()
@@ -137,6 +136,11 @@ private fun producing(bootstrap: String): Map<String, Any> = mapOf(
 )
 
 private const val SEND_WITHIN_MS = 5_000
+
+private val registryBack: Schedule<Throwable, *> =
+    Schedule.exponential<Throwable>(100.milliseconds)
+        .delayed { _, wait -> minOf(wait, 30.seconds) }
+        .doWhile { thrown, _ -> registryDown(thrown) }
 
 private fun ((DecodeError) -> Unit).counted(): (DecodeError) -> Unit = { bad ->
     this(bad)

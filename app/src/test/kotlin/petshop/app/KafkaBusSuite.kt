@@ -1,5 +1,6 @@
 package petshop.app
 
+import com.sun.net.httpserver.HttpServer
 import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import io.confluent.kafka.schemaregistry.testutil.MockSchemaRegistry
 import io.github.matthewjones372.surefold.Resource
@@ -7,6 +8,7 @@ import io.github.matthewjones372.surefold.app.Module
 import io.github.matthewjones372.surefold.junit.SharedSuite
 import io.github.matthewjones372.surefold.junit.shouldBe
 import io.github.matthewjones372.surefold.junit.shouldBeInstanceOf
+import io.github.matthewjones372.surefold.junit.shouldBeNull
 import io.github.matthewjones372.surefold.junit.shouldHaveSize
 import io.github.matthewjones372.surefold.junit.shouldNotBeNull
 import io.github.matthewjones372.surefold.junit.story
@@ -15,9 +17,11 @@ import io.github.matthewjones372.surefold.kafka.DecodeError
 import io.github.matthewjones372.surefold.kafka.KafkaBroker
 import io.github.matthewjones372.surefold.kafka.Topic
 import io.github.matthewjones372.surefold.kafka.kafkaBroker
+import io.github.matthewjones372.surefold.stream.Exit
 import io.github.matthewjones372.surefold.stream.Forks
 import io.github.matthewjones372.surefold.stream.start
 import io.github.matthewjones372.surefold.test.eventually
+import kotlinx.serialization.json.JsonPrimitive
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.kafka.common.serialization.ByteArraySerializer
 import org.apache.kafka.common.serialization.LongDeserializer
@@ -29,8 +33,11 @@ import petshop.domain.PetAdopted
 import petshop.domain.PetArrived
 import petshop.domain.PetId
 import petshop.domain.Species
+import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
 private fun registry(scope: String): Map<String, Any> = mapOf("schema.registry.url" to "mock://$scope")
@@ -53,6 +60,42 @@ private class KafkaUnderContract(private val kafka: KafkaBroker) : BusUnderContr
     override val remembersReaders = true
 
     override fun handled(name: String): Long? = kafka.committed("projection-$name", Topic(name))
+}
+
+/** A schema registry that answers 500 to everything until [up], and then serves the shop's schema for any id. */
+private class FlakySchemaRegistry : AutoCloseable {
+
+    private val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+    private val serving = AtomicBoolean(false)
+    val asked = AtomicInteger()
+
+    init {
+        server.createContext("/") { exchange ->
+            asked.incrementAndGet()
+            val path = exchange.requestURI.path
+            val (status, body) = when {
+                !serving.get() -> 500 to """{"error_code":50001,"message":"down"}"""
+
+                path.startsWith("/schemas/ids/") -> 200 to """{"schema":${JsonPrimitive(shopEventSchema.toString())}}"""
+
+                // Confluent's 8.x client asks for a subject's associations too; the shop has none.
+                path.startsWith("/associations") -> 200 to "[]"
+
+                else -> 404 to """{"error_code":40401,"message":"not here"}"""
+            }
+            val bytes = body.toByteArray()
+            exchange.responseHeaders.add("Content-Type", "application/vnd.schemaregistry.v1+json")
+            exchange.sendResponseHeaders(status, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+        server.start()
+    }
+
+    val registry: Map<String, Any> = mapOf("schema.registry.url" to "http://127.0.0.1:${server.address.port}")
+
+    fun up() = serving.set(true)
+
+    override fun close() = server.stop(0)
 }
 
 /** The registry is Confluent's in-process `mock://`: real serializers and wire format, no server. */
@@ -176,6 +219,67 @@ object KafkaBusSuite : SharedSuite<KafkaBroker>() {
                 }
                 And("both records are committed past").eventually(30.seconds) {
                     kafka.committed("projection-lettered", Topic("lettered")) shouldBe 2L
+                }
+            }
+        }
+
+        test("a handler that throws ends the read, and nothing is committed past it") { kafka ->
+            story {
+                val waffle = Given(
+                    "Waffle's arrival",
+                ) { PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog)) }
+                val calls = AtomicInteger()
+
+                using(kafka.busOn("throwing")) { bus ->
+                    When("the bus publishes Waffle, and a consumer whose handler throws reads the topic") {
+                        bus.publish(waffle)
+                        bus.consume {
+                            calls.incrementAndGet()
+                            throw IllegalStateException("a projection bug")
+                        }.start(Forks())
+                    }.use { running ->
+                        Then("the read ends as Died").eventually(30.seconds) {
+                            running.exit.toCompletableFuture().getNow(null).shouldBeInstanceOf<Exit.Died>()
+                        }
+                    }
+                }
+                And("the handler ran once: the read was not restarted onto the same record") { calls.get() shouldBe 1 }
+                And(
+                    "nothing was committed",
+                ) { kafka.committed("projection-throwing", Topic("throwing")).shouldBeNull() }
+            }
+        }
+
+        test("a schema registry that is down holds the read back, and it reads on once the registry is back") { kafka ->
+            FlakySchemaRegistry().use { flaky ->
+                story {
+                    val waffle = Given("Waffle's arrival on the topic") {
+                        PetArrived(seq = 1, pet = Pet(PetId(9), "Waffle", Species.Dog))
+                            .also { arrival -> using(kafka.busOn("outage")) { it.publish(arrival) } }
+                    }
+                    val seen = ConcurrentLinkedQueue<Any>()
+
+                    using(kafkaBus(Topic("outage"), kafka.bootstrap, "projection-outage", flaky.registry)) { bus ->
+                        When("a consumer reads the topic through a registry that answers 500") {
+                            bus.consume { event -> seen.add(event) }.start(Forks())
+                        }.use { running ->
+                            Then(
+                                "the registry is asked",
+                            ).eventually(30.seconds) { (flaky.asked.get() > 0) shouldBe true }
+                            And("nothing has reached the consumer, or been committed") {
+                                seen.toList() shouldBe emptyList()
+                                kafka.committed("projection-outage", Topic("outage")).shouldBeNull()
+                            }
+                            When("the registry comes back") { flaky.up() }
+                            Then("Waffle reaches the consumer").eventually(30.seconds) {
+                                seen.toList() shouldBe listOf(waffle)
+                            }
+                            And("the read never ended") { running.exit.toCompletableFuture().isDone shouldBe false }
+                        }
+                    }
+                    And("Waffle is committed past").eventually(30.seconds) {
+                        kafka.committed("projection-outage", Topic("outage")) shouldBe 1L
+                    }
                 }
             }
         }
