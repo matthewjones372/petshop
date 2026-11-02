@@ -97,7 +97,7 @@ const runs = (service: Service) => {
         status: running ? "in_progress" : "completed",
         conclusion: running ? null : "success",
         updated_at: new Date(each.built).toISOString(),
-        html_url: `https://github.com/matthewjones372/petshop/commits/${each.sha}`,
+        html_url: `https://github.com/surefold/petshop/commits/${each.sha}`,
       }
     }),
   }

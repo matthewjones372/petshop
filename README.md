@@ -47,7 +47,7 @@ Tempo's span metrics; `demo/README.md` says what each number is.
 `demo/` adds Prometheus, Grafana, Alertmanager and [Estate](https://github.com/matthewjones372/estate) to watch the
 running shop. Grafana is at <http://localhost:3000> and Estate at <http://localhost:8095>; see `demo/README.md`.
 
-[surefold-bank](https://github.com/matthewjones372/surefold-bank) uses the same libraries on something larger: a bank
+[surefold-bank](https://github.com/surefold/surefold-bank) uses the same libraries on something larger: a bank
 in four services, with accounts as actors on a three-node Surefold cluster, transfers as sagas, and Proofload and chaos
 runs against it. Petshop stays the small one, where each library can be judged on its own.
 
@@ -57,11 +57,11 @@ The libraries being tried out:
 
 | Library | What it does here |
 |---|---|
-| [Pelican](https://github.com/matthewjones372/pelican) | the shop's HTTP contract as values, served on Jetty and read with kotlinx.serialization: routes, the OpenAPI document, Swagger UI and a themed RapiDoc reference that sends requests, handlers that must answer a declared failure; live and ready probes (`pelican-health`); the chip registry's client generated from its contract; typed WireMock stubs, golden files and a typed test client |
+| [Pelican](https://github.com/surefold/pelican) | the shop's HTTP contract as values, served on Jetty and read with kotlinx.serialization: routes, the OpenAPI document, Swagger UI and a themed RapiDoc reference that sends requests, handlers that must answer a declared failure; live and ready probes (`pelican-health`); the chip registry's client generated from its contract; typed WireMock stubs, golden files and a typed test client |
 | [Surefold](https://github.com/matthewjones372/lark) | the application as a dependency graph that validates, subsets, starts and stops itself (`surefold-app`), with its settings and secrets read and reported by `surefold-app-typesafe`, the schema migrated by `surefold-app-liquibase` before anything reads it, and the graph checked at build time by the wiring plugin; the shop's actor, on virtual threads in a `flock` (`surefold-actor`, `surefold-app-actor`); the background work, the readiness gauges and the in-process bus as `Stream`s on Surefold's Forks (`surefold-stream`); Kafka as a `Stream` that commits what it handled and restarts after a defect (`surefold-kafka`); a circuit breaker on the chip registry, and retries on schedules; `Either` and `Fail` for declared failures, from the domain up; logs, metrics and traces that cross a fork (`surefold-slf4j`, `surefold-micrometer`, `surefold-otel`) |
 | [Proofload](https://github.com/matthewjones372/proofload) | load tests that start the whole service in-process, assert correctness under load, and write an HTML report |
 | [ExoQuery](https://github.com/ExoQuery/ExoQuery) | every statement against the outbox table, written as Kotlin and checked at compile time |
-| [kimney](https://github.com/matthewjones372/kimney) | the mappings between the shop's events and their wire records, and between the domain and the API's DTOs, derived at compile time |
+| [kimney](https://github.com/surefold/kimney) | the mappings between the shop's events and their wire records, and between the domain and the API's DTOs, derived at compile time |
 
 What they run on, and what the tests use:
 
@@ -109,7 +109,7 @@ compile.
 ### DTOs and the domain
 
 `Pet` stays in `domain`. The endpoints answer a `PetDto`, and the declared
-failures are a sealed `ProblemDto`. [kimney](https://github.com/matthewjones372/kimney)
+failures are a sealed `ProblemDto`. [kimney](https://github.com/surefold/kimney)
 writes each mapping at compile time:
 
 ```kotlin
