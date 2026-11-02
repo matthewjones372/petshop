@@ -60,7 +60,7 @@ or let it propagate.
 ## Use what surefold, pelican and kimney already provide
 
 Before writing a scheduler, a retry, a breaker, a health check, a config reader
-or a test wait, look for it in [surefold](https://github.com/matthewjones372/lark)
+or a test wait, look for it in [surefold](https://github.com/surefold/surefold)
 (its `docs/cookbook.md` ends with a need-to-API table) and
 [pelican](https://github.com/surefold/pelican) (`docs/modules.md`). Background work
 is a surefold `Stream` on the graph's `StreamBackend`, settings are read with
