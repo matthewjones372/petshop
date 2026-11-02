@@ -44,7 +44,7 @@ same trace (see `demo/README.md`). Its log lines go to
 the demo's Loki and its Web Vitals to Prometheus the same way, and Estate shows it as the service `petshop-web`, from
 Tempo's span metrics; `demo/README.md` says what each number is.
 
-`demo/` adds Prometheus, Grafana, Alertmanager and [Estate](https://github.com/matthewjones372/estate) to watch the
+`demo/` adds Prometheus, Grafana, Alertmanager and [Estate](https://github.com/surefold/estate) to watch the
 running shop. Grafana is at <http://localhost:3000> and Estate at <http://localhost:8095>; see `demo/README.md`.
 
 [surefold-bank](https://github.com/surefold/surefold-bank) uses the same libraries on something larger: a bank
