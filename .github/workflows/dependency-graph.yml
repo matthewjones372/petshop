@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   submit:
-    runs-on: namespace-profile-mattjones372
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
