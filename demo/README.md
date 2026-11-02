@@ -1,7 +1,7 @@
 # The petshop demo
 
 The shop running against a small production-like estate on your laptop: steady traffic, metrics, logs, traces,
-alerts, a dashboard in Grafana, an operations page in [Estate](https://github.com/matthewjones372/estate), a script
+alerts, a dashboard in Grafana, an operations page in [Estate](https://github.com/surefold/estate), a script
 that breaks things on purpose, and an optional Ask AI that explains the alerts it causes.
 
 The application runs on the host. Everything else runs in Docker.
@@ -251,7 +251,7 @@ turns Ask AI off.
 
 ## Estate
 
-[Estate](https://github.com/matthewjones372/estate) answers "is the shop well, and if not, where do I look?" on one
+[Estate](https://github.com/surefold/estate) answers "is the shop well, and if not, where do I look?" on one
 page, at <http://localhost:8095>. It reads the same Prometheus as Grafana, and the Alertmanager that
 `prometheus/rules.yml` fires into, so an alert arrives at the top of the page with what it means for adopters, a
 place for notes, and a silence that Alertmanager keeps.
