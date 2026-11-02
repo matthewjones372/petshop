@@ -62,7 +62,7 @@ or let it propagate.
 Before writing a scheduler, a retry, a breaker, a health check, a config reader
 or a test wait, look for it in [surefold](https://github.com/matthewjones372/lark)
 (its `docs/cookbook.md` ends with a need-to-API table) and
-[pelican](https://github.com/matthewjones372/pelican) (`docs/modules.md`). Background work
+[pelican](https://github.com/surefold/pelican) (`docs/modules.md`). Background work
 is a surefold `Stream` on the graph's `StreamBackend`, settings are read with
 surefold-app-typesafe's `config`/`secret`, readiness is pelican-health, and a test
 waits with surefold-test's `eventually`.
