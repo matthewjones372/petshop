@@ -1,1 +1,1 @@
-dependencies { api("io.github.matthewjones372:surefold:${providers.gradleProperty("surefoldVersion").get()}") }
+dependencies { api("dev.surefold:surefold:${providers.gradleProperty("surefoldVersion").get()}") }

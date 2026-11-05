@@ -1,9 +1,9 @@
 package petshop.app
 
-import io.github.matthewjones372.surefold.actor.Address
-import io.github.matthewjones372.surefold.actor.Reply
-import io.github.matthewjones372.surefold.junit.Suite
-import io.github.matthewjones372.surefold.junit.shouldBe
+import dev.surefold.actor.Address
+import dev.surefold.actor.Reply
+import dev.surefold.junit.Suite
+import dev.surefold.junit.shouldBe
 import petshop.domain.Pet
 import petshop.domain.PetId
 import petshop.domain.Species

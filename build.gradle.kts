@@ -26,11 +26,6 @@ subprojects {
             mavenLocal()
             // Gradle keeps a snapshot for 24h by default, so CI's cache once compiled against a stale one.
             configurations.configureEach { resolutionStrategy.cacheChangingModulesFor(0, "seconds") }
-        } else {
-            // Proofload's snapshot, for the load test: a day of demo traffic needs spec 0143, which no release has yet.
-            maven("https://central.sonatype.com/repository/maven-snapshots/") {
-                content { includeModuleByRegex("io\\.github\\.matthewjones372", "proofload-.*") }
-            }
         }
     }
 
@@ -63,9 +58,9 @@ subprojects {
         "testImplementation"(kotlin("test"))
         "testImplementation"("org.junit.jupiter:junit-jupiter:6.1.3")
         "testImplementation"("io.kotest:kotest-assertions-core:6.2.4")
-        "testImplementation"("io.github.matthewjones372:surefold-assert:$surefoldVersion")
+        "testImplementation"("dev.surefold:surefold-assert:$surefoldVersion")
         // The tests are surefold-junit suites: a suite is an object, its tests share one resource and run together.
-        "testImplementation"("io.github.matthewjones372:surefold-junit:$surefoldVersion")
+        "testImplementation"("dev.surefold:surefold-junit:$surefoldVersion")
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
         // pelican-core, Avro and Confluent bring Jackson before 2.22.3, which has open advisories.
         "implementation"(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
@@ -75,7 +70,7 @@ subprojects {
 
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi::class)
     extensions.configure<org.jetbrains.kotlin.powerassert.gradle.PowerAssertGradleExtension> {
-        functions.add("io.github.matthewjones372.surefold.junit.expect")
+        functions.add("dev.surefold.junit.expect")
         includedSourceSets.add("test")
     }
 

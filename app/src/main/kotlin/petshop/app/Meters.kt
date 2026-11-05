@@ -1,15 +1,15 @@
 package petshop.app
 
-import io.github.matthewjones372.surefold.app.Module
-import io.github.matthewjones372.surefold.app.closingOf
-import io.github.matthewjones372.surefold.gauge
-import io.github.matthewjones372.surefold.stream.Running
-import io.github.matthewjones372.surefold.stream.Stream
-import io.github.matthewjones372.surefold.stream.StreamBackend
-import io.github.matthewjones372.surefold.stream.map
-import io.github.matthewjones372.surefold.stream.runFold
-import io.github.matthewjones372.surefold.stream.start
-import io.github.matthewjones372.surefold.stream.tick
+import dev.surefold.app.Module
+import dev.surefold.app.closingOf
+import dev.surefold.gauge
+import dev.surefold.stream.Running
+import dev.surefold.stream.Stream
+import dev.surefold.stream.StreamBackend
+import dev.surefold.stream.map
+import dev.surefold.stream.runFold
+import dev.surefold.stream.start
+import dev.surefold.stream.tick
 import io.micrometer.core.instrument.binder.jvm.ClassLoaderMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics
 import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics

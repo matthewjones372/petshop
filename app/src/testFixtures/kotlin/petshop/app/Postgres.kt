@@ -1,9 +1,9 @@
 package petshop.app
 
-import io.github.matthewjones372.surefold.app.Module
-import io.github.matthewjones372.surefold.app.overriding
-import io.github.matthewjones372.surefold.app.single
-import io.github.matthewjones372.surefold.app.typesafe.Secret
+import dev.surefold.app.Module
+import dev.surefold.app.overriding
+import dev.surefold.app.single
+import dev.surefold.app.typesafe.Secret
 import org.testcontainers.postgresql.PostgreSQLContainer
 import java.sql.DriverManager
 import java.util.concurrent.atomic.AtomicInteger

@@ -1,11 +1,11 @@
 package petshop.app
 
-import io.github.matthewjones372.surefold.app.Module
-import io.github.matthewjones372.surefold.app.liquibase.Migrated
-import io.github.matthewjones372.surefold.app.single
-import io.github.matthewjones372.surefold.app.subgraph
-import io.github.matthewjones372.surefold.app.testApp
-import io.github.matthewjones372.surefold.test.story
+import dev.surefold.app.Migrated
+import dev.surefold.app.Module
+import dev.surefold.app.single
+import dev.surefold.app.subgraph
+import dev.surefold.app.testApp
+import dev.surefold.test.story
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test

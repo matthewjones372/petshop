@@ -1,14 +1,15 @@
-// A snapshot until a release carries spec 0143, so a day of demo traffic holds what an hour does.
-val proofloadVersion = "0.1.1-SNAPSHOT"
+// rc5 is the release that carries spec 0143, so a day of demo traffic holds what an hour does.
+val proofloadVersion = "0.1.0-rc5"
 val surefoldVersion: String = providers.gradleProperty("surefoldVersion").get()
+val surefoldIntegrationsVersion: String = providers.gradleProperty("surefoldIntegrationsVersion").get()
 
 dependencies {
     testImplementation(project(":app"))
     testImplementation(testFixtures(project(":app")))
-    testImplementation("io.github.matthewjones372:surefold-app:$surefoldVersion")
-    testImplementation("io.github.matthewjones372:surefold-app-typesafe:$surefoldVersion")
-    testImplementation("io.github.matthewjones372:surefold-stream:$surefoldVersion")
-    testImplementation("io.github.matthewjones372:surefold-test:$surefoldVersion")
+    testImplementation("dev.surefold:surefold-app:$surefoldVersion")
+    testImplementation("dev.surefold:surefold-app-typesafe:$surefoldIntegrationsVersion")
+    testImplementation("dev.surefold:surefold-stream:$surefoldVersion")
+    testImplementation("dev.surefold:surefold-test:$surefoldVersion")
     testImplementation("io.github.matthewjones372:pelican-test-wiremock")
     testImplementation(project(":registry"))
     testImplementation("io.github.matthewjones372:pelican-test")

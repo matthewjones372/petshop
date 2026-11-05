@@ -6,12 +6,14 @@ set -euo pipefail
 artifact=${1:?"usage: scripts/sources <artifact>, e.g. surefold-actor or pelican-core"}
 root=$(cd "$(dirname "$0")/.." && pwd)
 case $artifact in
-    surefold*) key=surefoldVersion ;;
-    pelican*) key=pelicanVersion ;;
+    surefold-app-typesafe|surefold-app-kotlinx|surefold-app-liquibase|surefold-kafka|surefold-kafka-test|surefold-otel|surefold-otel-test|surefold-slf4j|surefold-micrometer)
+        key=surefoldIntegrationsVersion; group=dev.surefold ;;
+    surefold*) key=surefoldVersion; group=dev.surefold ;;
+    pelican*) key=pelicanVersion; group=io.github.matthewjones372 ;;
     *) echo "only surefold-* and pelican-* artifacts are known" >&2; exit 1 ;;
 esac
 version=$(sed -n "s/^$key=//p" "$root/gradle.properties")
-jar=$(find "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1/io.github.matthewjones372/$artifact/$version" \
+jar=$(find "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1/$group/$artifact/$version" \
     -name '*-sources.jar' 2>/dev/null | head -1)
 [ -n "$jar" ] || { echo "no sources jar for $artifact $version; build once so Gradle fetches it" >&2; exit 1; }
 

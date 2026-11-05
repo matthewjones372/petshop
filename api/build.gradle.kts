@@ -15,9 +15,9 @@ dependencies {
     api("io.github.matthewjones372:pelican-health")
     // A span per request, continuing an inbound traceparent.
     api("io.github.matthewjones372:pelican-metrics-otel")
-    api("io.github.matthewjones372:surefold-stream:$surefoldVersion")
+    api("dev.surefold:surefold-stream:$surefoldVersion")
 
-    testImplementation("io.github.matthewjones372:surefold-stream-forks:$surefoldVersion")
+    testImplementation("dev.surefold:surefold-stream-forks:$surefoldVersion")
     testImplementation("io.github.matthewjones372:pelican-test")
     testImplementation("io.github.matthewjones372:pelican-test-jetty")
     testImplementation("io.github.matthewjones372:pelican-test-golden")

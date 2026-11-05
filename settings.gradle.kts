@@ -11,7 +11,7 @@ pluginManagement {
     }
     // Each plugin ships from the same build as its library, so it follows the library's version.
     plugins {
-        id("io.github.matthewjones372.surefold.wiring") version surefoldVersion
+        id("dev.surefold.wiring") version surefoldVersion
         id("io.github.matthewjones372.pelican") version pelicanVersion
     }
 }

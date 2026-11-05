@@ -1,15 +1,15 @@
 package petshop.app
 
-import io.github.matthewjones372.surefold.app.Module
-import io.github.matthewjones372.surefold.app.liquibase.Migrated
-import io.github.matthewjones372.surefold.app.single
-import io.github.matthewjones372.surefold.app.subgraph
-import io.github.matthewjones372.surefold.app.testApp
-import io.github.matthewjones372.surefold.junit.Suite
-import io.github.matthewjones372.surefold.junit.shouldBe
-import io.github.matthewjones372.surefold.junit.shouldBeEmpty
-import io.github.matthewjones372.surefold.junit.shouldThrow
-import io.github.matthewjones372.surefold.junit.story
+import dev.surefold.app.Migrated
+import dev.surefold.app.Module
+import dev.surefold.app.single
+import dev.surefold.app.subgraph
+import dev.surefold.app.testApp
+import dev.surefold.junit.Suite
+import dev.surefold.junit.shouldBe
+import dev.surefold.junit.shouldBeEmpty
+import dev.surefold.junit.shouldThrow
+import dev.surefold.junit.story
 import petshop.domain.Adopted
 import petshop.domain.Pet
 import petshop.domain.PetAdopted

@@ -2,12 +2,12 @@ package petshop.app
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
-import io.github.matthewjones372.surefold.app.Module
-import io.github.matthewjones372.surefold.app.boundTo
-import io.github.matthewjones372.surefold.app.closingOf
-import io.github.matthewjones372.surefold.app.liquibase.migrations
-import io.github.matthewjones372.surefold.app.typesafe.Secret
-import io.github.matthewjones372.surefold.app.typesafe.config
+import dev.surefold.app.Module
+import dev.surefold.app.boundTo
+import dev.surefold.app.closingOf
+import dev.surefold.app.liquibase.migrations
+import dev.surefold.app.typesafe.Secret
+import dev.surefold.app.typesafe.config
 import io.micrometer.core.instrument.Metrics
 import javax.sql.DataSource
 

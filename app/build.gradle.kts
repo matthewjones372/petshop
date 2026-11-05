@@ -1,7 +1,7 @@
 plugins {
     application
     `java-test-fixtures`
-    id("io.github.matthewjones372.surefold.wiring")
+    id("dev.surefold.wiring")
     kotlin("plugin.serialization")
     id("io.github.matthewjones372.kimney") version "0.3.0"
 }
@@ -17,18 +17,19 @@ tasks.named<JavaExec>("run") {
 }
 
 val surefoldVersion: String = providers.gradleProperty("surefoldVersion").get()
+val surefoldIntegrationsVersion: String = providers.gradleProperty("surefoldIntegrationsVersion").get()
 
 dependencies {
     api(project(":api"))
     implementation(project(":registry"))
-    implementation("io.github.matthewjones372:surefold-app:$surefoldVersion")
-    implementation("io.github.matthewjones372:surefold-actor:$surefoldVersion")
-    implementation("io.github.matthewjones372:surefold-app-actor:$surefoldVersion")
-    implementation("io.github.matthewjones372:surefold-app-typesafe:$surefoldVersion")
-    implementation("io.github.matthewjones372:surefold-app-kotlinx:$surefoldVersion")
-    implementation("io.github.matthewjones372:surefold-app-liquibase:$surefoldVersion")
-    implementation("io.github.matthewjones372:surefold-stream-forks:$surefoldVersion")
-    implementation("io.github.matthewjones372:surefold-kafka:$surefoldVersion")
+    implementation("dev.surefold:surefold-app:$surefoldVersion")
+    implementation("dev.surefold:surefold-actor:$surefoldVersion")
+    implementation("dev.surefold:surefold-app-actor:$surefoldVersion")
+    implementation("dev.surefold:surefold-app-typesafe:$surefoldIntegrationsVersion")
+    implementation("dev.surefold:surefold-app-kotlinx:$surefoldIntegrationsVersion")
+    implementation("dev.surefold:surefold-app-liquibase:$surefoldIntegrationsVersion")
+    implementation("dev.surefold:surefold-stream-forks:$surefoldVersion")
+    implementation("dev.surefold:surefold-kafka:$surefoldIntegrationsVersion")
     // avro4k's Confluent serde needs Confluent 8.3 or later.
     implementation("com.github.avro-kotlin.avro4k:avro4k-core:2.12.0")
     implementation("com.github.avro-kotlin.avro4k:avro4k-confluent-kafka-serializer:2.12.0")
@@ -46,7 +47,7 @@ dependencies {
         // Confluent's 32.0.1 calls sun.misc.Unsafe, which JDK 25 warns about at runtime; 33.7 uses VarHandle.
         implementation("com.google.guava:guava:33.7.2-jre")
     }
-    implementation("io.github.matthewjones372:surefold-otel:$surefoldVersion")
+    implementation("dev.surefold:surefold-otel:$surefoldIntegrationsVersion")
     // One OpenTelemetry version for the API pelican brings and the SDK here: a mixed pair fails at start.
     implementation(platform("io.opentelemetry:opentelemetry-bom:1.67.0"))
     implementation("io.opentelemetry:opentelemetry-sdk")
@@ -63,8 +64,8 @@ dependencies {
     implementation("io.github.matthewjones372:pelican-client-jetty")
 
     // Each registers itself through ServiceLoader, so being on the classpath is enough.
-    implementation("io.github.matthewjones372:surefold-slf4j:$surefoldVersion")
-    implementation("io.github.matthewjones372:surefold-micrometer:$surefoldVersion")
+    implementation("dev.surefold:surefold-slf4j:$surefoldIntegrationsVersion")
+    implementation("dev.surefold:surefold-micrometer:$surefoldIntegrationsVersion")
 
     // On the Prometheus Java client 1.x; the simpleclient build it replaces is deprecated.
     implementation("io.micrometer:micrometer-registry-prometheus:1.16.6")
@@ -76,17 +77,17 @@ dependencies {
     testImplementation("ch.qos.logback:logback-classic:1.5.34")
 
     testFixturesApi("org.testcontainers:testcontainers-postgresql:2.0.5")
-    testFixturesImplementation("io.github.matthewjones372:surefold-app:$surefoldVersion")
-    testFixturesImplementation("io.github.matthewjones372:surefold-app-typesafe:$surefoldVersion")
+    testFixturesImplementation("dev.surefold:surefold-app:$surefoldVersion")
+    testFixturesImplementation("dev.surefold:surefold-app-typesafe:$surefoldIntegrationsVersion")
     testFixturesImplementation("org.postgresql:postgresql:42.7.13")
     testFixturesImplementation(platform("com.fasterxml.jackson:jackson-bom:2.22.3"))
 
-    testImplementation("io.github.matthewjones372:surefold-stream-test:$surefoldVersion")
+    testImplementation("dev.surefold:surefold-stream-test:$surefoldVersion")
 
-    testImplementation("io.github.matthewjones372:surefold-test:$surefoldVersion")
+    testImplementation("dev.surefold:surefold-test:$surefoldVersion")
 
-    testImplementation("io.github.matthewjones372:surefold-kafka-test:$surefoldVersion")
-    testImplementation("io.github.matthewjones372:surefold-otel-test:$surefoldVersion")
+    testImplementation("dev.surefold:surefold-kafka-test:$surefoldIntegrationsVersion")
+    testImplementation("dev.surefold:surefold-otel-test:$surefoldIntegrationsVersion")
 
     testImplementation("io.github.matthewjones372:pelican-test-wiremock")
     testImplementation(project(":registry"))

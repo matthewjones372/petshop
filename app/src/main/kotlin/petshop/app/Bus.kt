@@ -1,17 +1,17 @@
 package petshop.app
 
-import io.github.matthewjones372.surefold.Carriers
-import io.github.matthewjones372.surefold.app.Module
-import io.github.matthewjones372.surefold.app.boundTo
-import io.github.matthewjones372.surefold.app.closingOf
-import io.github.matthewjones372.surefold.app.singleOf
-import io.github.matthewjones372.surefold.fail.Either
-import io.github.matthewjones372.surefold.fail.map
-import io.github.matthewjones372.surefold.fail.mapLeft
-import io.github.matthewjones372.surefold.stream.Hub
-import io.github.matthewjones372.surefold.stream.Run
-import io.github.matthewjones372.surefold.stream.map
-import io.github.matthewjones372.surefold.stream.runFold
+import dev.surefold.Carriers
+import dev.surefold.app.Module
+import dev.surefold.app.boundTo
+import dev.surefold.app.closingOf
+import dev.surefold.app.singleOf
+import dev.surefold.fail.Either
+import dev.surefold.fail.map
+import dev.surefold.fail.mapLeft
+import dev.surefold.stream.Hub
+import dev.surefold.stream.Run
+import dev.surefold.stream.map
+import dev.surefold.stream.runFold
 import io.opentelemetry.api.common.Attributes
 import petshop.domain.ShopEvent
 
