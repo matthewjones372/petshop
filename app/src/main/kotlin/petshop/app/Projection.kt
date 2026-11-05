@@ -1,12 +1,12 @@
 package petshop.app
 
-import io.github.matthewjones372.surefold.app.Module
-import io.github.matthewjones372.surefold.app.closingOf
-import io.github.matthewjones372.surefold.counter
-import io.github.matthewjones372.surefold.increment
-import io.github.matthewjones372.surefold.stream.Running
-import io.github.matthewjones372.surefold.stream.StreamBackend
-import io.github.matthewjones372.surefold.stream.start
+import dev.surefold.app.Module
+import dev.surefold.app.closingOf
+import dev.surefold.counter
+import dev.surefold.increment
+import dev.surefold.stream.Running
+import dev.surefold.stream.StreamBackend
+import dev.surefold.stream.start
 import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.Tracer
 import petshop.api.SpeciesTally

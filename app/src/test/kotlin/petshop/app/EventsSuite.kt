@@ -1,14 +1,14 @@
 package petshop.app
 
-import io.github.matthewjones372.surefold.app.Module
-import io.github.matthewjones372.surefold.app.overriding
-import io.github.matthewjones372.surefold.app.single
-import io.github.matthewjones372.surefold.app.subgraph
-import io.github.matthewjones372.surefold.app.testApp
-import io.github.matthewjones372.surefold.app.typesafe.overridingConfig
-import io.github.matthewjones372.surefold.junit.Suite
-import io.github.matthewjones372.surefold.junit.shouldBe
-import io.github.matthewjones372.surefold.junit.story
+import dev.surefold.app.Module
+import dev.surefold.app.overriding
+import dev.surefold.app.single
+import dev.surefold.app.subgraph
+import dev.surefold.app.testApp
+import dev.surefold.app.typesafe.overridingConfig
+import dev.surefold.junit.Suite
+import dev.surefold.junit.shouldBe
+import dev.surefold.junit.story
 import petshop.app.ScriptedRegistry.Transfer.LosesTheRequest
 import petshop.app.ScriptedRegistry.Transfer.Records
 import petshop.domain.Adopted

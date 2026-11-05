@@ -1,5 +1,7 @@
 package petshop.load
 
+import dev.surefold.Schedule
+import dev.surefold.retry
 import io.github.matthewjones372.pelican.test.ApiClient
 import io.github.matthewjones372.pelican.test.apiClient
 import io.github.matthewjones372.proofload.at
@@ -8,8 +10,6 @@ import io.github.matthewjones372.proofload.perSecond
 import io.github.matthewjones372.proofload.report.writeHtmlReport
 import io.github.matthewjones372.proofload.scenario
 import io.github.matthewjones372.proofload.step
-import io.github.matthewjones372.surefold.Schedule
-import io.github.matthewjones372.surefold.retry
 import petshop.api.ShopCodecs
 import petshop.api.adoptPet
 import petshop.api.getPet

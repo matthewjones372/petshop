@@ -1,16 +1,16 @@
 package petshop.api
 
+import dev.surefold.fail.Either
+import dev.surefold.fail.left
+import dev.surefold.junit.Suite
+import dev.surefold.junit.holds
+import dev.surefold.stream.Forks
+import dev.surefold.stream.Stream
+import dev.surefold.stream.empty
 import io.github.matthewjones372.pelican.health.health
 import io.github.matthewjones372.pelican.jetty.Handlers
 import io.github.matthewjones372.pelican.test.golden.Golden
 import io.github.matthewjones372.pelican.test.jetty.inMemory
-import io.github.matthewjones372.surefold.fail.Either
-import io.github.matthewjones372.surefold.fail.left
-import io.github.matthewjones372.surefold.junit.Suite
-import io.github.matthewjones372.surefold.junit.holds
-import io.github.matthewjones372.surefold.stream.Forks
-import io.github.matthewjones372.surefold.stream.Stream
-import io.github.matthewjones372.surefold.stream.empty
 import petshop.domain.NoSuchPet
 import petshop.domain.Pet
 import petshop.domain.PetId

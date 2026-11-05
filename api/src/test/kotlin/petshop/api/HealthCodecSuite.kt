@@ -1,9 +1,9 @@
 package petshop.api
 
+import dev.surefold.junit.Suite
+import dev.surefold.junit.shouldBe
 import io.github.matthewjones372.pelican.health.CheckResult
 import io.github.matthewjones372.pelican.health.HealthReport
-import io.github.matthewjones372.surefold.junit.Suite
-import io.github.matthewjones372.surefold.junit.shouldBe
 import kotlin.reflect.typeOf
 
 object HealthCodecSuite : Suite() {

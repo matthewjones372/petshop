@@ -1,7 +1,7 @@
 package petshop.app
 
-import io.github.matthewjones372.surefold.app.runApp
-import io.github.matthewjones372.surefold.logInfo
+import dev.surefold.app.runApp
+import dev.surefold.logInfo
 import kotlin.system.exitProcess
 
 fun main() {

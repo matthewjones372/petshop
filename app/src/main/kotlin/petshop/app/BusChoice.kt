@@ -1,11 +1,11 @@
 package petshop.app
 
 import com.typesafe.config.ConfigException
-import io.github.matthewjones372.surefold.app.Module
-import io.github.matthewjones372.surefold.app.choice
-import io.github.matthewjones372.surefold.app.typesafe.Reading
-import io.github.matthewjones372.surefold.app.typesafe.config
-import io.github.matthewjones372.surefold.kafka.Topic
+import dev.surefold.app.Module
+import dev.surefold.app.choice
+import dev.surefold.app.typesafe.Reading
+import dev.surefold.app.typesafe.config
+import dev.surefold.kafka.Topic
 
 /** Set by `petshop.bus.kind` in application.conf, overridden by `BUS`. */
 sealed interface BusSettings {

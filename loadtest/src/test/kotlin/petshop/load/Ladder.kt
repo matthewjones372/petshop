@@ -1,5 +1,12 @@
 package petshop.load
 
+import dev.surefold.app.Module
+import dev.surefold.app.overriding
+import dev.surefold.app.single
+import dev.surefold.app.typesafe.overridingConfig
+import dev.surefold.app.use
+import dev.surefold.assert.shouldBeRight
+import dev.surefold.test.eventually
 import io.github.matthewjones372.pelican.Outcome
 import io.github.matthewjones372.pelican.jetty.PelicanServer
 import io.github.matthewjones372.pelican.kotlinx.KotlinxCodecs
@@ -19,13 +26,6 @@ import io.github.matthewjones372.proofload.report.writeHtmlReport
 import io.github.matthewjones372.proofload.scenario
 import io.github.matthewjones372.proofload.step
 import io.github.matthewjones372.proofload.warmingUp
-import io.github.matthewjones372.surefold.app.Module
-import io.github.matthewjones372.surefold.app.overriding
-import io.github.matthewjones372.surefold.app.single
-import io.github.matthewjones372.surefold.app.typesafe.overridingConfig
-import io.github.matthewjones372.surefold.app.use
-import io.github.matthewjones372.surefold.assert.shouldBeRight
-import io.github.matthewjones372.surefold.test.eventually
 import io.kotest.matchers.longs.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.longs.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe

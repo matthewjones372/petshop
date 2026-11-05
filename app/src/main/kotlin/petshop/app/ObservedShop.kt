@@ -1,16 +1,16 @@
 package petshop.app
 
-import io.github.matthewjones372.surefold.counter
-import io.github.matthewjones372.surefold.fail.Either
-import io.github.matthewjones372.surefold.fail.fold
-import io.github.matthewjones372.surefold.increment
-import io.github.matthewjones372.surefold.logAnnotated
-import io.github.matthewjones372.surefold.logInfo
-import io.github.matthewjones372.surefold.logSpan
-import io.github.matthewjones372.surefold.logWarn
-import io.github.matthewjones372.surefold.metricTagged
-import io.github.matthewjones372.surefold.otel.tracedSpan
-import io.github.matthewjones372.surefold.timed
+import dev.surefold.counter
+import dev.surefold.fail.Either
+import dev.surefold.fail.fold
+import dev.surefold.increment
+import dev.surefold.logAnnotated
+import dev.surefold.logInfo
+import dev.surefold.logSpan
+import dev.surefold.logWarn
+import dev.surefold.metricTagged
+import dev.surefold.otel.tracedSpan
+import dev.surefold.timed
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.Tracer
 import petshop.domain.Adopting

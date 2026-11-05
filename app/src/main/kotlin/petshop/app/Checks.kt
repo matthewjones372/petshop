@@ -1,15 +1,15 @@
 package petshop.app
 
+import dev.surefold.actor.ActorRef
+import dev.surefold.app.Module
+import dev.surefold.app.single
+import dev.surefold.fail.fold
+import dev.surefold.stream.Running
 import io.github.matthewjones372.pelican.health.Check
 import io.github.matthewjones372.pelican.health.Status
 import io.github.matthewjones372.pelican.health.health
 import io.github.matthewjones372.pelican.health.jdbc
 import io.github.matthewjones372.pelican.health.noDeadlockedThreads
-import io.github.matthewjones372.surefold.actor.ActorRef
-import io.github.matthewjones372.surefold.app.Module
-import io.github.matthewjones372.surefold.app.single
-import io.github.matthewjones372.surefold.fail.fold
-import io.github.matthewjones372.surefold.stream.Running
 import javax.sql.DataSource
 import kotlin.time.Duration.Companion.seconds
 

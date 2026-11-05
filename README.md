@@ -58,7 +58,7 @@ The libraries being tried out:
 | Library | What it does here |
 |---|---|
 | [Pelican](https://github.com/surefold/pelican) | the shop's HTTP contract as values, served on Jetty and read with kotlinx.serialization: routes, the OpenAPI document, Swagger UI and a themed RapiDoc reference that sends requests, handlers that must answer a declared failure; live and ready probes (`pelican-health`); the chip registry's client generated from its contract; typed WireMock stubs, golden files and a typed test client |
-| [Surefold](https://github.com/surefold/surefold) | the application as a dependency graph that validates, subsets, starts and stops itself (`surefold-app`), with its settings and secrets read and reported by `surefold-app-typesafe`, the schema migrated by `surefold-app-liquibase` before anything reads it, and the graph checked at build time by the wiring plugin; the shop's actor, on virtual threads in a `flock` (`surefold-actor`, `surefold-app-actor`); the background work, the readiness gauges and the in-process bus as `Stream`s on Surefold's Forks (`surefold-stream`); Kafka as a `Stream` that commits what it handled and restarts after a defect (`surefold-kafka`); a circuit breaker on the chip registry, and retries on schedules; `Either` and `Fail` for declared failures, from the domain up; logs, metrics and traces that cross a fork (`surefold-slf4j`, `surefold-micrometer`, `surefold-otel`) |
+| [Surefold](https://github.com/surefold/surefold) | the application as a dependency graph that validates, subsets, starts and stops itself (`surefold-app`), with its settings and secrets read and reported by `surefold-app-typesafe`, the schema migrated by `surefold-app-liquibase` before anything reads it, and the graph checked at build time by the wiring plugin; the shop's actor, on virtual threads in a `flock` (`surefold-actor`, `surefold-app-actor`); an adoption as a saga, whose reservation is undone when the registry refuses; the background work, the readiness gauges and the in-process bus as `Stream`s on Surefold's Forks (`surefold-stream`); Kafka as a `Stream` that commits what it handled and restarts after a defect (`surefold-kafka`); a circuit breaker on the chip registry, and retries on schedules; `Either` and `Fail` for declared failures, from the domain up; logs, metrics and traces that cross a fork (`surefold-slf4j`, `surefold-micrometer`, `surefold-otel`) |
 | [Proofload](https://github.com/matthewjones372/proofload) | load tests that start the whole service in-process, assert correctness under load, and write an HTML report |
 | [ExoQuery](https://github.com/ExoQuery/ExoQuery) | every statement against the outbox table, written as Kotlin and checked at compile time |
 | [kimney](https://github.com/surefold/kimney) | the mappings between the shop's events and their wire records, and between the domain and the API's DTOs, derived at compile time |
@@ -314,8 +314,12 @@ requests through it, and gets the port back afterwards.
 
 An adoption is recorded with the national chip registry: a `GET` for the pet's
 chip, then a `POST` naming its new keeper. The actor decides who gets the pet
-first, so the people who lose a race never reach the registry, and if the
-registry cannot record the keeper the pet goes back to being available.
+first, so the people who lose a race never reach the registry. That reservation
+is one step of a saga named `adoption`: if the registry refuses, the step's undo
+puts the pet back on the shelf. A transfer whose outcome is not known is not
+undone — the pet stays being adopted, and settling asks the registry later. The
+saga lives in memory, so a process that dies between the two leaves the pet
+being adopted, which is why settling also runs for every such pet at start-up.
 
 The registry's contract is written the same way as the shop's own, as values,
 in `registry`. Pelican's Gradle plugin generates the client from them; the
@@ -556,7 +560,9 @@ adoptions at once, then lets one trial through on an exponential schedule. A
 declared 404 is an answer, not a failure, so it never opens the breaker.
 `surefold.breaker.state` and `surefold.policy.calls` are on `/metrics` without any code
 of the shop's. The same `Schedule` values drive the relay's and the Kafka
-consumer's restarts.
+consumer's restarts. An adoption is a `saga`: reserving the pet is the step, and
+a declared refusal undoes it. `surefold.saga.runs`, tagged `saga=adoption`, counts
+how those end.
 
 **Its limits.** No retry: `lookupChip` is a `GET` and could be retried, but
 `recordKeeper` is a `POST` the registry gives no idempotency key for.
@@ -636,7 +642,7 @@ loads on the project's Kotlin, or for a project with many more queries.
 
 ## Versions
 
-Pelican `1.2.0`, Surefold `0.14.0` (its Gradle wiring plugin too, which follows `surefoldVersion`), Proofload
+Pelican `1.2.0`, Surefold `0.18.1` (its Gradle wiring plugin too, which follows `surefoldVersion`; Kafka, otel, slf4j, micrometer, Typesafe Config and Liquibase are `0.18.0`), Proofload
 `0.1.1-SNAPSHOT`, ExoQuery `2.0.4.PL`, kimney `0.3.0`, Jetty `12.1.13`,
 kotlinx.serialization `1.11.0`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`,
 HikariCP `7.1.0`, OpenTelemetry SDK `1.67.0`, Micrometer's Prometheus registry `1.16.6`, Logback `1.5.34`, Kotest `6.2.4`, JUnit `6.1.3`,

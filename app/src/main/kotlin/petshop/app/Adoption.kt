@@ -1,31 +1,34 @@
 package petshop.app
 
-import io.github.matthewjones372.surefold.Schedule
-import io.github.matthewjones372.surefold.VirtualThreads
-import io.github.matthewjones372.surefold.actor.ActorRef
-import io.github.matthewjones372.surefold.actor.Reply
-import io.github.matthewjones372.surefold.actor.ask
-import io.github.matthewjones372.surefold.fail.Either
-import io.github.matthewjones372.surefold.fail.Fail
-import io.github.matthewjones372.surefold.fail.attempt
-import io.github.matthewjones372.surefold.fail.bind
-import io.github.matthewjones372.surefold.fail.fail
-import io.github.matthewjones372.surefold.fail.fold
-import io.github.matthewjones372.surefold.fail.getOrElse
-import io.github.matthewjones372.surefold.fail.left
-import io.github.matthewjones372.surefold.fail.onLeft
-import io.github.matthewjones372.surefold.logError
-import io.github.matthewjones372.surefold.logInfo
-import io.github.matthewjones372.surefold.retrying
-import io.github.matthewjones372.surefold.stream.Running
-import io.github.matthewjones372.surefold.stream.Stream
-import io.github.matthewjones372.surefold.stream.StreamBackend
-import io.github.matthewjones372.surefold.stream.blocking
-import io.github.matthewjones372.surefold.stream.flatMapMerge
-import io.github.matthewjones372.surefold.stream.fromStage
-import io.github.matthewjones372.surefold.stream.runFold
-import io.github.matthewjones372.surefold.stream.start
+import dev.surefold.Schedule
+import dev.surefold.Settled
+import dev.surefold.VirtualThreads
+import dev.surefold.actor.ActorRef
+import dev.surefold.actor.Reply
+import dev.surefold.actor.ask
+import dev.surefold.fail.Either
+import dev.surefold.fail.Fail
+import dev.surefold.fail.attempt
+import dev.surefold.fail.bind
+import dev.surefold.fail.fail
+import dev.surefold.fail.fold
+import dev.surefold.fail.getOrElse
+import dev.surefold.fail.left
+import dev.surefold.fail.onLeft
+import dev.surefold.logError
+import dev.surefold.logInfo
+import dev.surefold.retrying
+import dev.surefold.saga
+import dev.surefold.stream.Running
+import dev.surefold.stream.Stream
+import dev.surefold.stream.StreamBackend
+import dev.surefold.stream.blocking
+import dev.surefold.stream.flatMapMerge
+import dev.surefold.stream.fromStage
+import dev.surefold.stream.runFold
+import dev.surefold.stream.start
 import petshop.domain.Adopting
+import petshop.domain.Chip
 import petshop.domain.ChipRegistry
 import petshop.domain.NotChipped
 import petshop.domain.NotRegistered
@@ -35,6 +38,7 @@ import petshop.domain.PetShopError
 import petshop.domain.RegistryDown
 import petshop.domain.RegistryError
 import petshop.domain.Unreachable
+import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
@@ -89,43 +93,69 @@ class Adoption(
         val adoption = Unfinished(id, by)
         val (warnings, answer) = warnings {
             attempt {
-                // Throws when the actor stopped or timed out: that is a fault (a 500), not a declared refusal.
-                val adopting = ref.ask(within = 3.seconds) { reply -> Adopt(id, by, reply) }.getOrElse { failure ->
-                    // The actor may still record the pet as being adopted after the ask gave up. The registry was
-                    // never asked, so settling finds the shop still keeps the pet and puts it back on the shelf.
-                    waiting.put(adoption)
-                    error("the shop did not answer: $failure")
-                }.bind()
-                val chip = registry.lookup(id).getOrElse { failure ->
-                    warn("the registry could not look up pet ${id.value}: $failure")
-                    refuse(adoption, failure.refusing(id))
+                // A refusal undoes the reservation. This attempt is its own saga: the registry has no idempotency key.
+                saga("${id.value}:${UUID.randomUUID()}", name = "adoption") {
+                    val adopting = step(
+                        name = "reserve",
+                        action = { reserve(adoption) },
+                        // The actor may still be writing this reservation, so another ask waits behind that write.
+                        check = { Settled.DidNot },
+                        undo = { _, _, _ -> release(adoption) },
+                    )
+                    val chip = findChip(adoption)
+                    when (handOver(adoption, chip)) {
+                        HandOver.Pending -> adopting
+                        HandOver.Recorded -> confirm(adoption, adopting)
+                    }
                 }
-                registry.transfer(chip, to = by).fold(
-                    { failure ->
-                        warn("the registry did not record $by keeping pet ${id.value}: $failure")
-                        when (failure) {
-                            NotRegistered -> refuse(adoption, NotChipped(id.value))
-                            is Unreachable -> readBack(adoption, adopting)
-                        }
-                    },
-                    { confirm(adoption, adopting) },
-                )
             }
         }
         return AdoptionReport(answer, warnings)
     }
 
+    context(_: Fail<PetShopError>)
+    private fun reserve(adoption: Unfinished): Pet {
+        val (id, by) = adoption
+        // Throws when the actor stopped or timed out: that is a fault (a 500), not a declared refusal.
+        return ref.ask(within = 3.seconds) { reply -> Adopt(id, by, reply) }.getOrElse { failure ->
+            // The actor may still record the pet as being adopted after the ask gave up. The registry was
+            // never asked, so settling finds the shop still keeps the pet and puts it back on the shelf.
+            waiting.put(adoption)
+            error("the shop did not answer: $failure")
+        }.bind()
+    }
+
+    context(_: Warnings, _: Fail<PetShopError>)
+    private fun findChip(adoption: Unfinished): Chip = registry.lookup(adoption.id).getOrElse { failure ->
+        warn("the registry could not look up pet ${adoption.id.value}: $failure")
+        fail(failure.refusing(adoption.id))
+    }
+
+    context(_: Warnings, _: Fail<PetShopError>)
+    private fun handOver(adoption: Unfinished, chip: Chip): HandOver {
+        val (id, by) = adoption
+        return registry.transfer(chip, to = by).fold(
+            { failure ->
+                warn("the registry did not record $by keeping pet ${id.value}: $failure")
+                when (failure) {
+                    NotRegistered -> fail(NotChipped(id.value))
+                    is Unreachable -> readBack(adoption)
+                }
+            },
+            { HandOver.Recorded },
+        )
+    }
+
     /** The transfer may have landed before its answer was lost, so the registry is asked who keeps the pet. */
     context(_: Warnings, _: Fail<PetShopError>)
-    private fun readBack(adoption: Unfinished, adopting: Pet): Pet {
+    private fun readBack(adoption: Unfinished): HandOver {
         val (id, by) = adoption
         return registry.lookup(id).fold(
             { failure ->
-                adopting.also { settleLater(adoption, "the keeper of pet ${id.value} was not read back: $failure") }
+                settleLater(adoption, "the keeper of pet ${id.value} was not read back: $failure")
+                HandOver.Pending
             },
-            { chip ->
-                if (chip.keeper == by) confirm(adoption, adopting) else refuse(adoption, RegistryDown(id.value))
-            },
+            { chip -> if (chip.keeper == by) HandOver.Recorded else fail(RegistryDown(id.value)) },
         )
     }
 
@@ -137,12 +167,18 @@ class Adoption(
         }
     }
 
-    context(_: Warnings, _: Fail<PetShopError>)
-    private fun refuse(adoption: Unfinished, why: PetShopError): Nothing {
+    // An undo that throws becomes NotUndone and hides the registry's refusal, so a failed write is settled later.
+    context(_: Warnings)
+    private fun release(adoption: Unfinished) {
         val (id, by) = adoption
         ref.settled { reply -> Return(id, by, reply) }
             .onLeft { failure -> settleLater(adoption, "the return of pet ${id.value} was not recorded: $failure") }
-        fail(why)
+    }
+
+    private sealed interface HandOver {
+        data object Recorded : HandOver
+
+        data object Pending : HandOver
     }
 
     context(_: Warnings)
