@@ -643,7 +643,7 @@ loads on the project's Kotlin, or for a project with many more queries.
 ## Versions
 
 Pelican `1.2.0`, Surefold `0.18.1` (its Gradle wiring plugin too, which follows `surefoldVersion`; Kafka, otel, slf4j, micrometer, Typesafe Config and Liquibase are `0.18.0`), Proofload
-`0.1.1-SNAPSHOT`, ExoQuery `2.0.4.PL`, kimney `0.3.0`, Jetty `12.1.13`,
+`0.1.0-rc5`, ExoQuery `2.0.4.PL`, kimney `0.3.0`, Jetty `12.1.13`,
 kotlinx.serialization `1.11.0`, Testcontainers `2.0.5`, PostgreSQL driver `42.7.13`,
 HikariCP `7.1.0`, OpenTelemetry SDK `1.67.0`, Micrometer's Prometheus registry `1.16.6`, Logback `1.5.34`, Kotest `6.2.4`, JUnit `6.1.3`,
 avro4k `2.12.0`, Confluent's Avro serializer `8.3.0`, Kafka client `4.3.0`, the

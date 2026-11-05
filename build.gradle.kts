@@ -26,11 +26,6 @@ subprojects {
             mavenLocal()
             // Gradle keeps a snapshot for 24h by default, so CI's cache once compiled against a stale one.
             configurations.configureEach { resolutionStrategy.cacheChangingModulesFor(0, "seconds") }
-        } else {
-            // Proofload's snapshot, for the load test: a day of demo traffic needs spec 0143, which no release has yet.
-            maven("https://central.sonatype.com/repository/maven-snapshots/") {
-                content { includeModuleByRegex("io\\.github\\.matthewjones372", "proofload-.*") }
-            }
         }
     }
 
